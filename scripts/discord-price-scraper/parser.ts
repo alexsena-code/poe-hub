@@ -69,11 +69,12 @@ function detectItem(content: string): string {
   return "divine";
 }
 
-function detectLeague(content: string): string | null {
-  const match = content.match(/liga[:\s]*(\w+)/i)
-    || content.match(/league[:\s]*(\w+)/i)
-    || content.match(/\b(mirage|settlers|necropolis|affliction|ancestor|crucible|sanctum|kalandra|sentinel|archnemesis|scourge|expedition|ultimatum|ritual|heist|harvest|delirium|metamorph|blight|legion|synthesis|betrayal|delve|incursion|bestiary|abyss)\b/i);
-  return match ? match[1] : null;
+/**
+ * Detect if message is from CNL by content pattern (fallback when author ID not in cnlAuthorIds).
+ * CNL posts follow a distinctive template with "CNLGAMING.COM" and "BRL" pricing.
+ */
+function isCnlByContent(content: string): boolean {
+  return /cnlgaming\.com/i.test(content) && /BRL/i.test(content);
 }
 
 function isSoldMessage(content: string): boolean {
@@ -174,8 +175,12 @@ export function parseExport(
       continue;
     }
 
-    const league = leagueOverride || detectLeague(msg.content);
+    // League resolved by date in the scraper, not from message text
+    const league = leagueOverride || null;
     const stock = extractStock(msg.content);
+
+    // CNL: by author ID or by content pattern (fallback for unknown periods)
+    const isCnl = cnlAuthorIds.has(msg.author.id) || isCnlByContent(msg.content);
 
     entries.push({
       discordMessageId: msg.id,
@@ -183,7 +188,7 @@ export function parseExport(
       discordServerId: data.guild.id,
       authorDiscordId: msg.author.id,
       authorName: msg.author.nickname || msg.author.name,
-      isCnl: cnlAuthorIds.has(msg.author.id),
+      isCnl,
       price: extracted.price,
       currency: "brl",
       item,
