@@ -1,0 +1,316 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum BotStatus {
+  active
+  inactive
+  banned
+  maintenance
+}
+
+enum Currency {
+  divine
+  chaos
+  usd
+  brl
+  other
+}
+
+enum SaleUnit {
+  divine
+  chaos
+  exalted
+  other
+}
+
+enum SimulationStatus {
+  draft
+  active
+  archived
+}
+
+enum TaskStatus {
+  backlog
+  todo
+  in_progress
+  done
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum TaskModule {
+  bots
+  prices
+  sales
+  simulations
+  infra
+  other
+}
+
+enum PoeVersion {
+  poe1
+  poe2
+}
+
+enum UserRole {
+  admin
+  operator
+}
+
+// ============================================================
+// Models
+// ============================================================
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(operator)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  assignedTasks Task[] @relation("AssignedTasks")
+  createdTasks  Task[] @relation("CreatedTasks")
+
+  @@map("users")
+}
+
+model Bot {
+  id            String    @id @default(uuid())
+  nick          String
+  email         String
+  password      String    // encrypted
+  proxyIp       String    @map("proxy_ip")
+  proxyEol      DateTime? @map("proxy_eol")
+  status        BotStatus @default(active)
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("bots")
+}
+
+model ProxyConfig {
+  id            String   @id @default(uuid())
+  port          Int      @default(8080)
+  username      String   // encrypted
+  password      String   // encrypted
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("proxy_config")
+}
+
+model PriceEntry {
+  id               String   @id @default(uuid())
+  discordMessageId String   @unique @map("discord_message_id")
+  discordChannelId String   @map("discord_channel_id")
+  discordServerId  String   @map("discord_server_id")
+  authorDiscordId  String   @map("author_discord_id")
+  authorName       String   @map("author_name")
+  isCnl            Boolean  @default(false) @map("is_cnl")
+  price            Decimal  @db.Decimal(18, 8)
+  currency         Currency
+  item             String?
+  rawMessage       String   @map("raw_message")
+  messageTimestamp  DateTime @map("message_timestamp")
+  league           String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([discordChannelId])
+  @@index([messageTimestamp])
+  @@index([currency])
+  @@index([isCnl])
+  @@index([league])
+  @@map("price_entries")
+}
+
+model DiscordSource {
+  id           String   @id @default(uuid())
+  serverId     String   @map("server_id")
+  serverName   String   @map("server_name")
+  channelId    String   @map("channel_id")
+  channelName  String   @map("channel_name")
+  isActive     Boolean  @default(true) @map("is_active")
+  cnlAuthorIds String[] @map("cnl_author_ids")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([serverId, channelId])
+  @@map("discord_sources")
+}
+
+model Sale {
+  id              String   @id @default(uuid())
+  date            DateTime @db.Date
+  buyerId         String   @map("buyer_id")
+  quantity        Decimal  @db.Decimal(18, 8)
+  unit            SaleUnit
+  divinePriceUsd  Decimal? @map("divine_price_usd") @db.Decimal(18, 8)
+  divinePriceBrl  Decimal? @map("divine_price_brl") @db.Decimal(18, 8)
+  totalUsd        Decimal? @map("total_usd") @db.Decimal(18, 2)
+  totalBrl        Decimal? @map("total_brl") @db.Decimal(18, 2)
+  league          String
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  buyer Buyer @relation(fields: [buyerId], references: [id])
+
+  @@index([buyerId])
+  @@index([date])
+  @@index([league])
+  @@map("sales")
+}
+
+model Buyer {
+  id      String  @id @default(uuid())
+  name    String
+  isCnl   Boolean @default(false) @map("is_cnl")
+  contact String?
+  notes   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sales Sale[]
+
+  @@map("buyers")
+}
+
+model Simulation {
+  id             String           @id @default(uuid())
+  name           String
+  league         String
+  status         SimulationStatus @default(draft)
+  durationWeeks  Int              @map("duration_weeks")
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  weeks     SimulationWeek[]
+  costLinks SimulationCostLink[]
+
+  @@index([status])
+  @@index([league])
+  @@map("simulations")
+}
+
+model SimulationWeek {
+  id                     String  @id @default(uuid())
+  simulationId           String  @map("simulation_id")
+  weekNumber             Int     @map("week_number")
+  label                  String?
+  defaultActiveBots      Int     @map("default_active_bots")
+  defaultDivinePerHour   Decimal @map("default_divine_per_hour") @db.Decimal(18, 8)
+  defaultHoursPerDay     Decimal @map("default_hours_per_day") @db.Decimal(5, 2) @default(24)
+  defaultDivinePriceUsd  Decimal? @map("default_divine_price_usd") @db.Decimal(18, 8)
+  defaultDivinePriceBrl  Decimal? @map("default_divine_price_brl") @db.Decimal(18, 8)
+
+  simulation Simulation      @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+  days       SimulationDay[]
+
+  @@unique([simulationId, weekNumber])
+  @@map("simulation_weeks")
+}
+
+model SimulationDay {
+  id               String   @id @default(uuid())
+  simulationWeekId String   @map("simulation_week_id")
+  dayNumber        Int      @map("day_number")
+  date             DateTime? @db.Date
+  activeBots       Int?     @map("active_bots")
+  divinePerHour    Decimal? @map("divine_per_hour") @db.Decimal(18, 8)
+  hoursPerDay      Decimal? @map("hours_per_day") @db.Decimal(5, 2)
+  divinePriceUsd   Decimal? @map("divine_price_usd") @db.Decimal(18, 8)
+  divinePriceBrl   Decimal? @map("divine_price_brl") @db.Decimal(18, 8)
+  overrideNotes    String?  @map("override_notes")
+
+  week SimulationWeek @relation(fields: [simulationWeekId], references: [id], onDelete: Cascade)
+
+  @@unique([simulationWeekId, dayNumber])
+  @@map("simulation_days")
+}
+
+model GlobalCostConfig {
+  id                        String  @id @default(uuid())
+  name                      String
+  isDefault                 Boolean @default(false) @map("is_default")
+  proxyCostPerBotMonthly    Decimal @map("proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
+  vpsCostMonthly            Decimal @map("vps_cost_monthly") @db.Decimal(10, 2)
+  dpbLicenseCostMonthly     Decimal @map("dpb_license_cost_monthly") @db.Decimal(10, 2)
+  otherFixedCostsMonthly    Decimal @map("other_fixed_costs_monthly") @db.Decimal(10, 2)
+  otherVariableCostPerBot   Decimal @map("other_variable_cost_per_bot") @db.Decimal(10, 2)
+  notes                     String?
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  simulationLinks SimulationCostLink[]
+
+  @@map("global_cost_configs")
+}
+
+model SimulationCostLink {
+  simulationId String @map("simulation_id")
+  costConfigId String @map("cost_config_id")
+
+  simulation Simulation       @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+  costConfig GlobalCostConfig @relation(fields: [costConfigId], references: [id], onDelete: Cascade)
+
+  @@id([simulationId, costConfigId])
+  @@map("simulation_cost_links")
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(backlog)
+  priority    TaskPriority @default(medium)
+  assignedTo  String?      @map("assigned_to")
+  createdBy   String       @map("created_by")
+  dueDate     DateTime?    @db.Date @map("due_date")
+  league      String?
+  module      TaskModule?
+  position    Int          @default(0)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  assignee User? @relation("AssignedTasks", fields: [assignedTo], references: [id])
+  creator  User  @relation("CreatedTasks", fields: [createdBy], references: [id])
+
+  @@index([status])
+  @@index([assignedTo])
+  @@index([priority])
+  @@index([module])
+  @@map("tasks")
+}
+
+model League {
+  id         String     @id @default(uuid())
+  name       String     @unique
+  poeVersion PoeVersion @map("poe_version")
+  startDate  DateTime?  @db.Date @map("start_date")
+  endDate    DateTime?  @db.Date @map("end_date")
+  isCurrent  Boolean    @default(false) @map("is_current")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  @@map("leagues")
+}
