@@ -1,57 +1,36 @@
 /**
- * Discord Price Scraper — Parser Module
+ * Discord Price Message Parser
+ * Calibrated with real data from "Cnlgaming & Phoenix Store" server (2026-03-31)
  *
- * Parses DiscordChatExporter JSON format and extracts price entries.
+ * Recognized patterns:
+ * - "R$ 0,25 cada" / "R$0,23" / "R$: 0,23 cada" / "R$; 0,23 cada"
+ * - "0.205 BRL" (CNL format)
+ * - "Valor: R$ 0,22" / "Valor: 0,18"
+ * - "Price:0.20 cada"
+ * - Bulk: "300 divines R$60" / "200 div 40 reais"
+ * - Mirror: "Mirror of Kalandra Valor: R$ 200"
  */
+
+export interface DiscordExport {
+  guild: { id: string; name: string };
+  channel: { id: string; name: string };
+  messages: DiscordMessage[];
+}
 
 export interface DiscordMessage {
   id: string;
   type: string;
   timestamp: string;
-  timestampEdited: string | null;
-  callEndedTimestamp: string | null;
-  isPinned: boolean;
   content: string;
   author: {
     id: string;
     name: string;
-    discriminator: string;
-    nickname: string | null;
-    color: string | null;
+    nickname: string;
     isBot: boolean;
-    roles: unknown[];
-    avatarUrl: string;
   };
-  attachments: unknown[];
-  embeds: unknown[];
-  stickers: unknown[];
-  reactions: unknown[];
-  mentions: unknown[];
 }
 
-export interface DiscordExport {
-  guild: {
-    id: string;
-    name: string;
-    iconUrl: string;
-  };
-  channel: {
-    id: string;
-    type: string;
-    categoryId: string;
-    category: string;
-    name: string;
-    topic: string | null;
-  };
-  dateRange: {
-    after: string | null;
-    before: string | null;
-  };
-  messages: DiscordMessage[];
-  messageCount: number;
-}
-
-export interface ParsedPriceEntry {
+export interface ParsedPrice {
   discordMessageId: string;
   discordChannelId: string;
   discordServerId: string;
@@ -60,148 +39,161 @@ export interface ParsedPriceEntry {
   isCnl: boolean;
   price: number;
   currency: "divine" | "chaos" | "usd" | "brl" | "other";
-  item: string | null;
+  item: string;
   rawMessage: string;
-  messageTimestamp: Date;
+  messageTimestamp: string;
   league: string | null;
+  operation: "sell" | "buy";
+  quantity: number | null;
+  isSold: boolean;
 }
 
 export interface ParseResult {
-  entries: ParsedPriceEntry[];
+  entries: ParsedPrice[];
   skipped: number;
   errors: string[];
 }
 
-/**
- * Price extraction patterns. Each pattern has a regex and a currency mapping.
- * Patterns are tried in order; first match wins.
- */
-const PRICE_PATTERNS: Array<{
-  regex: RegExp;
-  currency: ParsedPriceEntry["currency"];
-  priceGroup: number;
-  itemGroup?: number;
-}> = [
-  // "divine 4.50", "div 4.50", "divine: 4.50", "div: 4.50"
-  { regex: /\bdivine[s]?\s*:?\s*(\d+[.,]?\d*)/i, currency: "divine", priceGroup: 1 },
-  // "4.50 divine", "4.50 div", "4,50 divines"
-  { regex: /(\d+[.,]?\d*)\s*divine[s]?/i, currency: "divine", priceGroup: 1 },
-  // "4.5 div", "4,5 div"
-  { regex: /(\d+[.,]?\d*)\s*div\b/i, currency: "divine", priceGroup: 1 },
-  // "div 4.50", "div: 4.50"
-  { regex: /\bdiv\s*:?\s*(\d+[.,]?\d*)/i, currency: "divine", priceGroup: 1 },
-  // "chaos 450", "chaos: 450"
-  { regex: /\bchaos\s*:?\s*(\d+[.,]?\d*)/i, currency: "chaos", priceGroup: 1 },
-  // "450 chaos"
-  { regex: /(\d+[.,]?\d*)\s*chaos/i, currency: "chaos", priceGroup: 1 },
-  // "$4.50", "$ 4.50", "USD 4.50", "usd: 4.50"
-  { regex: /\$\s*(\d+[.,]?\d*)/i, currency: "usd", priceGroup: 1 },
-  { regex: /\busd\s*:?\s*(\d+[.,]?\d*)/i, currency: "usd", priceGroup: 1 },
-  { regex: /(\d+[.,]?\d*)\s*usd/i, currency: "usd", priceGroup: 1 },
-  // "R$25", "R$ 25", "BRL 25", "brl: 25"
-  { regex: /R\$\s*(\d+[.,]?\d*)/i, currency: "brl", priceGroup: 1 },
-  { regex: /\bbrl\s*:?\s*(\d+[.,]?\d*)/i, currency: "brl", priceGroup: 1 },
-  { regex: /(\d+[.,]?\d*)\s*brl/i, currency: "brl", priceGroup: 1 },
-  // Standalone number with context hint (fallback — only if message is short, likely a price post)
-  // e.g., "4.50" alone in a short message from a price channel
-  { regex: /^(\d+[.,]\d+)$/, currency: "divine", priceGroup: 1 },
-];
-
-/**
- * Normalize a price string to a number.
- * Handles both "4.50" and "4,50" formats.
- */
-function normalizePrice(raw: string): number {
-  // Replace comma with dot for decimal parsing
-  const normalized = raw.replace(",", ".");
-  const value = parseFloat(normalized);
-  if (isNaN(value) || value <= 0) {
-    throw new Error(`Invalid price value: ${raw}`);
-  }
-  return value;
+function detectOperation(content: string): "sell" | "buy" {
+  if (/\bcompr[oe]\b/i.test(content)) return "buy";
+  return "sell";
 }
 
-/**
- * Extract price information from a message content string.
- * Returns null if no price pattern is found.
- */
-export function extractPrice(
-  content: string
-): { price: number; currency: ParsedPriceEntry["currency"]; item: string | null } | null {
-  const trimmed = content.trim();
-  if (!trimmed) return null;
+function detectItem(content: string): string {
+  // If message primarily sells/buys mirror (and not divine prices), classify as mirror
+  // Check if "mirror" appears in a pricing context without divine pricing
+  const hasDivinePrice = /divine\s*(?:orb)?[:\s]*R\$|R\$.*divine|divine.*(?:valor|price|preço)|compra\s*divines?\s*\d/i.test(content);
+  const hasMirrorOnly = /mirror\s*(of\s*kalandra)?/i.test(content) && !hasDivinePrice;
+  if (hasMirrorOnly) return "mirror";
+  if (/chaos\s*orb/i.test(content) && !hasDivinePrice) return "chaos";
+  return "divine";
+}
 
-  for (const pattern of PRICE_PATTERNS) {
-    const match = trimmed.match(pattern.regex);
-    if (match && match[pattern.priceGroup]) {
-      try {
-        const price = normalizePrice(match[pattern.priceGroup]);
-        const item = pattern.itemGroup ? match[pattern.itemGroup] || null : null;
-        return { price, currency: pattern.currency, item };
-      } catch {
-        // Price normalization failed, try next pattern
-        continue;
-      }
-    }
+function detectLeague(content: string): string | null {
+  const match = content.match(/liga[:\s]*(\w+)/i)
+    || content.match(/league[:\s]*(\w+)/i)
+    || content.match(/\b(mirage|settlers|necropolis|affliction|ancestor|crucible|sanctum|kalandra|sentinel|archnemesis|scourge|expedition|ultimatum|ritual|heist|harvest|delirium|metamorph|blight|legion|synthesis|betrayal|delve|incursion|bestiary|abyss)\b/i);
+  return match ? match[1] : null;
+}
+
+function isSoldMessage(content: string): boolean {
+  if (/\bvendido\b/i.test(content)) return true;
+  const stripped = content.replace(/~~[^~]+~~/g, "");
+  const totalLen = content.replace(/~~/g, "").length;
+  if (totalLen > 0 && stripped.trim().length / totalLen < 0.3) return true;
+  return false;
+}
+
+function parseBrlNumber(str: string): number {
+  return parseFloat(str.replace(",", "."));
+}
+
+function extractUnitPrice(content: string, item: string): { price: number; quantity: number | null } | null {
+  const cleaned = content.replace(/~~[^~]+~~/g, "").replace(/\*+/g, "");
+
+  // "0.205 BRL" (CNL format) — test BEFORE R$ to avoid false matches
+  const brlMatch = cleaned.match(/(\d+[.,]\d+)\s*BRL/i);
+  if (brlMatch) return { price: parseBrlNumber(brlMatch[1]), quantity: null };
+
+  // "Valor: R$ 0,22" / "Valor:** R$ 0,22" / "Valor: 0,18"
+  const valorMatch = cleaned.match(/Valor[:\s*]*\s*(?:R\$[:\s;]*)?\s*(\d+[.,]\d+)/i);
+  if (valorMatch) return { price: parseBrlNumber(valorMatch[1]), quantity: null };
+
+  // "Price:0.20" / "Preço: R$0,22"
+  const priceMatch = cleaned.match(/(?:Price|Preço)[:\s]*(?:R\$[:\s;]*)?\s*(\d+[.,]\d+)/i);
+  if (priceMatch) return { price: parseBrlNumber(priceMatch[1]), quantity: null };
+
+  // Bulk: "300 divines R$60,00" / "300 div = 60 reais" / "860 Divs R$ 137,60" — BEFORE unit R$ match
+  const bulkMatch = cleaned.match(/(\d+)\s*(?:divines?|divs?)\s*(?:=\s*)?(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:reais|R\$)?/i)
+    || cleaned.match(/(\d+)\s*(?:divines?|divs?)\s*R\$\s*(\d+[.,]?\d*)/i);
+  if (bulkMatch) {
+    const qty = parseInt(bulkMatch[1]);
+    const total = parseBrlNumber(bulkMatch[2]);
+    if (qty > 1 && total > 1) return { price: Math.round((total / qty) * 100) / 100, quantity: qty };
+  }
+
+  // "R$ 0,25 cada" / "R$0,23" / "R$: 0,23" / "R$; 0,23"
+  const unitMatch = cleaned.match(/R\$[:\s;]*\s*(\d+[.,]\d+)\s*(cada|\/\s*(?:unid|cada))?/i);
+  if (unitMatch) return { price: parseBrlNumber(unitMatch[1]), quantity: null };
+
+  // Mirror price: "R$ 200,00" / "R$ 150"
+  if (item === "mirror") {
+    const mirrorMatch = cleaned.match(/(?:Valor[:\s]*)?R\$[:\s;]*\s*(\d+[.,]?\d*)/i);
+    if (mirrorMatch) return { price: parseBrlNumber(mirrorMatch[1]), quantity: null };
   }
 
   return null;
 }
 
-/**
- * Parse a DiscordChatExporter JSON export and extract price entries.
- */
+function extractStock(content: string): number | null {
+  const match = content.match(/(?:Estoque|Stock|Disponíve(?:l|is))[:\s]*(\d+)\+?/i);
+  return match ? parseInt(match[1]) : null;
+}
+
+function shouldSkip(rawContent: string, isBot: boolean): boolean {
+  if (isBot) return true;
+  const content = rawContent.replace(/\*+/g, "");
+  if (content.length < 10) return true;
+  if (/\bvendo\s+build\b/i.test(content)) return true;
+  if (/\bfa[çc]o\b.*\b(level|leveling|atos)\b/i.test(content)) return true;
+  if (/\bwts\s+softcore\b/i.test(content) && !/divine|mirror/i.test(content)) return true;
+  if (/\bmain\s+skills?\b/i.test(content) && !/divine|mirror/i.test(content)) return true;
+  // Only skip Smoother KE if that's the ONLY product (not if it also has divine/mirror prices)
+  if (/\bsmoother\s+ke\b/i.test(content) && !/divine|div\b|mirror/i.test(content)) return true;
+  if (!/divine|div\b|mirror|chaos|currency|r\$|\breais\b|brl/i.test(content)) return true;
+  return false;
+}
+
 export function parseExport(
   data: DiscordExport,
-  cnlAuthorIds: string[],
-  league: string | null = null
+  cnlAuthorIds: Set<string>,
+  leagueOverride?: string
 ): ParseResult {
-  const entries: ParsedPriceEntry[] = [];
-  let skipped = 0;
+  const entries: ParsedPrice[] = [];
   const errors: string[] = [];
+  let skipped = 0;
 
-  const cnlSet = new Set(cnlAuthorIds);
-
-  for (const message of data.messages) {
-    // Skip bot messages and system messages
-    if (message.author.isBot) {
-      skipped++;
-      continue;
-    }
-    if (message.type !== "Default" && message.type !== "Reply") {
-      skipped++;
-      continue;
-    }
-    if (!message.content || !message.content.trim()) {
+  for (const msg of data.messages) {
+    if (shouldSkip(msg.content, msg.author.isBot)) {
       skipped++;
       continue;
     }
 
-    try {
-      const priceData = extractPrice(message.content);
-      if (!priceData) {
-        skipped++;
-        continue;
-      }
+    const isSold = isSoldMessage(msg.content);
+    let item = detectItem(msg.content);
+    const operation = detectOperation(msg.content);
 
-      entries.push({
-        discordMessageId: message.id,
-        discordChannelId: data.channel.id,
-        discordServerId: data.guild.id,
-        authorDiscordId: message.author.id,
-        authorName: message.author.nickname || message.author.name,
-        isCnl: cnlSet.has(message.author.id),
-        price: priceData.price,
-        currency: priceData.currency,
-        item: priceData.item,
-        rawMessage: message.content,
-        messageTimestamp: new Date(message.timestamp),
-        league,
-      });
-    } catch (err) {
-      const errorMsg = `Error parsing message ${message.id}: ${err instanceof Error ? err.message : String(err)}`;
-      errors.push(errorMsg);
+    const extracted = extractUnitPrice(msg.content, item);
+
+    // Sanity check: if price < R$1, it's divine (mirrors cost R$100+)
+    if (extracted && item === "mirror" && extracted.price < 1) {
+      item = "divine";
     }
+    if (!extracted) {
+      skipped++;
+      continue;
+    }
+
+    const league = leagueOverride || detectLeague(msg.content);
+    const stock = extractStock(msg.content);
+
+    entries.push({
+      discordMessageId: msg.id,
+      discordChannelId: data.channel.id,
+      discordServerId: data.guild.id,
+      authorDiscordId: msg.author.id,
+      authorName: msg.author.nickname || msg.author.name,
+      isCnl: cnlAuthorIds.has(msg.author.id),
+      price: extracted.price,
+      currency: "brl",
+      item,
+      rawMessage: msg.content,
+      messageTimestamp: msg.timestamp,
+      league,
+      operation,
+      quantity: stock ?? extracted.quantity,
+      isSold,
+    });
   }
 
   return { entries, skipped, errors };
