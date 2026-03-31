@@ -24,6 +24,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2 } from "lucide-react";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface Buyer {
   id: string;
@@ -187,26 +188,24 @@ function SalesTableInner() {
       <div className="flex flex-wrap gap-4 items-end">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">De</Label>
-          <Input
-            type="date"
+          <DatePicker
             value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
+            onChange={(val) => {
+              setDateFrom(val);
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            className="w-40"
+            placeholder="Data inicial"
           />
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Até</Label>
-          <Input
-            type="date"
+          <DatePicker
             value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
+            onChange={(val) => {
+              setDateTo(val);
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            className="w-40"
+            placeholder="Data final"
           />
         </div>
         <div className="space-y-1">

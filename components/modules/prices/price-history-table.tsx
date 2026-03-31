@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -152,27 +153,19 @@ function PriceHistoryTableInner() {
 
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">De</Label>
-          <Input
-            type="date"
+          <DatePicker
             value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              resetPage();
-            }}
-            className="w-40"
+            onChange={(val) => { setDateFrom(val); resetPage(); }}
+            placeholder="Data inicial"
           />
         </div>
 
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Ate</Label>
-          <Input
-            type="date"
+          <DatePicker
             value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              resetPage();
-            }}
-            className="w-40"
+            onChange={(val) => { setDateTo(val); resetPage(); }}
+            placeholder="Data final"
           />
         </div>
 
