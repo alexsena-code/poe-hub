@@ -197,10 +197,10 @@ async function aggregateDailyPrices(prisma: PrismaClient, entries: ParsedPrice[]
     const [dateStr, item, league] = key.split("|");
     const date = new Date(dateStr);
     const sellEntries = group.filter((e) => e.operation === "sell" && !e.isSold);
-    const prices = sellEntries.map((e) => e.price);
+    const prices = sellEntries.map((e) => e.price).filter((p) => !isNaN(p) && isFinite(p) && p > 0);
     if (prices.length === 0) continue;
 
-    const cnlPrices = group.filter((e) => e.isCnl).map((e) => e.price);
+    const cnlPrices = group.filter((e) => e.isCnl).map((e) => e.price).filter((p) => !isNaN(p) && isFinite(p) && p > 0);
 
     await prisma.dailyPrice.upsert({
       where: { date_item_league_currency: { date, item, league, currency: "brl" } },
