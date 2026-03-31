@@ -220,15 +220,88 @@ poe-hub/
 
 ---
 
-## Fase 4 — Registro de Vendas
+## Fase 4 — Registro de Vendas ✅
 
-**Status:** Não iniciada
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Zod schemas (sale + buyer) | ✅ | `lib/validations/sale.ts` |
+| POST/GET/PUT/DELETE /api/sales | ✅ | Filtros: dateFrom/dateTo, buyerId, league, search. Auto-calc totals. |
+| POST/GET/PUT/DELETE /api/buyers | ✅ | Delete retorna 409 se buyer tem sales |
+| Sales table + filters | ✅ | Paginação, filtro por período/comprador/liga, resumo totais |
+| Sale form (create/edit) | ✅ | Auto-cálculo totais em tempo real, buyer select com badge CNL |
+| Buyer inline dialog | ✅ | Criar comprador direto do form de venda |
+| Páginas: /sales, /sales/new, /sales/[id] | ✅ | Listagem, criação, edição |
+| Integration tests (31) | ✅ | Sales (20) + Buyers (11) |
+
+### Decisões Técnicas
+
+#### Auto-cálculo de totais
+- Total USD = quantity × divinePriceUsd (se não informado manualmente)
+- Total BRL = quantity × divinePriceBrl (se não informado manualmente)
+- Frontend calcula em tempo real; backend recalcula se não enviado
+
+#### Buyer com sales não pode ser deletado
+- Retorna 409 Conflict para proteger integridade referencial
 
 ---
 
-## Fase 5 — Histórico de Preços
+## Fase 5 — Histórico de Preços ✅
 
-**Status:** Não iniciada
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Zod schemas (price + discord source) | ✅ | `lib/validations/price.ts` |
+| POST /api/prices (bulk insert) | ✅ | skipDuplicates em discordMessageId |
+| GET /api/prices | ✅ | Filtros: currency, isCnl, league, dateFrom/dateTo, channelId |
+| GET /api/prices/stats | ✅ | CNL atual, médias 7d/30d, spread CNL vs mercado |
+| DELETE /api/prices/[id] | ✅ | |
+| CRUD /api/discord-sources | ✅ | Unique [serverId, channelId], 409 em duplicata |
+| Price stats cards | ✅ | 5 cards: CNL atual, médias 7d/30d, spread |
+| Price history table | ✅ | Paginação, filtros, toggle CNL-only, datetime pt-BR |
+| Discord source manager | ✅ | CRUD com dialog, toggle active, CNL author IDs |
+| Páginas: /prices, /prices/sources | ✅ | Dashboard + config sources |
+| Discord scraper CLI | ✅ | Parser com 14 regex patterns, batch insert, idempotente |
+| Scraper README | ✅ | Documentação de uso + cron |
+| Integration tests (22) | ✅ | Prices + Discord Sources |
+
+### Decisões Técnicas
+
+#### Bulk insert com skipDuplicates
+- Scraper e API usam `createMany({ skipDuplicates: true })` no discordMessageId
+- Garante idempotência — safe to re-run
+
+#### Stats via Prisma aggregate
+- Médias calculadas com `_avg` do Prisma, filtradas por período (7d, 30d)
+- Spread = ((avgMarket - avgCnl) / avgCnl) × 100
+
+#### Scraper CLI standalone
+- Roda via `npx tsx scripts/discord-price-scraper/index.ts`
+- Args: `--exports-dir`, `--league`
+- Processa JSONs do DiscordChatExporter, batch de 500
+
+### Totais de Testes (acumulado Fases 1-5)
+
+| Arquivo | Testes | Tipo |
+|---------|--------|------|
+| lib/crypto.test.ts | 8 | Unit |
+| lib/auth.test.ts | 6 | Unit |
+| app/api/bots/bots.test.ts | 17 | Integration |
+| components/modules/bots/bot-status-badge.test.tsx | 6 | Component |
+| components/modules/bots/secret-field.test.tsx | 5 | Component |
+| app/api/tasks/tasks.test.ts | 19 | Integration |
+| components/modules/tasks/task-priority-badge.test.tsx | 9 | Component |
+| components/modules/tasks/task-card.test.tsx | 8 | Component |
+| app/api/sales/sales.test.ts | 20 | Integration |
+| app/api/buyers/buyers.test.ts | 11 | Integration |
+| app/api/prices/prices.test.ts | 22 | Integration |
+| **Total** | **130** | |
 
 ---
 

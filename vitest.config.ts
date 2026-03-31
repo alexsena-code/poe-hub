@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    fileParallelism: false,
     setupFiles: ["./tests/vitest.setup.ts"],
     env: {
       DATABASE_URL: "postgresql://poth:poth@localhost:5432/potc_test",
