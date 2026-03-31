@@ -92,8 +92,9 @@ Example response:
 
 RESPOND ONLY WITH THE JSON ARRAY. No markdown, no explanation.`;
 
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 30;
 const MAX_RETRIES = 3;
+const CONCURRENCY = 10;
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -171,25 +172,37 @@ export async function parseExport(
   skipped += data.messages.length - candidates.length;
 
   console.log(`    Pre-filtered: ${candidates.length} candidates from ${data.messages.length} messages`);
+  console.log(`    Processing with ${CONCURRENCY} concurrent batches of ${BATCH_SIZE}...`);
 
-  // Process in batches
+  // Build all batches upfront
+  const allBatches: { startIdx: number; batch: typeof candidates }[] = [];
   for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-    const batch = candidates.slice(i, i + BATCH_SIZE);
+    allBatches.push({ startIdx: i, batch: candidates.slice(i, i + BATCH_SIZE) });
+  }
+
+  // Process batches with concurrency limit
+  let batchesDone = 0;
+
+  async function processSingleBatch(batchInfo: typeof allBatches[0]) {
+    const { startIdx, batch } = batchInfo;
     const batchInput = batch.map((m, idx) => ({ index: idx, content: m.content }));
 
     try {
       const results = await parseBatch(batchInput);
 
+      const batchEntries: ParsedPrice[] = [];
+      let batchSkipped = 0;
+
       for (const result of results) {
         if (result.skip || !result.price || !result.item) {
-          skipped++;
+          batchSkipped++;
           continue;
         }
 
         const msg = batch[result.index];
         if (!msg) continue;
 
-        entries.push({
+        batchEntries.push({
           discordMessageId: msg.id,
           discordChannelId: data.channel.id,
           discordServerId: data.guild.id,
@@ -207,21 +220,31 @@ export async function parseExport(
           isSold: result.isSold ?? false,
         });
       }
+
+      return { entries: batchEntries, skipped: batchSkipped, error: null };
     } catch (err) {
-      const errMsg = `Batch ${i}-${i + batch.length}: ${err instanceof Error ? err.message : String(err)}`;
-      errors.push(errMsg);
-      console.error(`    ERROR: ${errMsg}`);
-      // Count batch as skipped
-      skipped += batch.length;
+      const errMsg = `Batch ${startIdx}: ${err instanceof Error ? err.message : String(err)}`;
+      return { entries: [] as ParsedPrice[], skipped: batch.length, error: errMsg };
+    }
+  }
+
+  // Run with concurrency pool
+  for (let i = 0; i < allBatches.length; i += CONCURRENCY) {
+    const chunk = allBatches.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(chunk.map(processSingleBatch));
+
+    for (const r of results) {
+      entries.push(...r.entries);
+      skipped += r.skipped;
+      if (r.error) {
+        errors.push(r.error);
+        console.error(`    ERROR: ${r.error}`);
+      }
     }
 
-    // Progress log every 5 batches
-    if ((i / BATCH_SIZE) % 5 === 0 && i > 0) {
-      console.log(`    Progress: ${i}/${candidates.length} (${entries.length} extracted)`);
-    }
-
-    // Small delay to respect rate limits
-    await new Promise((r) => setTimeout(r, 100));
+    batchesDone += chunk.length;
+    const msgsProcessed = Math.min(batchesDone * BATCH_SIZE, candidates.length);
+    console.log(`    Progress: ${msgsProcessed}/${candidates.length} (${entries.length} extracted)`);
   }
 
   return { entries, skipped, errors };

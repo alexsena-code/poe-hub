@@ -32,7 +32,7 @@ import { parseExport, type DiscordExport, type ParsedPrice } from "./llm-parser.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_DCE_PATH = "C:/Users/alexa/Downloads/DiscordChatExporter.Cli.win-x64/DiscordChatExporter.Cli.exe";
-const TEMP_DIR = path.resolve(process.cwd(), ".scraper-temp");
+const EXPORTS_DIR = path.resolve(process.cwd(), "exports");
 const BATCH_SIZE = 500;
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ async function main() {
   console.log();
 
   // Ensure temp dir
-  if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+  if (!fs.existsSync(EXPORTS_DIR)) fs.mkdirSync(EXPORTS_DIR, { recursive: true });
 
   const prisma = createPrisma();
 
@@ -303,18 +303,23 @@ async function main() {
         console.log("  Full history export (--full flag)");
       }
 
-      // Export
-      const outputFile = path.join(TEMP_DIR, `${source.channelId}.json`);
-      try {
-        exportChannel(dcePath, token, source.channelId, outputFile, afterDate);
-      } catch (err) {
-        console.error(`  Export failed: ${err instanceof Error ? err.message : String(err)}`);
-        continue;
-      }
+      // Export (skip if file already exists and is > 1MB — reuse cached export)
+      const outputFile = path.join(EXPORTS_DIR, `${source.channelId}.json`);
+      if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 1024 * 1024) {
+        const sizeMB = (fs.statSync(outputFile).size / 1024 / 1024).toFixed(1);
+        console.log(`  Using cached export: ${outputFile} (${sizeMB}MB)`);
+      } else {
+        try {
+          exportChannel(dcePath, token, source.channelId, outputFile, afterDate);
+        } catch (err) {
+          console.error(`  Export failed: ${err instanceof Error ? err.message : String(err)}`);
+          continue;
+        }
 
-      if (!fs.existsSync(outputFile)) {
-        console.log("  No export file generated (no new messages)");
-        continue;
+        if (!fs.existsSync(outputFile)) {
+          console.log("  No export file generated (no new messages)");
+          continue;
+        }
       }
 
       // Parse
@@ -364,8 +369,8 @@ async function main() {
 
       totalSkipped += result.skipped;
 
-      // Cleanup temp file
-      fs.unlinkSync(outputFile);
+      // Keep exported file for future re-processing
+      console.log(`  Export saved: ${outputFile}`);
     }
 
     // Aggregate daily prices
@@ -382,11 +387,6 @@ async function main() {
     console.log(`Duplicates: ${totalDuplicates}`);
     console.log(`Skipped:    ${totalSkipped}`);
     console.log(`Total parsed: ${allParsedEntries.length}`);
-
-    // Cleanup temp dir
-    if (fs.existsSync(TEMP_DIR) && fs.readdirSync(TEMP_DIR).length === 0) {
-      fs.rmdirSync(TEMP_DIR);
-    }
 
     await prisma.$disconnect();
     process.exit(0);
