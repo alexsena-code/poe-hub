@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Pencil, Check, X } from "lucide-react";
 import { WeekEditor, type SimulationWeek, type SimulationDay } from "./week-editor";
 import { CostConfigSelector } from "./cost-config-selector";
+import { ImportPricesDialog } from "./import-prices-dialog";
 
 // --- Types ---
 
@@ -366,13 +367,19 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
           </div>
         </div>
 
-        <CostConfigSelector
-          simulationId={simulationId}
-          selectedConfigId={costConfig?.id ?? null}
-          onConfigChange={(c) =>
-            handleCostConfigChange(c as CostConfig | null)
-          }
-        />
+        <div className="flex gap-2">
+          <ImportPricesDialog
+            simulationId={simulationId}
+            onImported={fetchSimulation}
+          />
+          <CostConfigSelector
+            simulationId={simulationId}
+            selectedConfigId={costConfig?.id ?? null}
+            onConfigChange={(c) =>
+              handleCostConfigChange(c as CostConfig | null)
+            }
+          />
+        </div>
       </div>
 
       {/* Summary cards */}

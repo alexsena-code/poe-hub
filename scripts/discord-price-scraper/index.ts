@@ -342,14 +342,16 @@ async function main() {
         let inserted = 0;
         for (let i = 0; i < result.entries.length; i += BATCH_SIZE) {
           const batch = result.entries.slice(i, i + BATCH_SIZE);
-          const dbRecords = batch.map((e) => ({
+          const dbRecords = batch
+            .filter((e) => !isNaN(e.price) && e.price > 0)
+            .map((e) => ({
             discordMessageId: e.discordMessageId,
             discordChannelId: e.discordChannelId,
             discordServerId: e.discordServerId,
             authorDiscordId: e.authorDiscordId,
             authorName: e.authorName,
             isCnl: e.isCnl,
-            price: String(e.price),
+            price: parseFloat(Number(e.price).toFixed(8)).toString(),
             currency: e.currency as "divine" | "chaos" | "usd" | "brl" | "other",
             item: e.item,
             rawMessage: e.rawMessage,
@@ -357,8 +359,12 @@ async function main() {
             league: e.league,
           }));
 
-          const res = await prisma.priceEntry.createMany({ data: dbRecords, skipDuplicates: true });
-          inserted += res.count;
+          try {
+            const res = await prisma.priceEntry.createMany({ data: dbRecords, skipDuplicates: true });
+            inserted += res.count;
+          } catch (dbErr) {
+            console.error(`    DB batch error (skipping batch): ${dbErr instanceof Error ? dbErr.message.substring(0, 100) : String(dbErr)}`);
+          }
         }
 
         const dupes = result.entries.length - inserted;
