@@ -344,7 +344,7 @@ async function main() {
             authorDiscordId: e.authorDiscordId,
             authorName: e.authorName,
             isCnl: e.isCnl,
-            price: e.price,
+            price: String(e.price),
             currency: e.currency as "divine" | "chaos" | "usd" | "brl" | "other",
             item: e.item,
             rawMessage: e.rawMessage,

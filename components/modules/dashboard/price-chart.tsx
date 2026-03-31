@@ -7,6 +7,15 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 
 interface PricePoint {
   date: string;
@@ -14,6 +23,17 @@ interface PricePoint {
   cnlPrice: number | null;
   league: string;
 }
+
+const chartConfig = {
+  median: {
+    label: "Mediana Mercado",
+    color: "hsl(220, 70%, 60%)",
+  },
+  cnlPrice: {
+    label: "CNL",
+    color: "hsl(45, 90%, 55%)",
+  },
+} satisfies ChartConfig;
 
 export function PriceChart({ data }: { data: PricePoint[] }) {
   if (data.length === 0) {
@@ -32,72 +52,16 @@ export function PriceChart({ data }: { data: PricePoint[] }) {
     );
   }
 
-  // Calculate chart dimensions
-  const width = 600;
-  const height = 200;
-  const padding = { top: 20, right: 20, bottom: 40, left: 60 };
-  const chartW = width - padding.left - padding.right;
-  const chartH = height - padding.top - padding.bottom;
-
-  // Gather all values for y-axis range
-  const medians = data.map((d) => d.median);
-  const cnlPrices = data
-    .filter((d) => d.cnlPrice !== null)
-    .map((d) => d.cnlPrice as number);
-  const allValues = [...medians, ...cnlPrices];
-  const minVal = Math.min(...allValues);
-  const maxVal = Math.max(...allValues);
-  const yRange = maxVal - minVal || 1;
-  const yPadding = yRange * 0.1;
-  const yMin = minVal - yPadding;
-  const yMax = maxVal + yPadding;
-
-  // Map data to coordinates
-  const xScale = (i: number) =>
-    padding.left + (i / Math.max(data.length - 1, 1)) * chartW;
-  const yScale = (v: number) =>
-    padding.top + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
-
-  // Build SVG path for median line
-  const medianPath = data
-    .map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(d.median)}`)
-    .join(" ");
-
-  // Build SVG path for CNL line
-  const cnlPoints = data
-    .map((d, i) => ({ x: xScale(i), y: d.cnlPrice, idx: i }))
-    .filter((p) => p.y !== null);
-  const cnlPath =
-    cnlPoints.length > 1
-      ? cnlPoints
-          .map(
-            (p, i) =>
-              `${i === 0 ? "M" : "L"} ${p.x} ${yScale(p.y as number)}`
-          )
-          .join(" ")
-      : null;
-
-  // Y-axis ticks
-  const yTickCount = 5;
-  const yTicks = Array.from({ length: yTickCount }, (_, i) => {
-    const val = yMin + ((yMax - yMin) * i) / (yTickCount - 1);
-    return { val, y: yScale(val) };
-  });
-
-  // X-axis labels (show ~5 dates)
-  const xLabelCount = Math.min(5, data.length);
-  const xLabels = Array.from({ length: xLabelCount }, (_, i) => {
-    const dataIdx = Math.round(
-      (i / Math.max(xLabelCount - 1, 1)) * (data.length - 1)
-    );
-    return {
-      x: xScale(dataIdx),
-      label: new Date(data[dataIdx].date).toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-    };
-  });
+  const chartData = data.map((d) => ({
+    date: new Date(d.date).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+    }),
+    median: d.median,
+    cnlPrice: d.cnlPrice,
+    fullDate: new Date(d.date).toLocaleDateString("pt-BR"),
+    league: d.league,
+  }));
 
   return (
     <Card>
@@ -108,112 +72,60 @@ export function PriceChart({ data }: { data: PricePoint[] }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto"
-          preserveAspectRatio="xMidYMid meet"
-        >
-          {/* Grid lines */}
-          {yTicks.map((tick, i) => (
-            <line
-              key={`grid-${i}`}
-              x1={padding.left}
-              y1={tick.y}
-              x2={width - padding.right}
-              y2={tick.y}
-              stroke="currentColor"
-              strokeOpacity={0.1}
-              strokeDasharray="4 4"
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+          <LineChart data={chartData} accessibilityLayer>
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
             />
-          ))}
-
-          {/* Y-axis labels */}
-          {yTicks.map((tick, i) => (
-            <text
-              key={`ytick-${i}`}
-              x={padding.left - 8}
-              y={tick.y + 4}
-              textAnchor="end"
-              fontSize={10}
-              fill="currentColor"
-              fillOpacity={0.5}
-            >
-              {tick.val.toLocaleString("pt-BR", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </text>
-          ))}
-
-          {/* X-axis labels */}
-          {xLabels.map((label, i) => (
-            <text
-              key={`xtick-${i}`}
-              x={label.x}
-              y={height - 8}
-              textAnchor="middle"
-              fontSize={10}
-              fill="currentColor"
-              fillOpacity={0.5}
-            >
-              {label.label}
-            </text>
-          ))}
-
-          {/* Median line */}
-          <path
-            d={medianPath}
-            fill="none"
-            stroke="hsl(220, 70%, 60%)"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* CNL line */}
-          {cnlPath && (
-            <path
-              d={cnlPath}
-              fill="none"
-              stroke="hsl(45, 90%, 55%)"
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              tickFormatter={(v: number) =>
+                `R$${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+              }
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => {
+                    const label =
+                      name === "median" ? "Mediana" : "CNL";
+                    return (
+                      <span>
+                        {label}: R$
+                        {Number(value).toLocaleString("pt-BR", {
+                          minimumFractionDigits: 4,
+                        })}
+                      </span>
+                    );
+                  }}
+                />
+              }
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Line
+              type="monotone"
+              dataKey="median"
+              stroke="var(--color-median)"
               strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="6 3"
+              dot={false}
             />
-          )}
-
-          {/* Median dots */}
-          {data.map((d, i) => (
-            <circle
-              key={`dot-${i}`}
-              cx={xScale(i)}
-              cy={yScale(d.median)}
-              r={2.5}
-              fill="hsl(220, 70%, 60%)"
+            <Line
+              type="monotone"
+              dataKey="cnlPrice"
+              stroke="var(--color-cnlPrice)"
+              strokeWidth={2}
+              strokeDasharray="5 3"
+              dot={false}
+              connectNulls
             />
-          ))}
-        </svg>
-
-        {/* Legend */}
-        <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-0.5 rounded"
-              style={{ backgroundColor: "hsl(220, 70%, 60%)" }}
-            />
-            Mediana
-          </div>
-          {cnlPath && (
-            <div className="flex items-center gap-1.5">
-              <span
-                className="inline-block w-3 h-0.5 rounded border-dashed"
-                style={{ backgroundColor: "hsl(45, 90%, 55%)" }}
-              />
-              CNL
-            </div>
-          )}
-        </div>
+          </LineChart>
+        </ChartContainer>
       </CardContent>
     </Card>
   );
