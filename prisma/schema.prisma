@@ -142,6 +142,30 @@ model PriceEntry {
   @@map("price_entries")
 }
 
+model DailyPrice {
+  id             String   @id @default(uuid())
+  date           DateTime @db.Date
+  item           String   // divine, mirror, chaos
+  league         String   @default("")
+  currency       String   @default("brl") // brl, usd
+  median         Decimal  @db.Decimal(18, 8)
+  mean           Decimal  @db.Decimal(18, 8)
+  min            Decimal  @db.Decimal(18, 8)
+  max            Decimal  @db.Decimal(18, 8)
+  cnlPrice       Decimal? @map("cnl_price") @db.Decimal(18, 8)
+  sellCount      Int      @map("sell_count")
+  buyCount       Int      @map("buy_count")
+  totalOffers    Int      @map("total_offers")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([date, item, league, currency])
+  @@index([date])
+  @@index([item])
+  @@index([league])
+  @@map("daily_prices")
+}
+
 model DiscordSource {
   id           String   @id @default(uuid())
   serverId     String   @map("server_id")
