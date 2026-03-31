@@ -114,7 +114,7 @@ function exportChannel(
   console.log(`  Running: DiscordChatExporter export --channel ${channelId}${afterDate ? ` --after ${afterDate}` : " (full history)"}`);
 
   try {
-    execSync(cmd, { stdio: "pipe", timeout: 600000, maxBuffer: 10 * 1024 * 1024 }); // 10min timeout
+    execSync(cmd, { stdio: "pipe", timeout: 1800000, maxBuffer: 50 * 1024 * 1024 }); // 30min timeout
   } catch (err: unknown) {
     const error = err as { stderr?: Buffer; status?: number };
     const stderr = error.stderr?.toString() || "";
