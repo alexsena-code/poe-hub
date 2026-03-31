@@ -25,6 +25,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
+import { useLeagues } from "@/hooks/use-leagues";
 
 interface Buyer {
   id: string;
@@ -91,8 +92,9 @@ function SalesTableInner() {
     searchParams.get("buyerId") || "all"
   );
   const [leagueFilter, setLeagueFilter] = useState(
-    searchParams.get("league") || ""
+    searchParams.get("league") || "all"
   );
+  const { leagues } = useLeagues();
 
   // Summary
   const [summary, setSummary] = useState({
@@ -125,7 +127,7 @@ function SalesTableInner() {
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
     if (buyerFilter && buyerFilter !== "all") params.set("buyerId", buyerFilter);
-    if (leagueFilter) params.set("league", leagueFilter);
+    if (leagueFilter && leagueFilter !== "all") params.set("league", leagueFilter);
 
     try {
       const res = await fetch(`/api/sales?${params}`);
@@ -178,7 +180,7 @@ function SalesTableInner() {
     setDateFrom("");
     setDateTo("");
     setBuyerFilter("all");
-    setLeagueFilter("");
+    setLeagueFilter("all");
     setPagination((p) => ({ ...p, page: 1 }));
   }
 
@@ -242,15 +244,25 @@ function SalesTableInner() {
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Liga</Label>
-          <Input
+          <Select
             value={leagueFilter}
-            onChange={(e) => {
-              setLeagueFilter(e.target.value);
+            onValueChange={(val) => {
+              setLeagueFilter(val);
               setPagination((p) => ({ ...p, page: 1 }));
             }}
-            placeholder="Filtrar liga..."
-            className="w-40"
-          />
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {leagues.map((l) => (
+                <SelectItem key={l.id} value={l.name}>
+                  {l.name} {!l.isCurrent && "(encerrada)"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button variant="ghost" size="sm" onClick={resetFilters}>
           Limpar filtros
