@@ -18,9 +18,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BuyerInlineDialog } from "./buyer-inline-dialog";
+import { useLeagues } from "@/hooks/use-leagues";
 
 const saleFormSchema = z.object({
   date: z.string().min(1, "Data é obrigatória"),
@@ -74,6 +76,7 @@ export function SaleForm({ initialData }: SaleFormProps) {
   const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [loadingBuyers, setLoadingBuyers] = useState(true);
   const [buyerDialogOpen, setBuyerDialogOpen] = useState(false);
+  const { leagues } = useLeagues();
 
   const [totalUsd, setTotalUsd] = useState<number>(initialData?.totalUsd ?? 0);
   const [totalBrl, setTotalBrl] = useState<number>(initialData?.totalBrl ?? 0);
@@ -178,8 +181,11 @@ export function SaleForm({ initialData }: SaleFormProps) {
             {/* Date + Buyer */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="date">Data</Label>
-                <Input id="date" type="date" {...form.register("date")} />
+                <Label>Data</Label>
+                <DatePicker
+                  value={form.watch("date")}
+                  onChange={(val) => form.setValue("date", val, { shouldValidate: true })}
+                />
                 {form.formState.errors.date && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.date.message}
@@ -266,7 +272,7 @@ export function SaleForm({ initialData }: SaleFormProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="divine">Divine</SelectItem>
-                    <SelectItem value="chaos">Chaos</SelectItem>
+                    <SelectItem value="mirror">Mirror</SelectItem>
                     <SelectItem value="exalted">Exalted</SelectItem>
                     <SelectItem value="other">Outro</SelectItem>
                   </SelectContent>
@@ -274,12 +280,22 @@ export function SaleForm({ initialData }: SaleFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="league">Liga</Label>
-                <Input
-                  id="league"
-                  {...form.register("league")}
-                  placeholder="Ex: Settlers"
-                />
+                <Label>Liga</Label>
+                <Select
+                  value={form.watch("league")}
+                  onValueChange={(val) => form.setValue("league", val, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a liga" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leagues.map((l) => (
+                      <SelectItem key={l.id} value={l.name} disabled={!l.isCurrent}>
+                        {l.name} {!l.isCurrent && "(encerrada)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {form.formState.errors.league && (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.league.message}

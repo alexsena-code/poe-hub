@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { TASK_MODULES } from "@/lib/constants";
 import { useUsers } from "@/hooks/use-users";
 
@@ -232,11 +233,10 @@ export function TaskCreateForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dueDate">Data limite</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    {...register("dueDate")}
+                  <Label>Data limite</Label>
+                  <DatePicker
+                    value={watch("dueDate") ?? ""}
+                    onChange={(val) => setValue("dueDate", val)}
                   />
                 </div>
               </div>

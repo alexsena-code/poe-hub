@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
 import { TASK_MODULES } from "@/lib/constants";
 import { useUsers } from "@/hooks/use-users";
 import type { Task } from "./task-card";
@@ -261,11 +262,10 @@ export function TaskDetailDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="detail-dueDate">Data limite</Label>
-              <Input
-                id="detail-dueDate"
-                type="date"
-                {...register("dueDate")}
+              <Label>Data limite</Label>
+              <DatePicker
+                value={watch("dueDate") ?? ""}
+                onChange={(val) => setValue("dueDate", val)}
               />
             </div>
           </div>

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const botFormSchema = z.object({
   nick: z.string().min(1, "Nick é obrigatório"),
@@ -152,8 +153,11 @@ export function BotForm({ initialData }: BotFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="proxyEol">Expiração do Proxy</Label>
-                <Input id="proxyEol" type="date" {...form.register("proxyEol")} />
+                <Label>Expiração do Proxy</Label>
+                <DatePicker
+                  value={form.watch("proxyEol") ?? ""}
+                  onChange={(val) => form.setValue("proxyEol", val)}
+                />
               </div>
             </div>
           </div>

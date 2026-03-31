@@ -73,6 +73,20 @@ async function main() {
   });
 
   console.log(`Default proxy config: id=${proxyConfig.id}, port=${proxyConfig.port}`);
+
+  // Seed default league
+  const league = await prisma.league.upsert({
+    where: { name: "Settlers of Kalguur" },
+    update: {},
+    create: {
+      name: "Settlers of Kalguur",
+      poeVersion: "poe1",
+      isCurrent: true,
+      startDate: new Date("2024-07-26"),
+    },
+  });
+
+  console.log(`Default league: ${league.name} (current: ${league.isCurrent})`);
 }
 
 main()

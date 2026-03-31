@@ -55,7 +55,7 @@ interface Pagination {
 
 const UNIT_LABELS: Record<string, string> = {
   divine: "Divine",
-  chaos: "Chaos",
+  mirror: "Mirror",
   exalted: "Exalted",
   other: "Outro",
 };

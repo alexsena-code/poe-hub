@@ -28,7 +28,7 @@ enum Currency {
 
 enum SaleUnit {
   divine
-  chaos
+  mirror
   exalted
   other
 }

@@ -4,7 +4,7 @@ export const createSaleSchema = z.object({
   date: z.string().min(1, "Data é obrigatória"),
   buyerId: z.string().uuid("Buyer ID inválido"),
   quantity: z.number().positive("Quantidade deve ser positiva"),
-  unit: z.enum(["divine", "chaos", "exalted", "other"]).default("divine"),
+  unit: z.enum(["divine", "mirror", "exalted", "other"]).default("divine"),
   divinePriceUsd: z.number().positive().nullable().optional(),
   divinePriceBrl: z.number().positive().nullable().optional(),
   totalUsd: z.number().positive().nullable().optional(),
