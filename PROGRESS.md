@@ -305,18 +305,132 @@ poe-hub/
 
 ---
 
-## Fase 6 — Simulações de Faturamento
+## Fase 6 — Simulações de Faturamento ✅
 
-**Status:** Não iniciada
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Calculation engine | ✅ | resolveDay, calculateDay/Week/Simulation, ROI, break-even |
+| Unit tests (42) | ✅ | 100% coverage nos cálculos |
+| CRUD Simulations API | ✅ | Create (auto-gera weeks+days), GET nested, PUT, DELETE |
+| Duplicate simulation | ✅ | Deep clone com weeks + days + cost links |
+| Week/Day APIs | ✅ | Update defaults, overrides, reset day (DELETE) |
+| Cost config CRUD | ✅ | GET/POST/PUT/DELETE, delete blocked se em uso |
+| Simulation editor UI | ✅ | Accordion semanas, tabela inline editável |
+| Herança visual | ✅ | Cinza/itálico (herdado) vs bold (override), botão reset ↩ |
+| Summary cards | ✅ | Receita, custo, lucro, ROI |
+| Cost config selector | ✅ | Dropdown + link para /settings/costs |
+
+### Decisões Técnicas
+
+#### Engine de cálculo puro (sem side effects)
+- Funções puras: `resolveDay`, `calculateDay`, `calculateWeek`, `calculateSimulation`
+- Aceita tanto `number` quanto Prisma `Decimal` via tipo `NumericValue`
+- Custo semanal: `(fixedMonthly / 4) + (maxBots × variablePerBot × 7/30)`
+
+#### Agents paralelos (api-dev + frontend-dev)
+- API e UI construídos simultaneamente, testes depois
 
 ---
 
-## Fase 7 — Dashboard Geral
+## Fase 5.5 — Parser LLM + Pipeline Automatizado ✅
 
-**Status:** Não iniciada
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| LLM parser (Gemini 2.5 Flash-Lite) | ✅ | Substitui regex, batch de 20 msgs |
+| Pipeline automatizado | ✅ | DCE integrado, incremental, multi-canal |
+| League resolver por data | ✅ | Resolve liga pelo timestamp + tabela de ligas |
+| CNL auto-detect | ✅ | Por author ID + fallback por conteúdo (cnlgaming+BRL) |
+| DailyPrice aggregation | ✅ | Mediana, média, min, max, CNL, volume por dia |
+| 23 ligas históricas | ✅ | PoE 1 (3.10-3.28) + PoE 2 (0.1-0.4) com datas |
+| Discord sources seeded | ✅ | PoE 1 + PoE 2 channels com CNL IDs |
+
+### Decisões Técnicas
+
+#### LLM > Regex para parsing
+- Regex tinha 30+ ligas fragmentadas ("Dawn", "Abyss", "Valor") e outliers R$800 (contas)
+- LLM: zero outliers, classificação perfeita, CNL como "buy" (correto)
+- Custo: ~$1 para todo o histórico (~40k msgs), centavos para incremental
+
+#### League por data (não por texto)
+- Mensagens mencionam "Abyss" mas a liga é "Rise of the Abyssal"
+- Resolver pela data + tabela de ligas é 100% confiável
+
+#### Primeiro dia de liga ignorado na agregação
+- Preços muito voláteis no launch day
 
 ---
 
-## Fase 8 — Polish + E2E
+## Fase 7 — Dashboard Geral ✅
 
-**Status:** Não iniciada
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| GET /api/dashboard | ✅ | 9 queries paralelas com Promise.all |
+| KPI Cards (4) | ✅ | Bots ativos, vendas 30d, divine atual (% change), tarefas abertas |
+| Price chart (SVG) | ✅ | Gráfico de linhas 30d (mediana + CNL), sem lib externa |
+| Task summary | ✅ | Barra + badges por status |
+| Recent sales | ✅ | Últimas 5 vendas com buyer, qty, total |
+| Dashboard page | ✅ | Layout responsivo: KPIs, chart+tasks, sales |
+
+### Decisões Técnicas
+
+#### SVG chart sem biblioteca externa
+- Gráfico de linhas renderizado como SVG puro — zero dependências
+- Duas linhas: mediana (azul) e CNL (dourado)
+
+---
+
+## Fase 8 — Polish + Settings ✅
+
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Settings main page | ✅ | Cards com links para sub-settings |
+| Proxy settings | ✅ | Form com encrypt/decrypt, toggle visibilidade |
+| League management | ✅ | CRUD completo com DatePicker, toggle ativo |
+| User management | ✅ | CRUD com bcrypt, admin-only, prevent self-delete |
+| Sidebar polish | ✅ | User info (nome + role badge) no rodapé |
+| API users CRUD | ✅ | POST (create), PUT (update), DELETE (guard self) |
+
+### Totais de Testes (acumulado final)
+
+| Arquivo | Testes | Tipo |
+|---------|--------|------|
+| lib/crypto.test.ts | 8 | Unit |
+| lib/auth.test.ts | 6 | Unit |
+| lib/simulation-calculator.test.ts | 42 | Unit |
+| app/api/bots/bots.test.ts | 17 | Integration |
+| app/api/tasks/tasks.test.ts | 19 | Integration |
+| app/api/sales/sales.test.ts | 20 | Integration |
+| app/api/buyers/buyers.test.ts | 11 | Integration |
+| app/api/prices/prices.test.ts | 22 | Integration |
+| components/modules/bots/*.test.tsx | 11 | Component |
+| components/modules/tasks/*.test.tsx | 17 | Component |
+| **Total** | **172** | |
+
+---
+
+## Pendências / Melhorias Futuras
+
+- [ ] Gráfico de evolução de preço na página de Preços (usar DailyPrice)
+- [ ] Export vendas para CSV
+- [ ] Playwright E2E para fluxos críticos
+- [ ] Cron setup automatizado para scraper
+- [ ] Responsividade mobile refinada
+- [ ] Módulos editáveis nas configurações globais (atualmente em lib/constants.ts)
+- [ ] Notificações quando preço divine atingir threshold
+- [ ] Integração com DPB para criação automática de perfis (futuro)

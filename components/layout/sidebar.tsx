@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -13,22 +13,28 @@ import {
   Calculator,
   Settings,
   LogOut,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Bots", href: "/bots", icon: Bot },
   { title: "Tarefas", href: "/tasks", icon: ListTodo },
   { title: "Vendas", href: "/sales", icon: DollarSign },
-  { title: "Preços", href: "/prices", icon: TrendingUp },
-  { title: "Simulações", href: "/simulations", icon: Calculator },
-  { title: "Configurações", href: "/settings", icon: Settings },
+  { title: "Precos", href: "/prices", icon: TrendingUp },
+  { title: "Simulacoes", href: "/simulations", icon: Calculator },
+  { title: "Configuracoes", href: "/settings", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name ?? "Usuario";
+  const userRole = (session?.user as { role?: string })?.role ?? "operator";
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-border bg-sidebar-background">
@@ -59,10 +65,24 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="px-3 pb-4">
+      <Separator />
+      <div className="px-3 py-3">
+        <div className="flex items-center gap-3 rounded-md px-3 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <User className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate text-sidebar-foreground">
+              {userName}
+            </p>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {userRole === "admin" ? "Admin" : "Operador"}
+            </Badge>
+          </div>
+        </div>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground"
+          className="w-full justify-start gap-3 text-muted-foreground mt-1"
           onClick={() => signOut({ callbackUrl: "/login" })}
         >
           <LogOut className="h-4 w-4" />
