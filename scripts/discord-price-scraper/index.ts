@@ -114,12 +114,17 @@ function exportChannel(
   console.log(`  Running: DiscordChatExporter export --channel ${channelId}${afterDate ? ` --after ${afterDate}` : " (full history)"}`);
 
   try {
-    execSync(cmd, { stdio: "pipe", timeout: 300000 }); // 5min timeout
+    execSync(cmd, { stdio: "pipe", timeout: 600000, maxBuffer: 10 * 1024 * 1024 }); // 10min timeout
   } catch (err: unknown) {
-    const error = err as { stderr?: Buffer };
+    const error = err as { stderr?: Buffer; status?: number };
     const stderr = error.stderr?.toString() || "";
     if (stderr.includes("No messages found")) {
       console.log("  No new messages found.");
+      return;
+    }
+    // If the file was created despite the error, continue processing
+    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 100) {
+      console.log(`  DCE exited with error but file exists (${(fs.statSync(outputPath).size / 1024 / 1024).toFixed(1)}MB) — processing anyway`);
       return;
     }
     throw new Error(`DCE failed: ${stderr.substring(0, 200)}`);

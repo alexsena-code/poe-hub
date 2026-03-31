@@ -1,0 +1,141 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { createSimulationSchema } from "@/lib/validations/simulation";
+
+export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = request.nextUrl;
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+  const status = searchParams.get("status");
+  const league = searchParams.get("league");
+  const search = searchParams.get("search");
+
+  const where: Record<string, unknown> = {};
+
+  if (status) {
+    where.status = status;
+  }
+  if (league) {
+    where.league = league;
+  }
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { notes: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [simulations, total] = await Promise.all([
+    prisma.simulation.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { weeks: true } },
+        costLinks: {
+          include: {
+            costConfig: { select: { id: true, name: true } },
+          },
+        },
+      },
+    }),
+    prisma.simulation.count({ where }),
+  ]);
+
+  return NextResponse.json({
+    data: simulations,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
+}
+
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const parsed = createSimulationSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const data = parsed.data;
+
+  // Validate cost config IDs if provided
+  if (data.costConfigIds && data.costConfigIds.length > 0) {
+    const configs = await prisma.globalCostConfig.findMany({
+      where: { id: { in: data.costConfigIds } },
+      select: { id: true },
+    });
+    if (configs.length !== data.costConfigIds.length) {
+      return NextResponse.json(
+        { error: "One or more cost config IDs not found" },
+        { status: 404 }
+      );
+    }
+  }
+
+  const simulation = await prisma.simulation.create({
+    data: {
+      name: data.name,
+      league: data.league,
+      status: data.status,
+      durationWeeks: data.durationWeeks,
+      notes: data.notes ?? null,
+      costLinks: data.costConfigIds?.length
+        ? {
+            create: data.costConfigIds.map((configId) => ({
+              costConfigId: configId,
+            })),
+          }
+        : undefined,
+      weeks: {
+        create: Array.from({ length: data.durationWeeks }, (_, i) => ({
+          weekNumber: i + 1,
+          label: `Semana ${i + 1}`,
+          defaultActiveBots: 1,
+          defaultDivinePerHour: 0.5,
+          defaultHoursPerDay: 24,
+          days: {
+            create: Array.from({ length: 7 }, (_, d) => ({
+              dayNumber: d + 1,
+            })),
+          },
+        })),
+      },
+    },
+    include: {
+      weeks: {
+        orderBy: { weekNumber: "asc" },
+        include: {
+          days: { orderBy: { dayNumber: "asc" } },
+        },
+      },
+      costLinks: {
+        include: {
+          costConfig: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(simulation, { status: 201 });
+}
