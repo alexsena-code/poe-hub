@@ -25,7 +25,7 @@ import { execSync } from "child_process";
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { parseExport, type DiscordExport, type ParsedPrice } from "./parser.js";
+import { parseExport, type DiscordExport, type ParsedPrice } from "./llm-parser.js";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -169,11 +169,23 @@ function mean(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-async function aggregateDailyPrices(prisma: PrismaClient, entries: ParsedPrice[]) {
+async function aggregateDailyPrices(prisma: PrismaClient, entries: ParsedPrice[], leagues: LeagueInfo[]) {
+  // Build set of league launch dates to skip (first day is too volatile)
+  const launchDates = new Set<string>();
+  for (const l of leagues) {
+    if (l.startDate) {
+      launchDates.add(l.startDate.toISOString().split("T")[0]);
+    }
+  }
+
   const groups = new Map<string, ParsedPrice[]>();
 
   for (const entry of entries) {
     const date = new Date(entry.messageTimestamp).toISOString().split("T")[0];
+
+    // Skip first day of any league (prices are too volatile)
+    if (launchDates.has(date)) continue;
+
     const key = `${date}|${entry.item}|${entry.league || ""}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(entry);
@@ -308,7 +320,7 @@ async function main() {
       // Parse
       const data: DiscordExport = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
       const cnlAuthorIds = new Set(source.cnlAuthorIds);
-      const result = parseExport(data, cnlAuthorIds);
+      const result = await parseExport(data, cnlAuthorIds);
 
       // Auto-resolve leagues
       for (const entry of result.entries) {
@@ -359,7 +371,7 @@ async function main() {
     // Aggregate daily prices
     if (allParsedEntries.length > 0) {
       console.log("\n=== Aggregating Daily Prices ===");
-      const days = await aggregateDailyPrices(prisma, allParsedEntries);
+      const days = await aggregateDailyPrices(prisma, allParsedEntries, leagues);
       console.log(`Aggregated ${days} daily price records`);
     }
 

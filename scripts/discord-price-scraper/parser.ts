@@ -71,10 +71,10 @@ function detectItem(content: string): string {
 
 /**
  * Detect if message is from CNL by content pattern (fallback when author ID not in cnlAuthorIds).
- * CNL posts follow a distinctive template with "CNLGAMING.COM" and "BRL" pricing.
+ * Any message mentioning cnlgaming + BRL is definitively from CNL.
  */
 function isCnlByContent(content: string): boolean {
-  return /cnlgaming\.com/i.test(content) && /BRL/i.test(content);
+  return /cnlgaming/i.test(content) && /BRL/i.test(content);
 }
 
 function isSoldMessage(content: string): boolean {
@@ -135,12 +135,19 @@ function shouldSkip(rawContent: string, isBot: boolean): boolean {
   if (isBot) return true;
   const content = rawContent.replace(/\*+/g, "");
   if (content.length < 10) return true;
+
+  // Skip non-currency sales
   if (/\bvendo\s+build\b/i.test(content)) return true;
+  if (/\bvendo\s+conta\b/i.test(content)) return true;
+  if (/\bvendo\s+pack\b/i.test(content)) return true;
+  if (/\bsupporter\s+pack\b/i.test(content)) return true;
+  if (/\bvendo\s+skin/i.test(content)) return true;
   if (/\bfa[çc]o\b.*\b(level|leveling|atos)\b/i.test(content)) return true;
   if (/\bwts\s+softcore\b/i.test(content) && !/divine|mirror/i.test(content)) return true;
   if (/\bmain\s+skills?\b/i.test(content) && !/divine|mirror/i.test(content)) return true;
-  // Only skip Smoother KE if that's the ONLY product (not if it also has divine/mirror prices)
   if (/\bsmoother\s+ke\b/i.test(content) && !/divine|div\b|mirror/i.test(content)) return true;
+
+  // Must mention currency-related terms
   if (!/divine|div\b|mirror|chaos|currency|r\$|\breais\b|brl/i.test(content)) return true;
   return false;
 }
@@ -166,11 +173,17 @@ export function parseExport(
 
     const extracted = extractUnitPrice(msg.content, item);
 
-    // Sanity check: if price < R$1, it's divine (mirrors cost R$100+)
-    if (extracted && item === "mirror" && extracted.price < 1) {
+    // Sanity check: if price < R$1, it's divine (mirrors cost R$50+)
+    if (extracted && item === "mirror" && extracted.price < 50) {
       item = "divine";
     }
     if (!extracted) {
+      skipped++;
+      continue;
+    }
+
+    // Skip absurd prices — accounts, packs etc that slipped through
+    if (item === "divine" && extracted.price > 20) {
       skipped++;
       continue;
     }
