@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2 } from "lucide-react";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useLeagues } from "@/hooks/use-leagues";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Buyer {
   id: string;
@@ -66,11 +67,6 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("pt-BR");
 }
 
-function formatCurrency(value: number | null, prefix: string): string {
-  if (value === null || value === undefined) return "-";
-  return `${prefix}${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 function SalesTableInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,6 +91,7 @@ function SalesTableInner() {
     searchParams.get("league") || "all"
   );
   const { leagues } = useLeagues();
+  const { formatMoney, displayCurrency } = useCurrency();
 
   // Summary
   const [summary, setSummary] = useState({
@@ -282,15 +279,11 @@ function SalesTableInner() {
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total USD</p>
+              <p className="text-xs text-muted-foreground">Total</p>
               <p className="text-lg font-bold">
-                {formatCurrency(summary.totalUsd, "$")}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total BRL</p>
-              <p className="text-lg font-bold">
-                {formatCurrency(summary.totalBrl, "R$")}
+                {displayCurrency === "usd"
+                  ? formatMoney(summary.totalUsd, "usd")
+                  : formatMoney(summary.totalBrl, "brl")}
               </p>
             </div>
           </CardContent>
@@ -298,7 +291,7 @@ function SalesTableInner() {
       )}
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -306,9 +299,12 @@ function SalesTableInner() {
               <TableHead>Comprador</TableHead>
               <TableHead className="text-right">Qtd</TableHead>
               <TableHead>Unidade</TableHead>
-              <TableHead className="text-right">Preço Divine (USD)</TableHead>
-              <TableHead className="text-right">Total USD</TableHead>
-              <TableHead className="text-right">Total BRL</TableHead>
+              <TableHead className="text-right">
+                Preço Divine ({displayCurrency.toUpperCase()})
+              </TableHead>
+              <TableHead className="text-right">
+                Total ({displayCurrency.toUpperCase()})
+              </TableHead>
               <TableHead>Liga</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -317,7 +313,7 @@ function SalesTableInner() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={8}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Carregando...
@@ -326,7 +322,7 @@ function SalesTableInner() {
             ) : sales.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={8}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Nenhuma venda encontrada
@@ -356,13 +352,18 @@ function SalesTableInner() {
                   </TableCell>
                   <TableCell>{UNIT_LABELS[sale.unit] ?? sale.unit}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(sale.divinePriceUsd, "$")}
+                    {sale.divinePriceUsd !== null && sale.divinePriceUsd !== undefined
+                      ? formatMoney(Number(sale.divinePriceUsd), "usd")
+                      : "-"}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(sale.totalUsd, "$")}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatCurrency(sale.totalBrl, "R$")}
+                    {displayCurrency === "usd"
+                      ? (sale.totalUsd !== null && sale.totalUsd !== undefined
+                          ? formatMoney(Number(sale.totalUsd), "usd")
+                          : "-")
+                      : (sale.totalBrl !== null && sale.totalBrl !== undefined
+                          ? formatMoney(Number(sale.totalBrl), "brl")
+                          : "-")}
                   </TableCell>
                   <TableCell>{sale.league}</TableCell>
                   <TableCell className="text-right">

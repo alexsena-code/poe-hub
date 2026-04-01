@@ -40,11 +40,10 @@ function makeDay(overrides: Partial<RawDay> = {}): RawDay {
 
 function makeCostConfig(overrides: Partial<CostConfigData> = {}): CostConfigData {
   return {
-    proxyCostPerBotMonthly: 10,
-    vpsCostMonthly: 50,
-    dpbLicenseCostMonthly: 30,
-    otherFixedCostsMonthly: 20,
-    otherVariableCostPerBot: 5,
+    proxyCostPerBotMonthly: 1,
+    levelingCostPerBot: 20,
+    expluginsKeyCostDaily: 3,
+    dpbKeyCostDaily: 2,
     ...overrides,
   };
 }
@@ -298,19 +297,15 @@ describe("calculateWeek", () => {
     const week = makeWeek({ defaultActiveBots: 10 });
     const days = makeDays7();
     const costConfig = makeCostConfig({
-      vpsCostMonthly: 100,
-      dpbLicenseCostMonthly: 40,
-      otherFixedCostsMonthly: 60,
-      proxyCostPerBotMonthly: 10,
-      otherVariableCostPerBot: 5,
+      proxyCostPerBotMonthly: 2,
+      expluginsKeyCostDaily: 5,
+      dpbKeyCostDaily: 3,
     });
 
     const result = calculateWeek(week, days, costConfig);
 
-    // Fixed monthly: 100 + 40 + 60 = 200; weekly = 200/4 = 50
-    // Variable per bot: 10 + 5 = 15; weekly = 10 * 15 * 7/30 = 35
-    // Total cost: 50 + 35 = 85
-    expect(result.costUsd).toBeCloseTo(85, 2);
+    // costPerBotDaily = 5 + 3 + 2/30 = 8.0667; 10 bots * 7 days
+    expect(result.costUsd).toBeCloseTo(7 * 10 * (5 + 3 + 2 / 30), 2);
   });
 
   it("returns 0 cost when no cost config provided", () => {
@@ -344,8 +339,9 @@ describe("calculateWeek", () => {
     const result = calculateWeek(week, days, costConfig);
 
     // Revenue: 5 * 0.5 * 24 * 7 * 2.0 = 840
-    // Fixed: (50+30+20)/4 = 25; Variable: 5*(10+5)*7/30 = 17.5; Cost = 42.5
-    expect(result.profitUsd).toBeCloseTo(840 - 42.5, 2);
+    // costPerBotDaily = 3 + 2 + 1/30; 5 bots * 7 days
+    const weekCost = 7 * 5 * (3 + 2 + 1 / 30);
+    expect(result.profitUsd).toBeCloseTo(840 - weekCost, 2);
   });
 
   it("returns null profit when revenue is null", () => {
@@ -385,9 +381,8 @@ describe("calculateWeek", () => {
     expect(result.totalDivines).toBe(0);
     expect(result.revenueUsd).toBe(0);
     expect(result.maxActiveBots).toBe(0);
-    // Variable cost should be 0 since maxBots=0
-    // Fixed: (50+30+20)/4 = 25
-    expect(result.costUsd).toBeCloseTo(25, 2);
+    // 0 bots = 0 cost (all costs are per-bot)
+    expect(result.costUsd).toBe(0);
   });
 
   it("handles mixed override days correctly", () => {
@@ -475,9 +470,10 @@ describe("calculateSimulation", () => {
       costConfig
     );
 
-    // Per week: fixed (50+30+20)/4=25 + variable 5*(10+5)*7/30=17.5 = 42.5
-    // 2 weeks: 85
-    expect(result.totalCostUsd).toBeCloseTo(85, 2);
+    // costPerBotDaily = 3 + 2 + 1/30; 5 bots * 14 days
+    // Leveling: maxBots = 5, levelingCostPerBot = 20 -> 100
+    const opCost2w = 14 * 5 * (3 + 2 + 1 / 30);
+    expect(result.totalCostUsd).toBeCloseTo(opCost2w + 100, 2);
   });
 
   it("calculates profit as total revenue - total cost", () => {
@@ -494,8 +490,11 @@ describe("calculateSimulation", () => {
       costConfig
     );
 
-    // Revenue: 840, Cost: 42.5, Profit: 797.5
-    expect(result.totalProfitUsd).toBeCloseTo(797.5, 2);
+    // Revenue: 840
+    // Operational: 5 bots * (3+2+1/30) * 7 days; Leveling: 5*20=100
+    const opCost = 7 * 5 * (3 + 2 + 1 / 30);
+    const totalCost = opCost + 100;
+    expect(result.totalProfitUsd).toBeCloseTo(840 - totalCost, 2);
   });
 
   it("calculates ROI correctly", () => {
@@ -512,8 +511,9 @@ describe("calculateSimulation", () => {
       costConfig
     );
 
-    // ROI = (840 - 42.5) / 42.5 * 100 = 1876.47%
-    expect(result.roi).toBeCloseTo(((840 - 42.5) / 42.5) * 100, 1);
+    const opCost = 7 * 5 * (3 + 2 + 1 / 30);
+    const totalCost = opCost + 100;
+    expect(result.roi).toBeCloseTo(((840 - totalCost) / totalCost) * 100, 1);
   });
 
   it("returns null ROI when cost is 0", () => {
@@ -536,14 +536,13 @@ describe("calculateSimulation", () => {
   });
 
   it("finds break-even week", () => {
-    // Week 1: very high cost, low revenue -> negative cumulative
+    // Week 1: high per-bot cost, low revenue -> negative cumulative
     // Week 2: high revenue -> positive cumulative
     const costConfig = makeCostConfig({
-      vpsCostMonthly: 4000, // huge fixed cost
-      dpbLicenseCostMonthly: 0,
-      otherFixedCostsMonthly: 0,
+      expluginsKeyCostDaily: 20, // per-bot daily
+      dpbKeyCostDaily: 0,
       proxyCostPerBotMonthly: 0,
-      otherVariableCostPerBot: 0,
+      levelingCostPerBot: 0,
     });
 
     const week1 = makeWeek({
@@ -553,22 +552,31 @@ describe("calculateSimulation", () => {
       defaultHoursPerDay: 24,
       defaultDivinePriceUsd: 2.0,
     });
-    // Week1: revenue 840, cost 4000/4=1000 -> cumulative: -160
+    // Week1: revenue=5*0.5*24*7*2=840, cost=5*20*7=700 -> cumulative: 140
+    // That's already positive... need higher cost
+    // Actually let's use 30/bot/day: cost=5*30*7=1050, revenue=840 -> cumulative: -210
     const week2 = makeWeek({
       weekNumber: 2,
-      defaultActiveBots: 10,
+      defaultActiveBots: 5,
       defaultDivinePerHour: 1.0,
       defaultHoursPerDay: 24,
       defaultDivinePriceUsd: 2.0,
     });
-    // Week2: revenue 10*1.0*24*7*2=3360, cost 1000 -> cumulative: -160+2360=2200
+    // Week2: revenue=5*1*24*7*2=1680, cost=5*30*7=1050 -> cumulative: -210+630=420
+
+    const costConfig2 = makeCostConfig({
+      expluginsKeyCostDaily: 30,
+      dpbKeyCostDaily: 0,
+      proxyCostPerBotMonthly: 0,
+      levelingCostPerBot: 0,
+    });
 
     const result = calculateSimulation(
       [
         { week: week1, days: makeDays7() },
         { week: week2, days: makeDays7() },
       ],
-      costConfig
+      costConfig2
     );
 
     expect(result.breakEvenWeek).toBe(2);
@@ -576,11 +584,10 @@ describe("calculateSimulation", () => {
 
   it("returns null break-even when never profitable", () => {
     const costConfig = makeCostConfig({
-      vpsCostMonthly: 40000,
-      dpbLicenseCostMonthly: 0,
-      otherFixedCostsMonthly: 0,
+      expluginsKeyCostDaily: 10000, // per-bot, huge
+      dpbKeyCostDaily: 0,
       proxyCostPerBotMonthly: 0,
-      otherVariableCostPerBot: 0,
+      levelingCostPerBot: 0,
     });
 
     const week = makeWeek({
@@ -670,5 +677,66 @@ describe("calculateSimulation", () => {
     expect(result.totalRevenueUsd).toBe(756);
     // BRL: 504 * 7.5 = 3780
     expect(result.totalRevenueBrl).toBe(3780);
+  });
+
+  it("adds leveling cost once using max bots across all weeks", () => {
+    // Week1: 3 bots, Week2: 8 bots -> maxBots = 8
+    const week1 = makeWeek({ weekNumber: 1, defaultActiveBots: 3 });
+    const week2 = makeWeek({ weekNumber: 2, defaultActiveBots: 8 });
+    const costConfig = makeCostConfig({
+      proxyCostPerBotMonthly: 0,
+      expluginsKeyCostDaily: 0,
+      dpbKeyCostDaily: 0,
+      levelingCostPerBot: 50,
+    });
+
+    const result = calculateSimulation(
+      [
+        { week: week1, days: makeDays7() },
+        { week: week2, days: makeDays7() },
+      ],
+      costConfig
+    );
+
+    // Operational cost: 0 per day across all days
+    // Leveling: 8 * 50 = 400
+    expect(result.totalCostUsd).toBeCloseTo(400, 2);
+  });
+
+  it("leveling cost is 0 when levelingCostPerBot is 0", () => {
+    const week = makeWeek({ defaultActiveBots: 10 });
+    const costConfig = makeCostConfig({
+      proxyCostPerBotMonthly: 0,
+      expluginsKeyCostDaily: 0,
+      dpbKeyCostDaily: 0,
+      levelingCostPerBot: 0,
+    });
+
+    const result = calculateSimulation([{ week, days: makeDays7() }], costConfig);
+
+    expect(result.totalCostUsd).toBe(0);
+  });
+
+  it("leveling cost uses highest bot count across weeks, not sum", () => {
+    // If leveling were applied per-week it would be 3+8=11 bots worth; correct is max=8
+    const week1 = makeWeek({ weekNumber: 1, defaultActiveBots: 3 });
+    const week2 = makeWeek({ weekNumber: 2, defaultActiveBots: 8 });
+    const costConfig = makeCostConfig({
+      proxyCostPerBotMonthly: 0,
+      expluginsKeyCostDaily: 0,
+      dpbKeyCostDaily: 0,
+      levelingCostPerBot: 10,
+    });
+
+    const result = calculateSimulation(
+      [
+        { week: week1, days: makeDays7() },
+        { week: week2, days: makeDays7() },
+      ],
+      costConfig
+    );
+
+    // Should be 8 * 10 = 80, not (3+8)*10 = 110
+    expect(result.totalCostUsd).toBeCloseTo(80, 2);
   });
 });

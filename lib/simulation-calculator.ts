@@ -30,10 +30,9 @@ export interface RawWeek {
 /** Cost config data */
 export interface CostConfigData {
   proxyCostPerBotMonthly: number | { toNumber(): number };
-  vpsCostMonthly: number | { toNumber(): number };
-  dpbLicenseCostMonthly: number | { toNumber(): number };
-  otherFixedCostsMonthly: number | { toNumber(): number };
-  otherVariableCostPerBot: number | { toNumber(): number };
+  levelingCostPerBot: number | { toNumber(): number };
+  expluginsKeyCostDaily: number | { toNumber(): number };
+  dpbKeyCostDaily: number | { toNumber(): number };
 }
 
 /** Day with all values resolved (no nulls for core fields) */
@@ -124,9 +123,9 @@ export function calculateDay(resolved: ResolvedDay): DayCalculation {
 
 /**
  * Calculates totals for a week including costs.
- * Cost formula: (fixedMonthly / 4) + (maxBots * variablePerBot * 7/30)
- * Fixed monthly = vpsCostMonthly + dpbLicenseCostMonthly + otherFixedCostsMonthly
- * Variable per bot = proxyCostPerBotMonthly + otherVariableCostPerBot
+ * Cost per day = expluginsKeyCostDaily + dpbKeyCostDaily + (activeBots * proxyCostPerBotMonthly)
+ * Week cost = sum of per-day costs across all days in the week.
+ * Leveling cost is a one-time charge at simulation level, not included here.
  */
 export function calculateWeek(
   week: RawWeek,
@@ -155,16 +154,14 @@ export function calculateWeek(
 
   let costUsd = 0;
   if (costConfig) {
-    const fixedMonthly =
-      toNumRequired(costConfig.vpsCostMonthly) +
-      toNumRequired(costConfig.dpbLicenseCostMonthly) +
-      toNumRequired(costConfig.otherFixedCostsMonthly);
+    const expluginsPerBotDaily = toNumRequired(costConfig.expluginsKeyCostDaily);
+    const dpbPerBotDaily = toNumRequired(costConfig.dpbKeyCostDaily);
+    const proxyPerBotDaily = toNumRequired(costConfig.proxyCostPerBotMonthly) / 30;
+    const costPerBotDaily = expluginsPerBotDaily + dpbPerBotDaily + proxyPerBotDaily;
 
-    const variablePerBot =
-      toNumRequired(costConfig.proxyCostPerBotMonthly) +
-      toNumRequired(costConfig.otherVariableCostPerBot);
-
-    costUsd = fixedMonthly / 4 + maxActiveBots * variablePerBot * (7 / 30);
+    costUsd = resolvedDays.reduce((sum, rd) => {
+      return sum + rd.activeBots * costPerBotDaily;
+    }, 0);
   }
 
   const profitUsd = revenueUsd !== null ? revenueUsd - costUsd : null;
@@ -182,6 +179,7 @@ export function calculateWeek(
 
 /**
  * Calculates totals for the full simulation across all weeks.
+ * Leveling cost is a one-time charge: maxBotsAcrossAllWeeks * levelingCostPerBot.
  */
 export function calculateSimulation(
   weeks: { week: RawWeek; days: RawDay[] }[],
@@ -203,7 +201,20 @@ export function calculateSimulation(
     ? weekCalcs.reduce((sum, wc) => sum + (wc.revenueBrl ?? 0), 0)
     : null;
 
-  const totalCostUsd = weekCalcs.reduce((sum, wc) => sum + wc.costUsd, 0);
+  const operationalCostUsd = weekCalcs.reduce((sum, wc) => sum + wc.costUsd, 0);
+
+  const levelingCostUsd =
+    costConfig && weekCalcs.length > 0
+      ? (() => {
+          const maxBotsEver = weekCalcs.reduce(
+            (max, wc) => Math.max(max, wc.maxActiveBots),
+            0
+          );
+          return maxBotsEver * toNumRequired(costConfig.levelingCostPerBot);
+        })()
+      : 0;
+
+  const totalCostUsd = operationalCostUsd + levelingCostUsd;
 
   const totalProfitUsd =
     totalRevenueUsd !== null ? totalRevenueUsd - totalCostUsd : null;

@@ -29,6 +29,7 @@ import {
   Archive,
 } from "lucide-react";
 import { useLeagues } from "@/hooks/use-leagues";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Simulation {
   id: string;
@@ -98,6 +99,7 @@ function SimulationListInner() {
     searchParams.get("league") || "all"
   );
   const { leagues } = useLeagues();
+  const { formatMoney, exchangeRate } = useCurrency();
 
   const fetchSimulations = useCallback(async () => {
     setLoading(true);
@@ -227,7 +229,7 @@ function SimulationListInner() {
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -235,8 +237,8 @@ function SimulationListInner() {
               <TableHead>Liga</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-center">Semanas</TableHead>
-              <TableHead className="text-right">Receita (USD)</TableHead>
-              <TableHead className="text-right">Lucro (USD)</TableHead>
+              <TableHead className="text-right">Receita</TableHead>
+              <TableHead className="text-right">Lucro</TableHead>
               <TableHead className="text-right">ROI</TableHead>
               <TableHead>Criada em</TableHead>
               <TableHead className="text-right">Acoes</TableHead>
@@ -279,17 +281,42 @@ function SimulationListInner() {
                     {sim.durationWeeks}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(sim.totals?.revenueUsd, "$")}
+                    {(() => {
+                      const usd = sim.totals?.revenueUsd ?? 0;
+                      const brl = sim.totals?.revenueBrl ?? 0;
+                      const val = usd > 0 ? usd : brl / exchangeRate;
+                      return val > 0 ? formatMoney(val, "usd") : "-";
+                    })()}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(sim.totals?.profit, "$")}
+                    {(() => {
+                      const usd = sim.totals?.revenueUsd ?? 0;
+                      const brl = sim.totals?.revenueBrl ?? 0;
+                      const revenue = usd > 0 ? usd : brl / exchangeRate;
+                      const cost = sim.totals?.cost ?? 0;
+                      if (revenue === 0 && cost === 0) return "-";
+                      const profit = revenue - cost;
+                      return (
+                        <span className={profit >= 0 ? "text-green-500" : "text-destructive"}>
+                          {formatMoney(profit, "usd")}
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {sim.totals?.roi != null
-                      ? `${Number(sim.totals.roi).toLocaleString("pt-BR", {
-                          maximumFractionDigits: 1,
-                        })}%`
-                      : "-"}
+                    {(() => {
+                      const usd = sim.totals?.revenueUsd ?? 0;
+                      const brl = sim.totals?.revenueBrl ?? 0;
+                      const revenue = usd > 0 ? usd : brl / exchangeRate;
+                      const cost = sim.totals?.cost ?? 0;
+                      if (cost === 0) return "-";
+                      const roi = ((revenue - cost) / cost) * 100;
+                      return (
+                        <span className={roi >= 0 ? "text-green-500" : "text-destructive"}>
+                          {roi.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>{formatDate(sim.createdAt)}</TableCell>
                   <TableCell className="text-right">

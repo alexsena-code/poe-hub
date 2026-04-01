@@ -36,10 +36,10 @@ async function main() {
       name: "Custos Padrão 2026",
       isDefault: true,
       proxyCostPerBotMonthly: 5.0,
-      vpsCostMonthly: 50.0,
-      dpbLicenseCostMonthly: 30.0,
-      otherFixedCostsMonthly: 0,
-      otherVariableCostPerBot: 0,
+      levelingCostPerBot: 50.0,
+      stashPackCostPerBot: 0,
+      expluginsKeyCostDaily: 1.0,
+      dpbKeyCostDaily: 0,
     },
   });
 

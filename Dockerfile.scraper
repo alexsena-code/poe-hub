@@ -1,0 +1,38 @@
+# Dockerfile.scraper
+#
+# Lightweight image for the Discord price scraper cron service.
+# Unlike the main app's production image, this keeps full node_modules and
+# TypeScript source so that `tsx` can run scripts directly.
+#
+# The container entry point is a shell loop that calls cron-runner.ts on the
+# configured schedule (SCRAPER_INTERVAL_MINUTES, default 30).
+
+FROM node:20-alpine
+
+# Install bash and supercronic (reliable cron for containers, no syslog needed)
+RUN apk add --no-cache bash curl && \
+    SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.2.29/supercronic-linux-amd64 && \
+    curl -fsSL "$SUPERCRONIC_URL" -o /usr/local/bin/supercronic && \
+    chmod +x /usr/local/bin/supercronic
+
+WORKDIR /app
+
+# Copy package files and install ALL dependencies (including devDeps for tsx)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy Prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy only what the scraper needs
+COPY scripts ./scripts
+COPY tsconfig.json ./
+
+# crontab file — schedule is baked in here; override CRON_SCHEDULE at build
+# time or just rebuild this image with a different schedule string.
+# Default: every 30 minutes
+ARG CRON_SCHEDULE="*/30 * * * *"
+RUN echo "${CRON_SCHEDULE} npx tsx /app/scripts/discord-price-scraper/cron-runner.ts >> /proc/1/fd/1 2>> /proc/1/fd/2" > /etc/scraper-crontab
+
+CMD ["supercronic", "/etc/scraper-crontab"]

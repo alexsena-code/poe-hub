@@ -19,10 +19,10 @@ interface CostConfig {
   name: string;
   isDefault: boolean;
   proxyCostPerBotMonthly: number;
-  vpsCostMonthly: number;
-  dpbLicenseCostMonthly: number;
-  otherFixedCostsMonthly: number;
-  otherVariableCostPerBot: number;
+  levelingCostPerBot: number;
+  stashPackCostPerBot: number;
+  expluginsKeyCostDaily: number;
+  dpbKeyCostDaily: number;
 }
 
 interface CostConfigSelectorProps {

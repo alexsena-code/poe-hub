@@ -152,54 +152,70 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.status !== undefined) updateData.status = data.status;
   if (data.notes !== undefined) updateData.notes = data.notes ?? null;
 
-  // Handle cost config links update
-  if (data.costConfigIds !== undefined) {
-    // Validate config IDs
-    if (data.costConfigIds.length > 0) {
-      const configs = await prisma.globalCostConfig.findMany({
-        where: { id: { in: data.costConfigIds } },
-        select: { id: true },
-      });
-      if (configs.length !== data.costConfigIds.length) {
-        return NextResponse.json(
-          { error: "One or more cost config IDs not found" },
-          { status: 404 }
-        );
-      }
-    }
+  // Handle cost config: support both costConfigId (singular) and costConfigIds (array)
+  const configId = (body as Record<string, unknown>).costConfigId as string | undefined;
+  const costConfigIds = data.costConfigIds ?? (configId ? [configId] : undefined);
 
+  if (costConfigIds !== undefined) {
     // Delete existing links and create new ones
     await prisma.simulationCostLink.deleteMany({
       where: { simulationId: id },
     });
 
-    if (data.costConfigIds.length > 0) {
+    if (costConfigIds.length > 0) {
+      const configs = await prisma.globalCostConfig.findMany({
+        where: { id: { in: costConfigIds } },
+      });
+      if (configs.length !== costConfigIds.length) {
+        return NextResponse.json(
+          { error: "One or more cost config IDs not found" },
+          { status: 404 }
+        );
+      }
+
       await prisma.simulationCostLink.createMany({
-        data: data.costConfigIds.map((configId) => ({
+        data: costConfigIds.map((cid) => ({
           simulationId: id,
-          costConfigId: configId,
+          costConfigId: cid,
         })),
       });
+
+      // Snapshot cost config values into simulation
+      const primaryConfig = configs[0];
+      updateData.costConfigName = primaryConfig.name;
+      updateData.proxyCostPerBotMonthly = Number(primaryConfig.proxyCostPerBotMonthly);
+      updateData.levelingCostPerBot = Number(primaryConfig.levelingCostPerBot);
+      updateData.stashPackCostPerBot = Number(primaryConfig.stashPackCostPerBot);
+      updateData.expluginsKeyCostDaily = Number(primaryConfig.expluginsKeyCostDaily);
+      updateData.dpbKeyCostDaily = Number(primaryConfig.dpbKeyCostDaily);
     }
   }
 
-  const simulation = await prisma.simulation.update({
-    where: { id },
-    data: updateData,
-    include: {
-      weeks: {
-        orderBy: { weekNumber: "asc" },
-        include: {
-          days: { orderBy: { dayNumber: "asc" } },
+  try {
+    const simulation = await prisma.simulation.update({
+      where: { id },
+      data: updateData,
+      include: {
+        weeks: {
+          orderBy: { weekNumber: "asc" },
+          include: {
+            days: { orderBy: { dayNumber: "asc" } },
+          },
+        },
+        costLinks: {
+          include: { costConfig: true },
         },
       },
-      costLinks: {
-        include: { costConfig: true },
-      },
-    },
-  });
+    });
 
-  return NextResponse.json(simulation);
+    return NextResponse.json(simulation);
+  } catch (err) {
+    console.error("Simulation PUT error:", err);
+    return NextResponse.json(
+      { error: "Failed to update simulation", details: String(err) },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {

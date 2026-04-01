@@ -56,10 +56,10 @@ export const createCostConfigSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   isDefault: z.boolean().optional().default(false),
   proxyCostPerBotMonthly: z.number().min(0),
-  vpsCostMonthly: z.number().min(0),
-  dpbLicenseCostMonthly: z.number().min(0),
-  otherFixedCostsMonthly: z.number().min(0).optional().default(0),
-  otherVariableCostPerBot: z.number().min(0).optional().default(0),
+  levelingCostPerBot: z.number().min(0),
+  stashPackCostPerBot: z.number().min(0).optional().default(0),
+  expluginsKeyCostDaily: z.number().min(0),
+  dpbKeyCostDaily: z.number().min(0).optional().default(0),
   notes: z.string().nullable().optional(),
 });
 

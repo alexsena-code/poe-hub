@@ -14,11 +14,16 @@ export async function GET(request: NextRequest) {
   const league = searchParams.get("league");
   const dateFrom = searchParams.get("dateFrom");
   const dateTo = searchParams.get("dateTo");
-  const limit = Math.min(365, parseInt(searchParams.get("limit") || "90"));
+  const days = searchParams.get("days");
+  const limit = Math.min(365, parseInt(searchParams.get("limit") || "365"));
 
   const where: Record<string, unknown> = { item };
   if (league) where.league = league;
-  if (dateFrom || dateTo) {
+  if (days) {
+    const d = new Date();
+    d.setDate(d.getDate() - parseInt(days));
+    where.date = { gte: d };
+  } else if (dateFrom || dateTo) {
     where.date = {};
     if (dateFrom) (where.date as Record<string, unknown>).gte = new Date(dateFrom);
     if (dateTo) (where.date as Record<string, unknown>).lte = new Date(dateTo);

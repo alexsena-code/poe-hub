@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ArrowLeft, Plus, Pencil, Trash2, Star, Info } from "lucide-react";
+import { useCurrency } from "@/hooks/use-currency";
 
 // --- Types ---
 
@@ -42,10 +43,10 @@ interface CostConfig {
   name: string;
   isDefault: boolean;
   proxyCostPerBotMonthly: number;
-  vpsCostMonthly: number;
-  dpbLicenseCostMonthly: number;
-  otherFixedCostsMonthly: number;
-  otherVariableCostPerBot: number;
+  levelingCostPerBot: number;
+  stashPackCostPerBot: number;
+  expluginsKeyCostDaily: number;
+  dpbKeyCostDaily: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -57,10 +58,10 @@ const costConfigSchema = z.object({
   name: z.string().min(1, "Nome obrigatorio"),
   isDefault: z.boolean().optional(),
   proxyCostPerBotMonthly: z.number().min(0, "Valor minimo 0"),
-  vpsCostMonthly: z.number().min(0, "Valor minimo 0"),
-  dpbLicenseCostMonthly: z.number().min(0, "Valor minimo 0"),
-  otherFixedCostsMonthly: z.number().min(0, "Valor minimo 0"),
-  otherVariableCostPerBot: z.number().min(0, "Valor minimo 0"),
+  levelingCostPerBot: z.number().min(0, "Valor minimo 0"),
+  stashPackCostPerBot: z.number().min(0, "Valor minimo 0"),
+  expluginsKeyCostDaily: z.number().min(0, "Valor minimo 0"),
+  dpbKeyCostDaily: z.number().min(0, "Valor minimo 0"),
   notes: z.string().optional(),
 });
 
@@ -68,25 +69,33 @@ type CostConfigForm = z.infer<typeof costConfigSchema>;
 
 // --- Helpers ---
 
-function fmtCurrency(val: number): string {
-  return `$${Number(val).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
+// fmtCurrency removed — use formatMoney from useCurrency hook instead
 
-// --- Field with tooltip ---
+// --- Cost field names that hold monetary values ---
+const COST_FIELDS = [
+  "proxyCostPerBotMonthly",
+  "levelingCostPerBot",
+  "stashPackCostPerBot",
+  "expluginsKeyCostDaily",
+  "dpbKeyCostDaily",
+] as const;
+
+type CostFieldName = (typeof COST_FIELDS)[number];
+
+// --- Field with currency toggle ---
 
 interface CostFieldProps {
   label: string;
   tooltip: string;
   id: string;
   register: ReturnType<typeof useForm<CostConfigForm>>["register"];
-  fieldName: keyof CostConfigForm;
+  fieldName: CostFieldName;
   error?: string;
+  inputCurrency: "usd" | "brl";
+  onToggleCurrency: () => void;
 }
 
-function CostField({ label, tooltip, id, register, fieldName, error }: CostFieldProps) {
+function CostField({ label, tooltip, id, register, fieldName, error, inputCurrency, onToggleCurrency }: CostFieldProps) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-1.5">
@@ -100,13 +109,24 @@ function CostField({ label, tooltip, id, register, fieldName, error }: CostField
           </Tooltip>
         </TooltipProvider>
       </div>
-      <Input
-        id={id}
-        type="number"
-        step="0.01"
-        min="0"
-        {...register(fieldName, { valueAsNumber: true })}
-      />
+      <div className="flex">
+        <button
+          type="button"
+          onClick={onToggleCurrency}
+          className="flex items-center justify-center px-2.5 rounded-l-md border border-r-0 border-input bg-muted text-sm font-mono font-medium hover:bg-muted/80 transition-colors min-w-[3rem]"
+          title="Clique para alternar moeda"
+        >
+          {inputCurrency === "usd" ? "$" : "R$"}
+        </button>
+        <Input
+          id={id}
+          type="number"
+          step="0.01"
+          min="0"
+          className="rounded-l-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+          {...register(fieldName, { valueAsNumber: true })}
+        />
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
@@ -121,6 +141,33 @@ export default function CostConfigsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<CostConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { formatMoney, exchangeRate } = useCurrency();
+
+  // Per-field input currency (user can type in $ or R$, stored always as $)
+  const [fieldCurrencies, setFieldCurrencies] = useState<Record<CostFieldName, "usd" | "brl">>({
+    proxyCostPerBotMonthly: "usd",
+    levelingCostPerBot: "usd",
+    stashPackCostPerBot: "usd",
+    expluginsKeyCostDaily: "usd",
+    dpbKeyCostDaily: "usd",
+  });
+
+  function toggleFieldCurrency(field: CostFieldName) {
+    setFieldCurrencies((prev) => ({
+      ...prev,
+      [field]: prev[field] === "usd" ? "brl" : "usd",
+    }));
+  }
+
+  function resetFieldCurrencies() {
+    setFieldCurrencies({
+      proxyCostPerBotMonthly: "usd",
+      levelingCostPerBot: "usd",
+    stashPackCostPerBot: "usd",
+      expluginsKeyCostDaily: "usd",
+      dpbKeyCostDaily: "usd",
+    });
+  }
 
   const {
     register,
@@ -134,10 +181,10 @@ export default function CostConfigsPage() {
       name: "",
       isDefault: false,
       proxyCostPerBotMonthly: 0,
-      vpsCostMonthly: 0,
-      dpbLicenseCostMonthly: 0,
-      otherFixedCostsMonthly: 0,
-      otherVariableCostPerBot: 0,
+      levelingCostPerBot: 0,
+      stashPackCostPerBot: 0,
+      expluginsKeyCostDaily: 0,
+      dpbKeyCostDaily: 0,
       notes: "",
     },
   });
@@ -161,14 +208,15 @@ export default function CostConfigsPage() {
 
   function openCreate() {
     setEditingConfig(null);
+    resetFieldCurrencies();
     reset({
       name: "",
       isDefault: false,
       proxyCostPerBotMonthly: 0,
-      vpsCostMonthly: 0,
-      dpbLicenseCostMonthly: 0,
-      otherFixedCostsMonthly: 0,
-      otherVariableCostPerBot: 0,
+      levelingCostPerBot: 0,
+      stashPackCostPerBot: 0,
+      expluginsKeyCostDaily: 0,
+      dpbKeyCostDaily: 0,
       notes: "",
     });
     setDialogOpen(true);
@@ -176,14 +224,15 @@ export default function CostConfigsPage() {
 
   function openEdit(config: CostConfig) {
     setEditingConfig(config);
+    resetFieldCurrencies();
     reset({
       name: config.name,
       isDefault: config.isDefault,
       proxyCostPerBotMonthly: Number(config.proxyCostPerBotMonthly),
-      vpsCostMonthly: Number(config.vpsCostMonthly),
-      dpbLicenseCostMonthly: Number(config.dpbLicenseCostMonthly),
-      otherFixedCostsMonthly: Number(config.otherFixedCostsMonthly),
-      otherVariableCostPerBot: Number(config.otherVariableCostPerBot),
+      levelingCostPerBot: Number(config.levelingCostPerBot),
+      stashPackCostPerBot: Number(config.stashPackCostPerBot),
+      expluginsKeyCostDaily: Number(config.expluginsKeyCostDaily),
+      dpbKeyCostDaily: Number(config.dpbKeyCostDaily),
       notes: config.notes ?? "",
     });
     setDialogOpen(true);
@@ -192,6 +241,14 @@ export default function CostConfigsPage() {
   async function onSubmit(data: CostConfigForm) {
     setSubmitting(true);
     try {
+      // Convert any fields entered in BRL to USD before saving
+      const payload = { ...data };
+      for (const field of COST_FIELDS) {
+        if (fieldCurrencies[field] === "brl" && exchangeRate > 0) {
+          payload[field] = Number(((payload[field] as number) / exchangeRate).toFixed(4));
+        }
+      }
+
       const url = editingConfig
         ? `/api/cost-configs/${editingConfig.id}`
         : "/api/cost-configs";
@@ -200,7 +257,7 @@ export default function CostConfigsPage() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -270,10 +327,10 @@ export default function CostConfigsPage() {
             <TableRow>
               <TableHead>Nome</TableHead>
               <TableHead className="text-right">Proxy/Bot (mensal)</TableHead>
-              <TableHead className="text-right">VPS (mensal)</TableHead>
-              <TableHead className="text-right">Licenca DPB (mensal)</TableHead>
-              <TableHead className="text-right">Outros Fixos (mensal)</TableHead>
-              <TableHead className="text-right">Var./Bot (mensal)</TableHead>
+              <TableHead className="text-right">Leveling/Bot (unico)</TableHead>
+              <TableHead className="text-right">Stash Pack/Bot (unico)</TableHead>
+              <TableHead className="text-right">Explugins Key (diario)</TableHead>
+              <TableHead className="text-right">DPB Key (diario)</TableHead>
               <TableHead className="text-right">Acoes</TableHead>
             </TableRow>
           </TableHeader>
@@ -311,19 +368,19 @@ export default function CostConfigsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {fmtCurrency(Number(config.proxyCostPerBotMonthly))}
+                    {formatMoney(Number(config.proxyCostPerBotMonthly), "usd")}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {fmtCurrency(Number(config.vpsCostMonthly))}
+                    {formatMoney(Number(config.levelingCostPerBot), "usd")}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {fmtCurrency(Number(config.dpbLicenseCostMonthly))}
+                    {formatMoney(Number(config.stashPackCostPerBot), "usd")}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {fmtCurrency(Number(config.otherFixedCostsMonthly))}
+                    {formatMoney(Number(config.expluginsKeyCostDaily), "usd")}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {fmtCurrency(Number(config.otherVariableCostPerBot))}
+                    {formatMoney(Number(config.dpbKeyCostDaily), "usd")}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
@@ -362,7 +419,7 @@ export default function CostConfigsPage() {
               {editingConfig ? "Editar Configuracao" : "Nova Configuracao"}
             </DialogTitle>
             <DialogDescription>
-              Define os custos operacionais mensais para simulacoes.
+              Define os custos operacionais diarios para simulacoes.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -382,44 +439,54 @@ export default function CostConfigsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <CostField
-                label="Proxy/Bot"
+                label="Proxy/Bot (mensal)"
                 tooltip="Custo mensal de proxy por bot ativo"
                 id="proxyCost"
                 register={register}
                 fieldName="proxyCostPerBotMonthly"
                 error={errors.proxyCostPerBotMonthly?.message}
+                inputCurrency={fieldCurrencies.proxyCostPerBotMonthly}
+                onToggleCurrency={() => toggleFieldCurrency("proxyCostPerBotMonthly")}
               />
               <CostField
-                label="VPS"
-                tooltip="Custo mensal de VPS (servidor virtual)"
-                id="vpsCost"
+                label="Leveling/Bot (unico)"
+                tooltip="Custo unico de leveling por bot (cobrado uma vez na criacao do bot)"
+                id="levelingCost"
                 register={register}
-                fieldName="vpsCostMonthly"
-                error={errors.vpsCostMonthly?.message}
+                fieldName="levelingCostPerBot"
+                error={errors.levelingCostPerBot?.message}
+                inputCurrency={fieldCurrencies.levelingCostPerBot}
+                onToggleCurrency={() => toggleFieldCurrency("levelingCostPerBot")}
               />
               <CostField
-                label="Licenca DPB"
-                tooltip="Custo mensal de licenca DPB"
-                id="dpbCost"
+                label="Stash Pack/Bot (unico)"
+                tooltip="Custo unico do pack de stash por bot"
+                id="stashPackCost"
                 register={register}
-                fieldName="dpbLicenseCostMonthly"
-                error={errors.dpbLicenseCostMonthly?.message}
+                fieldName="stashPackCostPerBot"
+                error={errors.stashPackCostPerBot?.message}
+                inputCurrency={fieldCurrencies.stashPackCostPerBot}
+                onToggleCurrency={() => toggleFieldCurrency("stashPackCostPerBot")}
               />
               <CostField
-                label="Outros Fixos"
-                tooltip="Outros custos fixos mensais (energia, internet, etc.)"
-                id="otherFixed"
+                label="Explugins Key (diario)"
+                tooltip="Custo diario da chave Explugins"
+                id="expluginsKeyCost"
                 register={register}
-                fieldName="otherFixedCostsMonthly"
-                error={errors.otherFixedCostsMonthly?.message}
+                fieldName="expluginsKeyCostDaily"
+                error={errors.expluginsKeyCostDaily?.message}
+                inputCurrency={fieldCurrencies.expluginsKeyCostDaily}
+                onToggleCurrency={() => toggleFieldCurrency("expluginsKeyCostDaily")}
               />
               <CostField
-                label="Variavel/Bot"
-                tooltip="Custo variavel mensal por bot (alem do proxy)"
-                id="otherVariable"
+                label="DPB Key (diario)"
+                tooltip="Custo diario da chave DPB"
+                id="dpbKeyCost"
                 register={register}
-                fieldName="otherVariableCostPerBot"
-                error={errors.otherVariableCostPerBot?.message}
+                fieldName="dpbKeyCostDaily"
+                error={errors.dpbKeyCostDaily?.message}
+                inputCurrency={fieldCurrencies.dpbKeyCostDaily}
+                onToggleCurrency={() => toggleFieldCurrency("dpbKeyCostDaily")}
               />
             </div>
 

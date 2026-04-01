@@ -217,12 +217,12 @@ describe("Prices API", () => {
       });
 
       const res = await GET_STATS(
-        getReq("http://localhost:3000/api/prices/stats?currency=divine")
+        getReq("http://localhost:3000/api/prices/stats?item=divine")
       );
       const body = await res.json();
 
       expect(res.status).toBe(200);
-      expect(body.currency).toBe("divine");
+      expect(body.item).toBe("divine");
       expect(body.currentCnlPrice).toBeDefined();
       expect(body.avgCnl7d).toBeCloseTo(2.5, 1);
       expect(body.avgMarket7d).toBeCloseTo(2.0, 1);

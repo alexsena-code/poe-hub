@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -14,10 +15,19 @@ import {
   Settings,
   LogOut,
   User,
+  Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { useCurrency } from "@/hooks/use-currency";
+
+type DisplayCurrency = "usd" | "brl";
 
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -29,17 +39,33 @@ const navItems = [
   { title: "Configuracoes", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar() {
-  const pathname = usePathname();
-  const { data: session } = useSession();
+interface SidebarContentProps {
+  pathname: string;
+  userName: string;
+  userRole: string;
+  displayCurrency: string;
+  exchangeRate: number;
+  onSetDisplayCurrency: (c: DisplayCurrency) => void;
+  onClose?: () => void;
+}
 
-  const userName = session?.user?.name ?? "Usuario";
-  const userRole = (session?.user as { role?: string })?.role ?? "operator";
-
+function SidebarContent({
+  pathname,
+  userName,
+  userRole,
+  displayCurrency,
+  exchangeRate,
+  onSetDisplayCurrency,
+  onClose,
+}: SidebarContentProps) {
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-border bg-sidebar-background">
+    <div className="flex h-full flex-col">
       <div className="flex h-14 items-center px-6">
-        <Link href="/dashboard" className="text-xl font-bold text-sidebar-foreground">
+        <Link
+          href="/dashboard"
+          className="text-xl font-bold text-sidebar-foreground"
+          onClick={onClose}
+        >
           PoE HUB
         </Link>
       </div>
@@ -52,6 +78,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
@@ -65,6 +92,31 @@ export function Sidebar() {
           );
         })}
       </nav>
+      <div className="px-3 py-2 space-y-1">
+        <div className="flex items-center justify-between px-3">
+          <span className="text-[10px] text-muted-foreground/60">USD/BRL</span>
+          <span className="text-[10px] font-mono text-muted-foreground">
+            R$ {exchangeRate.toFixed(2)}
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-between px-3 text-muted-foreground hover:text-sidebar-foreground"
+          onClick={() =>
+            onSetDisplayCurrency(
+              (displayCurrency === "usd" ? "brl" : "usd") as DisplayCurrency
+            )
+          }
+        >
+          <span className="text-xs font-medium">
+            {displayCurrency === "usd" ? "$ USD" : "R$ BRL"}
+          </span>
+          <span className="text-[10px] text-muted-foreground/60">
+            {displayCurrency === "usd" ? "→ BRL" : "→ USD"}
+          </span>
+        </Button>
+      </div>
       <Separator />
       <div className="px-3 py-3">
         <div className="flex items-center gap-3 rounded-md px-3 py-2">
@@ -89,6 +141,52 @@ export function Sidebar() {
           Sair
         </Button>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const userName = session?.user?.name ?? "Usuario";
+  const userRole = (session?.user as { role?: string })?.role ?? "operator";
+  const { displayCurrency, setDisplayCurrency, exchangeRate } = useCurrency();
+
+  const sharedProps: SidebarContentProps = {
+    pathname,
+    userName,
+    userRole,
+    displayCurrency,
+    exchangeRate,
+    onSetDisplayCurrency: setDisplayCurrency,
+  };
+
+  return (
+    <>
+      {/* Desktop sidebar — hidden on mobile */}
+      <aside className="hidden md:flex h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar-background">
+        <SidebarContent {...sharedProps} />
+      </aside>
+
+      {/* Mobile hamburger button + Sheet drawer */}
+      <div className="md:hidden fixed top-0 left-0 z-40 flex h-14 w-full items-center border-b border-border bg-background px-4">
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Abrir menu">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <span className="ml-3 text-lg font-bold">PoE HUB</span>
+          <SheetContent side="left" className="w-64 p-0 bg-sidebar-background">
+            <SidebarContent
+              {...sharedProps}
+              onClose={() => setMobileOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      </div>
+    </>
   );
 }

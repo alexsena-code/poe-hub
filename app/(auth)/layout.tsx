@@ -18,7 +18,8 @@ export default async function AuthLayout({
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      {/* On mobile, add top padding to clear the fixed hamburger bar (h-14) */}
+      <main className="flex-1 overflow-auto p-6 pt-20 md:pt-6">{children}</main>
       <Toaster />
     </div>
   );

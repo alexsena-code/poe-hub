@@ -219,14 +219,24 @@ model Buyer {
 }
 
 model Simulation {
-  id             String           @id @default(uuid())
-  name           String
-  league         String
-  status         SimulationStatus @default(draft)
-  durationWeeks  Int              @map("duration_weeks")
-  notes          String?
-  createdAt      DateTime         @default(now()) @map("created_at")
-  updatedAt      DateTime         @updatedAt @map("updated_at")
+  id              String           @id @default(uuid())
+  name            String
+  league          String
+  status          SimulationStatus @default(draft)
+  durationWeeks   Int              @map("duration_weeks")
+  startDayOffset  Int              @default(0) @map("start_day_offset")
+  notes           String?
+
+  // Cost snapshot (copied from GlobalCostConfig when selected)
+  costConfigName          String?  @map("cost_config_name")
+  proxyCostPerBotMonthly  Decimal? @map("sim_proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
+  levelingCostPerBot      Decimal? @map("sim_leveling_cost_per_bot") @db.Decimal(10, 2)
+  stashPackCostPerBot     Decimal? @map("sim_stash_pack_cost_per_bot") @db.Decimal(10, 2)
+  expluginsKeyCostDaily   Decimal? @map("sim_explugins_key_cost_daily") @db.Decimal(10, 4)
+  dpbKeyCostDaily         Decimal? @map("sim_dpb_key_cost_daily") @db.Decimal(10, 4)
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
 
   weeks     SimulationWeek[]
   costLinks SimulationCostLink[]
@@ -277,10 +287,10 @@ model GlobalCostConfig {
   name                      String
   isDefault                 Boolean @default(false) @map("is_default")
   proxyCostPerBotMonthly    Decimal @map("proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
-  vpsCostMonthly            Decimal @map("vps_cost_monthly") @db.Decimal(10, 2)
-  dpbLicenseCostMonthly     Decimal @map("dpb_license_cost_monthly") @db.Decimal(10, 2)
-  otherFixedCostsMonthly    Decimal @map("other_fixed_costs_monthly") @db.Decimal(10, 2)
-  otherVariableCostPerBot   Decimal @map("other_variable_cost_per_bot") @db.Decimal(10, 2)
+  levelingCostPerBot        Decimal @map("leveling_cost_per_bot") @db.Decimal(10, 2)
+  stashPackCostPerBot       Decimal @default(0) @map("stash_pack_cost_per_bot") @db.Decimal(10, 2)
+  expluginsKeyCostDaily     Decimal @map("explugins_key_cost_daily") @db.Decimal(10, 4)
+  dpbKeyCostDaily           Decimal @map("dpb_key_cost_daily") @db.Decimal(10, 4)
   notes                     String?
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")

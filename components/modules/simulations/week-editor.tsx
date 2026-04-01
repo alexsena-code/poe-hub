@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Table,
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 
 // --- Types ---
 
@@ -50,22 +51,25 @@ export interface SimulationWeek {
 
 interface CostConfig {
   proxyCostPerBotMonthly: number;
-  vpsCostMonthly: number;
-  dpbLicenseCostMonthly: number;
-  otherFixedCostsMonthly: number;
-  otherVariableCostPerBot: number;
+  levelingCostPerBot: number;
+  expluginsKeyCostDaily: number;
+  dpbKeyCostDaily: number;
 }
 
 interface WeekEditorProps {
   simulationId: string;
   week: SimulationWeek;
   costConfig: CostConfig | null;
+  startDayOffset?: number;
   onWeekUpdated: (week: SimulationWeek) => void;
 }
 
-const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"];
-
 // --- Helpers ---
+
+function fmtDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
 
 function resolveField(
   day: SimulationDay,
@@ -94,17 +98,18 @@ function isOverridden(
   return day[field] !== null && day[field] !== undefined;
 }
 
+/** Format as USD without conversion */
+function fmtUsd(val: number | null | undefined): string {
+  if (val === null || val === undefined) return "-";
+  return `$${Number(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function fmtNum(val: number | null | undefined, decimals = 2): string {
   if (val === null || val === undefined) return "-";
   return Number(val).toLocaleString("pt-BR", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-}
-
-function fmtCurrency(val: number | null | undefined, prefix: string): string {
-  if (val === null || val === undefined) return "-";
-  return `${prefix}${fmtNum(val)}`;
 }
 
 // --- Inline Editable Cell ---
@@ -152,37 +157,35 @@ function InlineCell({
     if (e.key === "Escape") setEditing(false);
   }
 
-  if (editing) {
-    return (
-      <Input
-        ref={inputRef}
-        className="h-7 w-24 text-right font-mono text-sm"
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={handleKeyDown}
-      />
-    );
-  }
-
   const displayVal =
     value !== null && value !== undefined
       ? `${prefix}${type === "int" ? Number(value).toLocaleString("pt-BR") : fmtNum(value)}`
       : "-";
 
   return (
-    <div className={cn("flex items-center gap-1 group", className)}>
-      <span
-        className={cn(
-          "cursor-pointer font-mono text-sm",
-          inherited ? "text-muted-foreground italic" : "font-bold"
-        )}
-        onClick={startEdit}
-        title={inherited ? "Herdado da semana (clique para sobrescrever)" : "Valor sobrescrito"}
-      >
-        {displayVal}
-      </span>
-      {!inherited && onReset && (
+    <div className={cn("flex items-center justify-end gap-1 group", className)}>
+      {editing ? (
+        <input
+          ref={inputRef}
+          className="h-6 w-20 text-right font-mono text-sm px-1 bg-background border border-input rounded-sm outline-none focus:ring-1 focus:ring-ring"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={handleKeyDown}
+        />
+      ) : (
+        <span
+          className={cn(
+            "cursor-pointer font-mono text-sm",
+            inherited ? "text-muted-foreground italic" : "font-bold"
+          )}
+          onClick={startEdit}
+          title={inherited ? "Herdado da semana (clique para sobrescrever)" : "Valor sobrescrito"}
+        >
+          {displayVal}
+        </span>
+      )}
+      {!editing && !inherited && onReset && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -286,14 +289,15 @@ export function WeekEditor({
   week,
   costConfig,
   onWeekUpdated,
+  startDayOffset = 0,
 }: WeekEditorProps) {
   const [localWeek, setLocalWeek] = useState<SimulationWeek>(week);
+  const { formatMoney, convert, exchangeRate } = useCurrency();
 
-  // Sync from parent
-  const weekId = week.id;
-  if (localWeek.id !== weekId) {
+  // Sync from parent — update localWeek when parent data changes (e.g. after import)
+  useEffect(() => {
     setLocalWeek(week);
-  }
+  }, [week]);
 
   // --- API calls ---
 
@@ -400,42 +404,46 @@ export function WeekEditor({
     return divines * price;
   }
 
-  // Week subtotals
-  const weekDivines = localWeek.days.reduce(
+  // Filter out locked days (before startDayOffset) from calculations
+  const activeDays = localWeek.days.filter((d) => {
+    const gi = (localWeek.weekNumber - 1) * 7 + (d.dayNumber - 1);
+    return gi >= startDayOffset;
+  });
+
+  // Week subtotals (only active days)
+  const weekDivines = activeDays.reduce(
     (sum, d) => sum + (calcDayDivines(d) ?? 0),
     0
   );
-  const weekRevenueUsd = localWeek.days.reduce(
+  const weekRevenueUsd = activeDays.reduce(
     (sum, d) => sum + (calcDayRevenueUsd(d) ?? 0),
     0
   );
-  const weekRevenueBrl = localWeek.days.reduce(
+  const weekRevenueBrl = activeDays.reduce(
     (sum, d) => sum + (calcDayRevenueBrl(d) ?? 0),
     0
   );
 
-  // Cost calculation per PRD formula
+  // Cost calculation — only active days
+  // All costs are per-bot: explugins key, dpb key, proxy
   let weekCost = 0;
   if (costConfig) {
-    const fixedMonthly =
-      costConfig.vpsCostMonthly +
-      costConfig.dpbLicenseCostMonthly +
-      costConfig.otherFixedCostsMonthly;
-    const fixedWeekly = fixedMonthly / 4;
+    const expluginsPerBotDaily = Number(costConfig.expluginsKeyCostDaily);
+    const dpbPerBotDaily = Number(costConfig.dpbKeyCostDaily);
+    const proxyPerBotDaily = Number(costConfig.proxyCostPerBotMonthly) / 30;
+    const costPerBotDaily = expluginsPerBotDaily + dpbPerBotDaily + proxyPerBotDaily;
 
-    const maxBots = localWeek.days.reduce((max, d) => {
-      const bots = resolveField(d, "activeBots", localWeek);
-      return Math.max(max, bots ?? 0);
-    }, 0);
-
-    const variablePerBot =
-      costConfig.proxyCostPerBotMonthly + costConfig.otherVariableCostPerBot;
-    const variableWeekly = maxBots * variablePerBot * (7 / 30);
-
-    weekCost = fixedWeekly + variableWeekly;
+    for (const day of activeDays) {
+      const bots = resolveField(day, "activeBots", localWeek) ?? 0;
+      weekCost += bots * costPerBotDaily;
+    }
   }
 
-  const weekProfit = weekRevenueUsd - weekCost;
+  // Use USD revenue if available, otherwise convert BRL→USD directly
+  const effectiveRevenueUsd = weekRevenueUsd > 0
+    ? weekRevenueUsd
+    : weekRevenueBrl / exchangeRate;
+  const weekProfit = effectiveRevenueUsd - weekCost;
 
   // Sort days
   const sortedDays = [...localWeek.days].sort(
@@ -456,12 +464,14 @@ export function WeekEditor({
         <DefaultField
           label="Divine/Hora"
           value={Number(localWeek.defaultDivinePerHour)}
+          type="int"
           tooltip="Divines por hora por bot"
           onSave={(val) => saveWeekDefaults({ defaultDivinePerHour: val } as Partial<SimulationWeek>)}
         />
         <DefaultField
           label="Horas/Dia"
           value={Number(localWeek.defaultHoursPerDay)}
+          type="int"
           tooltip="Horas de operacao por dia"
           onSave={(val) => saveWeekDefaults({ defaultHoursPerDay: val } as Partial<SimulationWeek>)}
         />
@@ -493,23 +503,43 @@ export function WeekEditor({
               <TableHead className="text-right">Preco USD</TableHead>
               <TableHead className="text-right">Preco BRL</TableHead>
               <TableHead className="text-right bg-muted/30">Divines/Dia</TableHead>
-              <TableHead className="text-right bg-muted/30">Receita USD</TableHead>
-              <TableHead className="text-right bg-muted/30">Receita BRL</TableHead>
+              <TableHead className="text-right bg-muted/30">Receita</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedDays.map((day) => {
-              const dayDivines = calcDayDivines(day);
-              const dayRevUsd = calcDayRevenueUsd(day);
-              const dayRevBrl = calcDayRevenueBrl(day);
-              const dayLabel = DAY_LABELS[(day.dayNumber - 1) % 7] ?? `D${day.dayNumber}`;
+              const globalDayIndex = (localWeek.weekNumber - 1) * 7 + (day.dayNumber - 1);
+              const isLocked = globalDayIndex < startDayOffset;
+              const dayDivines = isLocked ? 0 : calcDayDivines(day);
+              const dayRevUsd = isLocked ? 0 : calcDayRevenueUsd(day);
+              const dayRevBrl = isLocked ? 0 : calcDayRevenueBrl(day);
+              const dayLabel = day.date ? fmtDate(day.date) : `D${day.dayNumber}`;
               const hasAnyOverride =
                 day.activeBots !== null ||
                 day.divinePerHour !== null ||
                 day.hoursPerDay !== null ||
                 day.divinePriceUsd !== null ||
                 day.divinePriceBrl !== null;
+
+              if (isLocked) {
+                return (
+                  <TableRow key={day.id} className="opacity-30">
+                    <TableCell className="font-medium">
+                      <span className="text-xs text-muted-foreground mr-1">{day.dayNumber}</span>
+                      {dayLabel}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">0</TableCell>
+                    <TableCell className="text-right text-muted-foreground">-</TableCell>
+                    <TableCell className="text-right text-muted-foreground">-</TableCell>
+                    <TableCell className="text-right text-muted-foreground">-</TableCell>
+                    <TableCell className="text-right text-muted-foreground">-</TableCell>
+                    <TableCell className="text-right bg-muted/30 text-muted-foreground">0</TableCell>
+                    <TableCell className="text-right bg-muted/30 text-muted-foreground">-</TableCell>
+                    <TableCell />
+                  </TableRow>
+                );
+              }
 
               return (
                 <TableRow key={day.id}>
@@ -536,6 +566,7 @@ export function WeekEditor({
                     <InlineCell
                       value={resolveField(day, "divinePerHour", localWeek)}
                       inherited={!isOverridden(day, "divinePerHour")}
+                      type="int"
                       onSave={(val) => saveDayField(day.dayNumber, "divinePerHour", val)}
                       onReset={
                         isOverridden(day, "divinePerHour")
@@ -548,6 +579,7 @@ export function WeekEditor({
                     <InlineCell
                       value={resolveField(day, "hoursPerDay", localWeek)}
                       inherited={!isOverridden(day, "hoursPerDay")}
+                      type="int"
                       onSave={(val) => saveDayField(day.dayNumber, "hoursPerDay", val)}
                       onReset={
                         isOverridden(day, "hoursPerDay")
@@ -584,13 +616,14 @@ export function WeekEditor({
                   </TableCell>
                   {/* Calculated columns */}
                   <TableCell className="text-right bg-muted/30 font-mono text-sm">
-                    {fmtNum(dayDivines)}
+                    {fmtNum(dayDivines, 0)}
                   </TableCell>
                   <TableCell className="text-right bg-muted/30 font-mono text-sm">
-                    {fmtCurrency(dayRevUsd, "$")}
-                  </TableCell>
-                  <TableCell className="text-right bg-muted/30 font-mono text-sm">
-                    {fmtCurrency(dayRevBrl, "R$")}
+                    {dayRevBrl !== null
+                      ? formatMoney(dayRevBrl, "brl")
+                      : dayRevUsd !== null
+                      ? formatMoney(dayRevUsd, "usd")
+                      : "-"}
                   </TableCell>
                   <TableCell>
                     {hasAnyOverride && (
@@ -622,13 +655,10 @@ export function WeekEditor({
                 Subtotal Semana {localWeek.weekNumber}
               </TableCell>
               <TableCell className="text-right font-mono">
-                {fmtNum(weekDivines)}
+                {fmtNum(weekDivines, 0)}
               </TableCell>
               <TableCell className="text-right font-mono">
-                {fmtCurrency(weekRevenueUsd, "$")}
-              </TableCell>
-              <TableCell className="text-right font-mono">
-                {fmtCurrency(weekRevenueBrl, "R$")}
+                {formatMoney(weekRevenueBrl > 0 ? weekRevenueBrl : weekRevenueUsd, weekRevenueBrl > 0 ? "brl" : "usd")}
               </TableCell>
               <TableCell />
             </TableRow>
@@ -640,9 +670,8 @@ export function WeekEditor({
                     Custo semanal
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {fmtCurrency(weekCost, "$")}
+                    {formatMoney(weekCost, "usd")}
                   </TableCell>
-                  <TableCell />
                   <TableCell />
                 </TableRow>
                 <TableRow className="bg-muted/30">
@@ -655,9 +684,8 @@ export function WeekEditor({
                       weekProfit >= 0 ? "text-green-500" : "text-destructive"
                     )}
                   >
-                    {fmtCurrency(weekProfit, "$")}
+                    {formatMoney(weekProfit, "usd")}
                   </TableCell>
-                  <TableCell />
                   <TableCell />
                 </TableRow>
               </>

@@ -424,13 +424,70 @@ poe-hub/
 
 ---
 
-## Pendências / Melhorias Futuras
+## Fase 9 — Polish, Custos, Moeda, Charts, Mobile, E2E
 
-- [ ] Gráfico de evolução de preço na página de Preços (usar DailyPrice)
+**Data:** 2026-03-31
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Separacao item vs moeda | Done | Divine/chaos como item, BRL/USD como moeda real |
+| Stats cards fix | Done | Filtra por item em vez de currency, exclui outliers |
+| Custos refatorados | Done | Tudo diario, per-bot, Explugins Key, DPB Key, Stash Pack, Leveling |
+| Custos snapshot | Done | Valores de custo copiados pra simulacao ao selecionar config |
+| Conversao USD/BRL | Done | API de cambio (open.er-api.com), toggle global na sidebar, formatMoney |
+| Toggle moeda por campo | Done | Config de custos permite input em $ ou R$ por campo |
+| Datas reais simulacao | Done | Dias mapeiam pra datas da liga, startDayOffset, dias bloqueados |
+| Liga editavel | Done | Click para trocar liga na simulacao |
+| Import precos fix | Done | Reset antes de reimportar, offset correto, refresh automatico |
+| Grafico dashboard | Done | 2 charts (PoE1 + PoE2), select de range 7d/14d/30d |
+| Grafico pagina precos | Done | Recharts com Mediana + CNL, ranges 7d/30d/90d |
+| Filtro semana da liga | Done | Selects "Semana de/ate" auto-calculam datas |
+| Ordenacao precos | Done | Select asc/desc na tabela de historico |
+| Responsividade mobile | Done | Sidebar colapsavel com Sheet, hamburger, overflow-x-auto nas tabelas |
+| Playwright E2E | Done | 32 testes: auth, navegacao, simulacoes, precos |
+| Cron scraper | Done | cron-runner.ts, Dockerfile.scraper, docker-compose service |
+| Receita unificada | Done | 1 coluna "Receita" em vez de USD+BRL separados |
+| Vendas conversao | Done | Total USD/BRL auto-calculado com cambio |
+
+### Decisoes Tecnicas
+
+#### Custos per-bot (nao fixo)
+- Explugins Key, DPB Key e Proxy sao todos multiplicados pelo numero de bots ativos
+- Leveling e Stash Pack sao one-time baseados no max bots da simulacao
+
+#### Cost snapshot na simulacao
+- Ao selecionar config de custos, valores sao copiados para a simulacao
+- Mudancas no config global nao afetam simulacoes existentes
+
+#### Conversao BRL→USD
+- Usa `/ exchangeRate` direto (nao a funcao convert que depende do displayCurrency)
+- API de cambio com cache de 1h, fallback R$5.00
+
+#### Datas reais nas simulacoes
+- Cada dia mapeia para league_start + globalDayIndex
+- Dias antes do startDayOffset ficam bloqueados (opacity-30, sem calculo)
+
+### Migrations criadas
+
+| Migration | Descricao |
+|-----------|-----------|
+| 20260331190000 | Refactor cost config: monthly → daily |
+| 20260331191000 | Proxy back to monthly |
+| 20260331192000 | Rename other_fixed to dpb_key |
+| 20260331193000 | Add start_day_offset to simulation |
+| 20260331194000 | Add stash_pack_cost_per_bot |
+| 20260331195000 | Add cost snapshot fields to simulation |
+
+---
+
+## Pendencias / Melhorias Futuras
+
+- [x] Grafico de evolucao de preco na pagina de Precos (usar DailyPrice)
 - [ ] Export vendas para CSV
-- [ ] Playwright E2E para fluxos críticos
-- [ ] Cron setup automatizado para scraper
-- [ ] Responsividade mobile refinada
-- [ ] Módulos editáveis nas configurações globais (atualmente em lib/constants.ts)
-- [ ] Notificações quando preço divine atingir threshold
-- [ ] Integração com DPB para criação automática de perfis (futuro)
+- [x] Playwright E2E para fluxos criticos
+- [x] Cron setup automatizado para scraper
+- [x] Responsividade mobile refinada
+- [ ] Modulos editaveis nas configuracoes globais (atualmente em lib/constants.ts)
+- [ ] Integracao DPB Monitor (logs em tempo real, alertas, status de bots)

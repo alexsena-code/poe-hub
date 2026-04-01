@@ -10,17 +10,29 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
-  const currency = searchParams.get("currency") || "divine";
+  const item = searchParams.get("item") || "divine";
   const league = searchParams.get("league");
+  const channelId = searchParams.get("channelId");
 
   const now = new Date();
   const days7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const baseWhere: Record<string, unknown> = { currency };
-  if (league) {
-    baseWhere.league = league;
-  }
+  // Filter by item field (new data) or legacy currency field (old data)
+  const itemFilter = {
+    OR: [
+      { item },
+      ...(["divine", "chaos"].includes(item)
+        ? [{ currency: item as "divine" | "chaos", item: null }]
+        : []),
+    ],
+  };
+
+  const baseWhere: Record<string, unknown> = {
+    ...itemFilter,
+    ...(league ? { league } : {}),
+    ...(channelId ? { discordChannelId: channelId } : {}),
+  };
 
   // Current CNL price (most recent CNL entry)
   const latestCnl = await prisma.priceEntry.findFirst({
@@ -47,12 +59,6 @@ export async function GET(request: NextRequest) {
     _avg: { price: true },
   });
 
-  // Avg Market 30d (non-CNL)
-  const avgMarket30d = await prisma.priceEntry.aggregate({
-    where: { ...baseWhere, isCnl: false, messageTimestamp: { gte: days30Ago } },
-    _avg: { price: true },
-  });
-
   const toNumber = (v: unknown): number | null =>
     v !== null && v !== undefined ? Number(v) : null;
 
@@ -60,7 +66,6 @@ export async function GET(request: NextRequest) {
   const avgCnl7dVal = toNumber(avgCnl7d._avg.price);
   const avgCnl30dVal = toNumber(avgCnl30d._avg.price);
   const avgMarket7dVal = toNumber(avgMarket7d._avg.price);
-  const avgMarket30dVal = toNumber(avgMarket30d._avg.price);
 
   // Spread: CNL vs Market (7d)
   let spreadCnlVsMarket: number | null = null;
@@ -71,13 +76,12 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    currency,
+    item,
     league: league ?? null,
     currentCnlPrice,
     avgCnl7d: avgCnl7dVal,
     avgCnl30d: avgCnl30dVal,
     avgMarket7d: avgMarket7dVal,
-    avgMarket30d: avgMarket30dVal,
     spreadCnlVsMarket,
   });
 }

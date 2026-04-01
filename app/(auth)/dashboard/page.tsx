@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { KpiCards } from "@/components/modules/dashboard/kpi-cards";
 import { RecentSales } from "@/components/modules/dashboard/recent-sales";
-import { PriceChart } from "@/components/modules/dashboard/price-chart";
+import { PriceCharts } from "@/components/modules/dashboard/price-charts";
 import { TaskSummary } from "@/components/modules/dashboard/task-summary";
 import { Loader2 } from "lucide-react";
 
@@ -34,12 +34,7 @@ interface DashboardData {
     totalBrl: number | null;
     totalUsd: number | null;
   }[];
-  priceHistory30d: {
-    date: string;
-    median: number;
-    cnlPrice: number | null;
-    league: string;
-  }[];
+  currentLeagues: { name: string; poeVersion: string }[];
 }
 
 export default function DashboardPage() {
@@ -84,16 +79,10 @@ export default function DashboardPage() {
 
       <KpiCards data={data} />
 
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
-        {/* Price chart - takes more space */}
-        <div className="lg:col-span-4">
-          <PriceChart data={data.priceHistory30d} />
-        </div>
+      <PriceCharts currentLeagues={data.currentLeagues} />
 
-        {/* Task summary */}
-        <div className="lg:col-span-3">
-          <TaskSummary counts={data.taskCounts} />
-        </div>
+      <div className="grid gap-4 grid-cols-1">
+        <TaskSummary counts={data.taskCounts} />
       </div>
 
       <div className="grid gap-4 grid-cols-1">

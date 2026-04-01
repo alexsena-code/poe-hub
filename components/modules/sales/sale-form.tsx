@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BuyerInlineDialog } from "./buyer-inline-dialog";
 import { useLeagues } from "@/hooks/use-leagues";
+import { useCurrency } from "@/hooks/use-currency";
 
 const saleFormSchema = z.object({
   date: z.string().min(1, "Data é obrigatória"),
@@ -77,6 +78,7 @@ export function SaleForm({ initialData }: SaleFormProps) {
   const [loadingBuyers, setLoadingBuyers] = useState(true);
   const [buyerDialogOpen, setBuyerDialogOpen] = useState(false);
   const { leagues } = useLeagues();
+  const { formatMoney, displayCurrency, exchangeRate } = useCurrency();
 
   const [totalUsd, setTotalUsd] = useState<number>(initialData?.totalUsd ?? 0);
   const [totalBrl, setTotalBrl] = useState<number>(initialData?.totalBrl ?? 0);
@@ -347,14 +349,20 @@ export function SaleForm({ initialData }: SaleFormProps) {
                 <div className="space-y-1">
                   <Label className="text-muted-foreground">Total USD</Label>
                   <p className="text-2xl font-bold">
-                    ${totalUsd.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${(totalUsd > 0 ? totalUsd : totalBrl / exchangeRate).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
+                  {totalUsd === 0 && totalBrl > 0 && (
+                    <p className="text-xs text-muted-foreground">convertido de BRL</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-muted-foreground">Total BRL</Label>
                   <p className="text-2xl font-bold">
-                    R${totalBrl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    R$ {(totalBrl > 0 ? totalBrl : totalUsd * exchangeRate).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
+                  {totalBrl === 0 && totalUsd > 0 && (
+                    <p className="text-xs text-muted-foreground">convertido de USD</p>
+                  )}
                 </div>
               </div>
             </div>

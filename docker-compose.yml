@@ -31,5 +31,29 @@ services:
       db:
         condition: service_healthy
 
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+      # Override the cron schedule at build time:
+      #   docker compose build --build-arg CRON_SCHEDULE="0 * * * *" scraper
+      args:
+        CRON_SCHEDULE: "*/30 * * * *"
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://poth:poth@db:5432/poth
+      NODE_ENV: production
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    # Mount a host volume to persist DiscordChatExporter exports between runs.
+    # The DCE_PATH must point to the binary inside the container — mount it below
+    # or set DCE_PATH in .env to a path that exists inside the container.
+    volumes:
+      - scraper_exports:/app/exports
+
 volumes:
   pgdata:
+  scraper_exports:

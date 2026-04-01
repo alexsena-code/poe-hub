@@ -19,7 +19,7 @@ export async function GET() {
   // Get current leagues
   const currentLeagues = await prisma.league.findMany({
     where: { isCurrent: true },
-    select: { name: true },
+    select: { name: true, poeVersion: true },
   });
   const currentLeagueNames = currentLeagues.map((l) => l.name);
 
@@ -88,11 +88,11 @@ export async function GET() {
       orderBy: { date: "desc" },
     }),
 
-    // Price history last 30 days for divine
+    // Price history last 7 days for divine (per league, not mixed)
     prisma.dailyPrice.findMany({
       where: {
         item: "divine",
-        date: { gte: thirtyDaysAgo },
+        date: { gte: sevenDaysAgo },
         ...(currentLeagueNames.length > 0
           ? { league: { in: currentLeagueNames } }
           : {}),
@@ -158,11 +158,6 @@ export async function GET() {
       totalBrl: s.totalBrl ? Number(s.totalBrl) : null,
       totalUsd: s.totalUsd ? Number(s.totalUsd) : null,
     })),
-    priceHistory30d: priceHistory30d.map((p) => ({
-      date: p.date,
-      median: Number(p.median),
-      cnlPrice: p.cnlPrice ? Number(p.cnlPrice) : null,
-      league: p.league,
-    })),
+    currentLeagues: currentLeagues.map((l) => ({ name: l.name, poeVersion: l.poeVersion })),
   });
 }

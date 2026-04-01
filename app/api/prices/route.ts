@@ -14,16 +14,21 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
   const currency = searchParams.get("currency");
+  const item = searchParams.get("item");
   const isCnl = searchParams.get("isCnl");
   const league = searchParams.get("league");
   const dateFrom = searchParams.get("dateFrom");
   const dateTo = searchParams.get("dateTo");
   const channelId = searchParams.get("channelId");
+  const sort = searchParams.get("sort") === "asc" ? "asc" as const : "desc" as const;
 
   const where: Record<string, unknown> = {};
 
   if (currency) {
     where.currency = currency;
+  }
+  if (item) {
+    where.item = item;
   }
   if (isCnl !== null && isCnl !== undefined && isCnl !== "") {
     where.isCnl = isCnl === "true";
@@ -50,7 +55,7 @@ export async function GET(request: NextRequest) {
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: { messageTimestamp: "desc" },
+      orderBy: { messageTimestamp: sort },
     }),
     prisma.priceEntry.count({ where }),
   ]);

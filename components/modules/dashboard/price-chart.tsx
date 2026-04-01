@@ -41,7 +41,7 @@ export function PriceChart({ data }: { data: PricePoint[] }) {
       <Card>
         <CardHeader>
           <CardTitle>Divine - Historico de Preco</CardTitle>
-          <CardDescription>Ultimos 30 dias</CardDescription>
+          <CardDescription>Ultimos 7 dias</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -52,7 +52,15 @@ export function PriceChart({ data }: { data: PricePoint[] }) {
     );
   }
 
-  const chartData = data.map((d) => ({
+  // Group by date, pick the league with highest volume (most data points)
+  const leagueCounts: Record<string, number> = {};
+  for (const d of data) {
+    leagueCounts[d.league] = (leagueCounts[d.league] ?? 0) + 1;
+  }
+  const primaryLeague = Object.entries(leagueCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const filtered = primaryLeague ? data.filter((d) => d.league === primaryLeague) : data;
+
+  const chartData = filtered.map((d) => ({
     date: new Date(d.date).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
@@ -68,7 +76,7 @@ export function PriceChart({ data }: { data: PricePoint[] }) {
       <CardHeader>
         <CardTitle>Divine - Historico de Preco</CardTitle>
         <CardDescription>
-          Ultimos 30 dias &mdash; Mediana e CNL (R$)
+          Ultimos 7 dias &mdash; {primaryLeague ?? "Todas as ligas"} (R$)
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -9,6 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 const importPricesSchema = z.object({
   league: z.string().min(1),
   priceSource: z.enum(["median", "cnl"]).default("median"),
+  startDayOffset: z.number().int().min(0).default(0),
 });
 
 /**
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
   }
 
-  const { league, priceSource } = parsed.data;
+  const { league, priceSource, startDayOffset } = parsed.data;
 
   // Fetch league dates
   const leagueData = await prisma.league.findUnique({ where: { name: league } });
@@ -77,37 +78,62 @@ export async function POST(request: NextRequest, { params }: Params) {
     priceMap.set(dateKey, price);
   }
 
-  // Map simulation days to real dates starting from league start
+  // Reset all day overrides before reimporting so stale data is cleared
+  const allDayIds = simulation.weeks.flatMap((w) => w.days.map((d) => d.id));
+  await prisma.simulationDay.updateMany({
+    where: { id: { in: allDayIds } },
+    data: {
+      divinePriceBrl: null,
+      divinePriceUsd: null,
+      date: null,
+      activeBots: null,
+    },
+  });
+
+  // Also reset week default prices
+  const allWeekIds = simulation.weeks.map((w) => w.id);
+  await prisma.simulationWeek.updateMany({
+    where: { id: { in: allWeekIds } },
+    data: {
+      defaultDivinePriceBrl: null,
+      defaultDivinePriceUsd: null,
+    },
+  });
+
+  // Map simulation days to real dates starting from league day 1.
+  // Days before startDayOffset get activeBots=0 (no production, prices for reference).
   const leagueStart = new Date(leagueData.startDate);
   let updatedDays = 0;
 
   for (const week of simulation.weeks) {
     for (const day of week.days) {
-      // Calculate the real date for this simulation day
-      const dayOffset = (week.weekNumber - 1) * 7 + (day.dayNumber - 1);
+      // Global day index (0-based) across the entire simulation
+      const globalDayIndex = (week.weekNumber - 1) * 7 + (day.dayNumber - 1);
       const realDate = new Date(leagueStart);
-      realDate.setDate(realDate.getDate() + dayOffset);
+      realDate.setDate(realDate.getDate() + globalDayIndex);
       const dateKey = realDate.toISOString().split("T")[0];
 
       const price = priceMap.get(dateKey);
-      if (price !== undefined) {
-        await prisma.simulationDay.update({
-          where: { id: day.id },
-          data: {
-            divinePriceBrl: price.toString(),
-            date: realDate,
-          },
-        });
-        updatedDays++;
-      }
+      const isBeforeStart = globalDayIndex < startDayOffset;
+
+      await prisma.simulationDay.update({
+        where: { id: day.id },
+        data: {
+          date: realDate,
+          ...(price !== undefined ? { divinePriceBrl: price.toString() } : {}),
+          // Zero out bots for days before the chosen start day
+          ...(isBeforeStart ? { activeBots: 0 } : {}),
+        },
+      });
+      if (price !== undefined) updatedDays++;
     }
 
-    // Also update week default with the average price for that week
-    const weekStart = (week.weekNumber - 1) * 7;
+    // Update week default with the average price for that week
+    const weekStartIndex = (week.weekNumber - 1) * 7;
     const weekPrices: number[] = [];
     for (let d = 0; d < 7; d++) {
       const realDate = new Date(leagueStart);
-      realDate.setDate(realDate.getDate() + weekStart + d);
+      realDate.setDate(realDate.getDate() + weekStartIndex + d);
       const dateKey = realDate.toISOString().split("T")[0];
       const price = priceMap.get(dateKey);
       if (price !== undefined) weekPrices.push(price);
@@ -123,6 +149,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
   }
+
+  await prisma.simulation.update({ where: { id }, data: { startDayOffset } });
 
   return NextResponse.json({
     success: true,

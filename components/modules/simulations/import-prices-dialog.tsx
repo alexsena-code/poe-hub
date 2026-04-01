@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ export function ImportPricesDialog({
   const [open, setOpen] = useState(false);
   const [league, setLeague] = useState("");
   const [priceSource, setPriceSource] = useState<"median" | "cnl">("median");
+  const [startDay, setStartDay] = useState(1);
   const [loading, setLoading] = useState(false);
   const { leagues } = useLeagues();
 
@@ -48,7 +50,7 @@ export function ImportPricesDialog({
       const res = await fetch(`/api/simulations/${simulationId}/import-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ league, priceSource }),
+        body: JSON.stringify({ league, priceSource, startDayOffset: startDay - 1 }),
       });
 
       if (!res.ok) {
@@ -104,6 +106,19 @@ export function ImportPricesDialog({
               <p className="text-xs text-muted-foreground">
                 Os preços serão mapeados a partir do primeiro dia da liga
                 selecionada, dia a dia, para cada semana/dia da simulação.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Dia inicial da liga</Label>
+              <Input
+                type="number"
+                min="1"
+                value={startDay}
+                onChange={(e) => setStartDay(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+              <p className="text-xs text-muted-foreground">
+                A simulacao comeca a partir do dia N da liga selecionada
               </p>
             </div>
 

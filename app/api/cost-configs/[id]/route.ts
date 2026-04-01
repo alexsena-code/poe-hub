@@ -60,10 +60,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   if (data.name !== undefined) updateData.name = data.name;
   if (data.proxyCostPerBotMonthly !== undefined) updateData.proxyCostPerBotMonthly = data.proxyCostPerBotMonthly;
-  if (data.vpsCostMonthly !== undefined) updateData.vpsCostMonthly = data.vpsCostMonthly;
-  if (data.dpbLicenseCostMonthly !== undefined) updateData.dpbLicenseCostMonthly = data.dpbLicenseCostMonthly;
-  if (data.otherFixedCostsMonthly !== undefined) updateData.otherFixedCostsMonthly = data.otherFixedCostsMonthly;
-  if (data.otherVariableCostPerBot !== undefined) updateData.otherVariableCostPerBot = data.otherVariableCostPerBot;
+  if (data.levelingCostPerBot !== undefined) updateData.levelingCostPerBot = data.levelingCostPerBot;
+  if (data.stashPackCostPerBot !== undefined) updateData.stashPackCostPerBot = data.stashPackCostPerBot;
+  if (data.expluginsKeyCostDaily !== undefined) updateData.expluginsKeyCostDaily = data.expluginsKeyCostDaily;
+  if (data.dpbKeyCostDaily !== undefined) updateData.dpbKeyCostDaily = data.dpbKeyCostDaily;
   if (data.notes !== undefined) updateData.notes = data.notes ?? null;
 
   // Handle isDefault toggle
