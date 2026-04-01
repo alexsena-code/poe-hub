@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Bot,
+  Activity,
   ListTodo,
   DollarSign,
   TrendingUp,
@@ -32,6 +33,7 @@ type DisplayCurrency = "usd" | "brl";
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Bots", href: "/bots", icon: Bot },
+  { title: "Monitor", href: "/monitor", icon: Activity },
   { title: "Tarefas", href: "/tasks", icon: ListTodo },
   { title: "Vendas", href: "/sales", icon: DollarSign },
   { title: "Precos", href: "/prices", icon: TrendingUp },

@@ -482,6 +482,50 @@ poe-hub/
 
 ---
 
+## Fase 10 — DPB Monitor (Bot Monitoring em Tempo Real)
+
+**Data:** 2026-04-01
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Schema BotInstance + BotAlert | Done | 2 models, 2 enums, indexes, FK para Bot |
+| WebSocket Server | Done | Node.js standalone (porta 8766), aceita agents + dashboards |
+| Alert Engine | Done | Port do log_parser.py: erros, loops, stuck, hideout >10min, inatividade, keywords |
+| Discord Notifier | Done | Webhook com embeds coloridos por severidade, rate-limited |
+| API REST Monitor | Done | instances, alerts (CRUD + acknowledge), stats |
+| Monitor UI | Done | Pagina /monitor com stats, PC groups, bot cards, log viewer, alert panel |
+| Agent Python | Done | Compativel com agent existente do logger, snake_case normalizado |
+| Fake Agents Script | Done | Simula 12 bots em 3 PCs com logs reais do DPB |
+| Sidebar atualizada | Done | Link "Monitor" com icone Activity |
+
+### Decisoes Tecnicas
+
+#### Logs em memoria (nao no banco)
+- Buffer circular de 300 logs por bot — evita encher disco
+- Com 12 bots: ~36KB na memoria total
+- Alertas e stats vao pro PostgreSQL, logs brutos ficam so no PC do agent
+
+#### Agent Python mantido como esta
+- Protocolo snake_case do agent original compativel — WS server normaliza
+- Requisitos minimos: aiohttp + watchdog
+- Roda em qualquer PC com Python 3.8+
+
+#### Alertas especificos
+- Hideout >10min: detecta bot parado no hideout sem entrar em mapa
+- Loop stuck: pattern repetido 10x em 30s (StuckDetection, Vendor fails)
+- Loop persistente: pattern 50x em 5min (WalkablePosition, pathfinding)
+- Cooldown 60s entre alertas iguais por instancia
+
+### Migration
+
+| Migration | Descricao |
+|-----------|-----------|
+| 20260331200000 | Add bot_instances + bot_alerts tables with enums |
+
+---
+
 ## Pendencias / Melhorias Futuras
 
 - [x] Grafico de evolucao de preco na pagina de Precos (usar DailyPrice)
@@ -490,4 +534,7 @@ poe-hub/
 - [x] Cron setup automatizado para scraper
 - [x] Responsividade mobile refinada
 - [ ] Modulos editaveis nas configuracoes globais (atualmente em lib/constants.ts)
-- [ ] Integracao DPB Monitor (logs em tempo real, alertas, status de bots)
+- [x] Integracao DPB Monitor (logs em tempo real, alertas, status de bots)
+- [ ] Bot Discord com comandos /status /logs /alerts
+- [ ] Vinculacao automatica BotInstance → Bot por config_name
+- [ ] Metricas de producao de divines extraidas dos logs
