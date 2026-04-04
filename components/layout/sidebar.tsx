@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   Menu,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +40,7 @@ const navItems = [
   { title: "Precos", href: "/prices", icon: TrendingUp },
   { title: "Simulacoes", href: "/simulations", icon: Calculator },
   { title: "Configuracoes", href: "/settings", icon: Settings },
+  { title: "Guides", href: "/guides", icon: BookOpen },
 ];
 
 interface SidebarContentProps {
