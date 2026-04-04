@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     prisma.bot.count({ where }),
   ]);
 
-  const safeBots = bots.map((bot) => ({
+  const safeBots = bots.map((bot: any) => ({
     ...bot,
     password: "••••••••",
   }));
