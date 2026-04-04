@@ -36,7 +36,14 @@ export async function POST(_request: NextRequest, { params }: Params) {
       league: original.league,
       status: "draft",
       durationWeeks: original.durationWeeks,
+      startDayOffset: original.startDayOffset,
       notes: original.notes,
+      costConfigName: original.costConfigName,
+      proxyCostPerBotMonthly: original.proxyCostPerBotMonthly,
+      levelingCostPerBot: original.levelingCostPerBot,
+      stashPackCostPerBot: original.stashPackCostPerBot,
+      expluginsKeyCostDaily: original.expluginsKeyCostDaily,
+      dpbKeyCostDaily: original.dpbKeyCostDaily,
       costLinks: original.costLinks.length > 0
         ? {
             create: original.costLinks.map((link) => ({

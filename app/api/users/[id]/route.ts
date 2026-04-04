@@ -38,8 +38,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessionUser = session.user as { role?: string };
-  if (sessionUser.role !== "admin") {
+  if (session.user?.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -97,14 +96,13 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sessionUser = session.user as { id?: string; role?: string };
-  if (sessionUser.role !== "admin") {
+  if (session.user?.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
 
-  if (sessionUser.id === id) {
+  if (session.user?.id === id) {
     return NextResponse.json(
       { error: "Nao e possivel deletar o proprio usuario" },
       { status: 400 }

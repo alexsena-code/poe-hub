@@ -22,10 +22,11 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const { searchParams } = request.nextUrl;
   const revealSecrets = searchParams.get("reveal") === "true";
+  const isAdmin = session.user?.role === "admin";
 
   return NextResponse.json({
     ...bot,
-    password: revealSecrets ? decrypt(bot.password) : "••••••••",
+    password: revealSecrets && isAdmin ? decrypt(bot.password) : "••••••••",
   });
 }
 

@@ -125,6 +125,7 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
   const [nameValue, setNameValue] = useState("");
   const [editingStatus, setEditingStatus] = useState(false);
   const [editingLeague, setEditingLeague] = useState(false);
+  const [chartMode, setChartMode] = useState<"cumulative" | "stacked">("cumulative");
   const { leagues } = useLeagues();
 
   const fetchSimulation = useCallback(async () => {
@@ -527,6 +528,173 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
         </Card>
       </div>
 
+      {/* Cost & Revenue breakdown cards */}
+      {costConfig && (() => {
+        const explugins = Number(costConfig.expluginsKeyCostDaily);
+        const dpb = Number(costConfig.dpbKeyCostDaily);
+        const proxyDaily = Number(costConfig.proxyCostPerBotMonthly) / 30;
+        const costPerBotDaily = explugins + dpb + proxyDaily;
+        const offset = simulation.startDayOffset ?? 0;
+        const maxBots = Math.max(...simulation.weeks.map((w) => Number(w.defaultActiveBots)), 0);
+
+        let cumProfit = 0;
+        const weekData = sortedWeeks.map((week) => {
+          const activeDays = week.days.filter((d) => {
+            const gi = (week.weekNumber - 1) * 7 + (d.dayNumber - 1);
+            return gi >= offset;
+          });
+          let weekCost = 0;
+          let weekRevUsd = 0;
+          let weekRevBrl = 0;
+          for (const day of activeDays) {
+            const bots = resolveField(day, "activeBots", week) ?? 0;
+            weekCost += bots * costPerBotDaily;
+            const dph = resolveField(day, "divinePerHour", week);
+            const hours = resolveField(day, "hoursPerDay", week);
+            const priceUsd = resolveField(day, "divinePriceUsd", week);
+            const priceBrl = resolveField(day, "divinePriceBrl", week);
+            if (bots && dph && hours) {
+              const divines = bots * dph * hours;
+              if (priceUsd) weekRevUsd += divines * priceUsd;
+              if (priceBrl) weekRevBrl += divines * priceBrl;
+            }
+          }
+          const effectiveRev = weekRevUsd > 0 ? weekRevUsd : weekRevBrl / exchangeRate;
+          cumProfit += effectiveRev - weekCost;
+          return {
+            name: `S${week.weekNumber}`,
+            receita: Number(effectiveRev.toFixed(2)),
+            custo: Number(weekCost.toFixed(2)),
+            lucro: Number((effectiveRev - weekCost).toFixed(2)),
+            lucroAcumulado: Number(cumProfit.toFixed(2)),
+            weekCost,
+            activeDays: activeDays.length,
+            bots: week.defaultActiveBots,
+          };
+        });
+
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Card 1: Detalhamento de Custos */}
+            <Card>
+              <CardContent className="pt-5 pb-4 space-y-4 text-sm">
+                <div>
+                  <p className="font-semibold">Detalhamento de Custos</p>
+                  <p className="text-xs text-muted-foreground">{costConfig.name}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-xs">
+                  <span>ExPlugins <span className="font-mono text-foreground">{formatMoney(explugins, "usd")}</span></span>
+                  <span>+ DPB <span className="font-mono text-foreground">{formatMoney(dpb, "usd")}</span></span>
+                  <span>+ Proxy <span className="font-mono text-foreground">{formatMoney(proxyDaily, "usd")}</span><span className="ml-1">({formatMoney(Number(costConfig.proxyCostPerBotMonthly), "usd")}/mes)</span></span>
+                  <span>= <span className="font-mono font-bold text-foreground">{formatMoney(costPerBotDaily, "usd")}/bot/dia</span></span>
+                </div>
+                <div className="grid gap-1">
+                  {weekData.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
+                      <span className="text-muted-foreground">
+                        {d.name}
+                        <span className="ml-2 text-xs">{d.bots} bots × {d.activeDays}d</span>
+                      </span>
+                      <span className="font-mono tabular-nums w-28 text-right">{formatMoney(d.weekCost, "usd")}</span>
+                    </div>
+                  ))}
+                  {(Number(costConfig.levelingCostPerBot) > 0 || Number(costConfig.stashPackCostPerBot) > 0) && (
+                    <div className="flex items-center justify-between py-1 border-b border-border/50 text-muted-foreground">
+                      <span>Unico (Lv + Stash) <span className="text-xs ml-1">{maxBots} bots</span></span>
+                      <span className="font-mono tabular-nums w-28 text-right">
+                        {formatMoney(maxBots * (Number(costConfig.levelingCostPerBot) + Number(costConfig.stashPackCostPerBot)), "usd")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between py-1 font-medium">
+                    <span>Total</span>
+                    <span className="font-mono tabular-nums w-28 text-right">{formatMoney(totals.totalCost ?? 0, "usd")}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: Receita & Lucro por Semana */}
+            <Card>
+              <CardContent className="pt-5 pb-4 space-y-4 text-sm">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Receita & Lucro</p>
+                    <div className="flex gap-1 border rounded-md p-0.5">
+                      <Button
+                        variant={chartMode === "cumulative" ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setChartMode("cumulative")}
+                      >
+                        Lucro Acumulado
+                      </Button>
+                      <Button
+                        variant={chartMode === "stacked" ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setChartMode("stacked")}
+                      >
+                        Receita / Custo
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {chartMode === "cumulative" ? "Lucro da semana e acumulado" : "Breakdown semanal"}
+                  </p>
+                </div>
+                {/* Spacer to align with left card formula row */}
+                <div className="text-xs invisible">spacer</div>
+
+                {chartMode === "cumulative" ? (
+                  <div className="grid gap-1">
+                    {weekData.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
+                        <span className="text-muted-foreground">
+                          {d.name}
+                          <span className="ml-2 text-xs">{d.bots} bots × {d.activeDays}d</span>
+                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-xs text-muted-foreground">
+                            sem: <span className={`font-mono ${d.lucro >= 0 ? "text-green-500" : "text-destructive"}`}>{d.lucro >= 0 ? "+" : ""}{formatMoney(d.lucro, "usd")}</span>
+                          </span>
+                          <span className={`font-mono tabular-nums w-28 text-right font-medium ${d.lucroAcumulado >= 0 ? "text-green-500" : "text-destructive"}`}>
+                            {d.lucroAcumulado >= 0 ? "+" : ""}{formatMoney(d.lucroAcumulado, "usd")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid gap-1">
+                    <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground pb-1 border-b border-border/50">
+                      <span className="w-24 text-right">Receita</span>
+                      <span className="w-24 text-right">Custo</span>
+                      <span className="w-24 text-right">Lucro</span>
+                    </div>
+                    {weekData.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
+                        <span className="text-muted-foreground">
+                          {d.name}
+                          <span className="ml-2 text-xs">{d.bots} bots × {d.activeDays}d</span>
+                        </span>
+                        <div className="flex items-center gap-3 font-mono tabular-nums text-right">
+                          <span className="text-green-500 w-24">{formatMoney(d.receita, "usd")}</span>
+                          <span className="text-destructive w-24">{formatMoney(d.custo, "usd")}</span>
+                          <span className={`w-24 font-medium ${d.lucro >= 0 ? "text-green-500" : "text-destructive"}`}>
+                            {d.lucro >= 0 ? "+" : ""}{formatMoney(d.lucro, "usd")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
       {/* Weeks accordion */}
       <Accordion
         type="multiple"
@@ -534,7 +702,6 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
         className="space-y-2"
       >
         {sortedWeeks.map((week) => {
-          // Calculate week revenue for the trigger label
           let weekRevenue = 0;
           for (const day of week.days) {
             const bots = resolveField(day, "activeBots", week);

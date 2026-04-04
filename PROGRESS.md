@@ -526,15 +526,117 @@ poe-hub/
 
 ---
 
-## Pendencias / Melhorias Futuras
+## Fase 11 — Scraper UI, Simulacoes Avancadas, Precos Cross-League
 
-- [x] Grafico de evolucao de preco na pagina de Precos (usar DailyPrice)
+**Data:** 2026-04-02 / 2026-04-03
+
+### O que foi feito
+
+| Item | Status | Detalhes |
+|------|--------|---------|
+| Botao "Atualizar Precos" | Done | POST /api/prices/scrape com SSE streaming de logs em tempo real |
+| Painel de log do scraper | Done | Terminal-style com auto-scroll, cores por tipo de mensagem |
+| Limpa cache antes de scrape | Done | Deleta exports/*.json para forcar nova exportacao do DCE |
+| Scraper rate limiting | Done | --rate-limit true no DCE + delay 30-60s entre canais |
+| Fix grafico precos: days vs limit | Done | Corrigido param de API (usava limit em vez de days) |
+| Fix grafico precos: filtro por league | Done | Passa league atual baseada no poeVersion selecionado |
+| Escala logaritmica precos | Done | Toggle "Log" quando variacao > 5x, ticks customizados (0.10 em 0.10, depois 1 em 1) |
+| Filtro 14d no grafico | Done | Adicionado range de 14 dias |
+| Cross-league price overlay | Done | GET /api/prices/daily/cross-league, chart com multiplas ligas por "Dia da Liga" |
+| Coluna unica de preco (moeda) | Done | Tabela de simulacao usa displayCurrency em vez de USD+BRL separados |
+| Detalhamento de custos | Done | 2 cards lado a lado: custos + receita/lucro por semana |
+| Custo/dia na week view | Done | Nova coluna com custo diario calculado |
+| Comparacao de simulacoes | Done | /simulations/compare?ids=a,b — metricas, tabela semana a semana, grafico lucro acumulado |
+| Edicao inline na comparacao | Done | Edita bots/div-hr/hrs e recalcula tudo em tempo real |
+| Selecao + comparar na lista | Done | Checkboxes + botao "Comparar (N)" |
+| Criar baseado em existente | Done | "Baseado em" no dialog de criacao → duplica + abre comparacao |
+| Projecao 3 cenarios | Done | POST /api/simulations/create-projected — Otimista/Esperado/Pessimista |
+| Media ponderada (Esperado) | Done | 50% liga recente, 30% penultima, 20% ante-penultima |
+| Cost config auto na projecao | Done | Importa config default automaticamente |
+| S1 com 0 bots por padrao | Done | Projecao inicia com 0 bots na semana 1 |
+| Dia 1 da liga ignorado | Done | Precos do launch day excluidos (muito volateis) |
+| Breakdown diario unificado | Done | Tabela unica com todos cenarios lado a lado por dia |
+| Duplicate copia cost snapshot | Done | startDayOffset + todos campos de custo copiados |
+| Comparison generalizada N sims | Done | Resumo, tabela, grafico funcionam com 2, 3 ou mais sims |
+| Padding lateral global | Done | px-8 / lg:px-12 no layout autenticado |
+
+### Decisoes Tecnicas
+
+#### SSE para logs do scraper
+- POST /api/prices/scrape retorna Server-Sent Events
+- Frontend le o stream com ReadableStream reader
+- Eventos: log, error, done
+
+#### Cross-league por dayOfLeague
+- API calcula dayOfLeague = (date - league.startDate) / 86400000 + 1
+- Chart sobrepoe curvas alinhadas pelo dia da liga (nao por data calendario)
+
+#### Projecao com 3 cenarios
+- Otimista: Math.max() entre ligas por dia
+- Esperado: media ponderada (50/30/20 por recencia)
+- Pessimista: Math.min() entre ligas por dia
+- Dia 1 ignorado, S1 com 0 bots, cost config default auto-importado
+
+#### Comparacao side-by-side
+- Fetcha N simulacoes via GET /api/simulations/[id]
+- Calcula totais client-side (mesma logica do editor)
+- Edicao inline atualiza state local + recalcula tudo instantaneamente
+- Grafico lucro acumulado por dia (nao por semana) com break-even real
+
+### Arquivos novos
+
+| Arquivo | Descricao |
+|---------|-----------|
+| app/api/prices/scrape/route.ts | Endpoint SSE para triggerar scraper |
+| app/api/prices/daily/cross-league/route.ts | Precos multi-liga por dayOfLeague |
+| app/api/simulations/create-projected/route.ts | Cria 3 cenarios projetados |
+| app/(auth)/simulations/compare/page.tsx | Pagina de comparacao |
+| components/modules/simulations/simulation-comparison.tsx | Comparacao N sims |
+| components/modules/simulations/simulation-projection-dialog.tsx | Dialog de projecao |
+| components/modules/prices/cross-league-price-chart.tsx | Chart multi-liga |
+| lib/simulation-diff.ts | Utility de diff entre simulacoes |
+| components/ui/checkbox.tsx | shadcn checkbox |
+| components/ui/collapsible.tsx | shadcn collapsible |
+
+---
+
+## Status para Release 1.0
+
+### Pronto
+
+- [x] Auth + login
+- [x] Gestao de bots (CRUD, criptografia, proxy)
+- [x] Kanban de tarefas (drag-drop, filtros)
+- [x] Registro de vendas (CRUD, totais, filtros)
+- [x] Historico de precos (scraper, stats, graficos)
+- [x] Simulacoes de faturamento (editor, custos, heranca)
+- [x] Dashboard com KPIs
+- [x] Settings (proxy, ligas, usuarios, custos)
+- [x] DPB Monitor (WebSocket, alertas, logs)
+- [x] Comparacao de simulacoes
+- [x] Projecao de cenarios (otimista/esperado/pessimista)
+- [x] Cross-league price overlay
+- [x] Scraper com UI trigger + logs
+- [x] Escala log + ticks customizados nos graficos
+- [x] Toggle de moeda (USD/BRL) global
+- [x] Responsividade mobile
+- [x] E2E tests (32 Playwright)
+- [x] 172+ testes unitarios e integracao
+
+### Pendente para 1.0
+
 - [ ] Export vendas para CSV
-- [x] Playwright E2E para fluxos criticos
-- [x] Cron setup automatizado para scraper
-- [x] Responsividade mobile refinada
-- [ ] Modulos editaveis nas configuracoes globais (atualmente em lib/constants.ts)
-- [x] Integracao DPB Monitor (logs em tempo real, alertas, status de bots)
+- [ ] Revisar todos os TODO/FIXME no codigo
+- [ ] Verificar que todas as rotas validam auth
+- [ ] Testar deploy via Docker Compose completo (app + db + scraper)
+- [ ] Gerar NEXTAUTH_SECRET e ENCRYPTION_KEY para producao
+- [ ] Trocar senha admin padrao (admin123)
+
+### Nice-to-have (pos 1.0)
+
 - [ ] Bot Discord com comandos /status /logs /alerts
 - [ ] Vinculacao automatica BotInstance → Bot por config_name
 - [ ] Metricas de producao de divines extraidas dos logs
+- [ ] Modulos editaveis nas configuracoes globais
+- [ ] Reddit/YouTube content integration para contexto de mercado
+- [ ] LLM reports (resumo de movimentos de preco + eventos)

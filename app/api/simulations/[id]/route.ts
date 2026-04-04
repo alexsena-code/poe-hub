@@ -212,7 +212,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   } catch (err) {
     console.error("Simulation PUT error:", err);
     return NextResponse.json(
-      { error: "Failed to update simulation", details: String(err) },
+      { error: "Failed to update simulation" },
       { status: 500 }
     );
   }

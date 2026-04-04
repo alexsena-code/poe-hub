@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parsed.data;
-  const userId = (session.user as { id: string }).id;
+  const userId = session.user?.id;
 
   // If no position given, place at end of the target status column
   let position = data.position;

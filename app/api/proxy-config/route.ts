@@ -12,10 +12,15 @@ const updateProxySchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Only admins can access proxy credentials
+  if (session.user?.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const config = await prisma.proxyConfig.findFirst();
@@ -24,11 +29,13 @@ export async function GET() {
     return NextResponse.json(null);
   }
 
+  const reveal = request.nextUrl.searchParams.get("reveal") === "true";
+
   return NextResponse.json({
     id: config.id,
     port: config.port,
     username: decrypt(config.username),
-    password: decrypt(config.password),
+    password: reveal ? decrypt(config.password) : "••••••••",
     notes: config.notes,
     createdAt: config.createdAt,
     updatedAt: config.updatedAt,

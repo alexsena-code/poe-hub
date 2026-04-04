@@ -11,7 +11,10 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   const username = process.env.ADMIN_USERNAME || "admin";
-  const password = process.env.ADMIN_PASSWORD || "admin123";
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error("ADMIN_PASSWORD must be set in environment variables before seeding.");
+  }
 
   const passwordHash = await bcrypt.hash(password, 12);
 

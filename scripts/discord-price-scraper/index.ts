@@ -104,6 +104,7 @@ function exportChannel(
     "--token", `"${token}"`,
     "-f", "Json",
     "-o", `"${outputPath}"`,
+    "--rate-limit", "true",
   ];
 
   if (afterDate) {
@@ -275,7 +276,16 @@ async function main() {
     let totalSkipped = 0;
     const allParsedEntries: ParsedPrice[] = [];
 
-    for (const source of sources) {
+    for (let si = 0; si < sources.length; si++) {
+      const source = sources[si];
+
+      // Delay between channels to reduce detection risk (skip first)
+      if (si > 0) {
+        const delaySec = 30 + Math.floor(Math.random() * 30); // 30-60s
+        console.log(`\n  Waiting ${delaySec}s before next channel...`);
+        await new Promise((r) => setTimeout(r, delaySec * 1000));
+      }
+
       console.log(`\n--- ${source.serverName} / ${source.channelName} (${source.channelId}) ---`);
 
       // Determine poeVersion from channel name

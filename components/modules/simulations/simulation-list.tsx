@@ -22,11 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Pencil,
   Trash2,
   Copy,
   Archive,
+  GitCompareArrows,
 } from "lucide-react";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useCurrency } from "@/hooks/use-currency";
@@ -100,6 +102,16 @@ function SimulationListInner() {
   );
   const { leagues } = useLeagues();
   const { formatMoney, exchangeRate } = useCurrency();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const fetchSimulations = useCallback(async () => {
     setLoading(true);
@@ -226,6 +238,17 @@ function SimulationListInner() {
         <Button variant="ghost" size="sm" onClick={resetFilters}>
           Limpar filtros
         </Button>
+        {selectedIds.size >= 2 && (
+          <Button
+            size="sm"
+            onClick={() =>
+              router.push(`/simulations/compare?ids=${Array.from(selectedIds).join(",")}`)
+            }
+          >
+            <GitCompareArrows className="h-4 w-4 mr-2" />
+            Comparar ({selectedIds.size})
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -233,6 +256,7 @@ function SimulationListInner() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10"></TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Liga</TableHead>
               <TableHead>Status</TableHead>
@@ -248,7 +272,7 @@ function SimulationListInner() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={10}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Carregando...
@@ -257,7 +281,7 @@ function SimulationListInner() {
             ) : simulations.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={10}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Nenhuma simulacao encontrada
@@ -270,6 +294,12 @@ function SimulationListInner() {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => router.push(`/simulations/${sim.id}`)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds.has(sim.id)}
+                      onCheckedChange={() => toggleSelect(sim.id)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{sim.name}</TableCell>
                   <TableCell>{sim.league}</TableCell>
                   <TableCell>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,23 +25,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, GitCompareArrows } from "lucide-react";
 import { useLeagues } from "@/hooks/use-leagues";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatorio"),
-  league: z.string().min(1, "Liga obrigatoria"),
-  durationWeeks: z.number().int().min(1, "Minimo 1 semana").max(52, "Maximo 52 semanas"),
+  league: z.string().optional(),
+  durationWeeks: z.number().int().min(1).max(52).optional(),
   notes: z.string().optional(),
 });
 
 type CreateForm = z.infer<typeof createSchema>;
 
+interface SimOption {
+  id: string;
+  name: string;
+  league: string;
+}
+
 export function SimulationCreateDialog() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [baseSimId, setBaseSimId] = useState<string>("");
+  const [simOptions, setSimOptions] = useState<SimOption[]>([]);
   const router = useRouter();
   const { leagues, loading: leaguesLoading } = useLeagues();
+
+  // Fetch existing simulations for "Baseado em"
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/simulations?limit=50")
+      .then((r) => r.json())
+      .then((d) => setSimOptions((d.data ?? []).map((s: SimOption) => ({ id: s.id, name: s.name, league: s.league }))))
+      .catch(() => {});
+  }, [open]);
 
   const {
     register,
@@ -62,20 +79,40 @@ export function SimulationCreateDialog() {
   async function onSubmit(data: CreateForm) {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/simulations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Erro ao criar simulacao");
+      if (baseSimId) {
+        // Duplicate the base simulation and rename
+        const dupRes = await fetch(`/api/simulations/${baseSimId}/duplicate`, { method: "POST" });
+        if (!dupRes.ok) throw new Error("Erro ao duplicar simulacao base");
+        const dup = await dupRes.json();
+
+        // Update the duplicate with the new name
+        await fetch(`/api/simulations/${dup.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: data.name }),
+        });
+
+        toast.success("Simulacao criada a partir de base");
+        setOpen(false);
+        reset();
+        setBaseSimId("");
+        router.push(`/simulations/compare?ids=${baseSimId},${dup.id}`);
+      } else {
+        const res = await fetch("/api/simulations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Erro ao criar simulacao");
+        }
+        const sim = await res.json();
+        toast.success("Simulacao criada com sucesso");
+        setOpen(false);
+        reset();
+        router.push(`/simulations/${sim.id}`);
       }
-      const sim = await res.json();
-      toast.success("Simulacao criada com sucesso");
-      setOpen(false);
-      reset();
-      router.push(`/simulations/${sim.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar simulacao");
     } finally {
@@ -111,39 +148,73 @@ export function SimulationCreateDialog() {
             )}
           </div>
 
+          {!baseSimId && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="league">Liga</Label>
+                <Select
+                  onValueChange={(val) => setValue("league", val)}
+                  disabled={leaguesLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar liga" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leagues.map((l) => (
+                      <SelectItem key={l.id} value={l.name}>
+                        {l.name} {l.isCurrent ? "(atual)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.league && (
+                  <p className="text-sm text-destructive">{errors.league.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="durationWeeks">Duracao (semanas)</Label>
+                <Input
+                  id="durationWeeks"
+                  type="number"
+                  min={1}
+                  max={52}
+                  {...register("durationWeeks", { valueAsNumber: true })}
+                />
+                {errors.durationWeeks && (
+                  <p className="text-sm text-destructive">{errors.durationWeeks.message}</p>
+                )}
+              </div>
+            </>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="league">Liga</Label>
-            <Select
-              onValueChange={(val) => setValue("league", val)}
-              disabled={leaguesLoading}
-            >
+            <Label>Baseado em (opcional)</Label>
+            <Select value={baseSimId} onValueChange={(val) => {
+              setBaseSimId(val === "none" ? "" : val);
+              // Auto-fill league from base simulation
+              if (val && val !== "none") {
+                const base = simOptions.find((s) => s.id === val);
+                if (base) setValue("league", base.league);
+              }
+            }}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecionar liga" />
+                <SelectValue placeholder="Criar do zero" />
               </SelectTrigger>
               <SelectContent>
-                {leagues.map((l) => (
-                  <SelectItem key={l.id} value={l.name}>
-                    {l.name} {l.isCurrent ? "(atual)" : ""}
+                <SelectItem value="none">Criar do zero</SelectItem>
+                {simOptions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.league && (
-              <p className="text-sm text-destructive">{errors.league.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="durationWeeks">Duracao (semanas)</Label>
-            <Input
-              id="durationWeeks"
-              type="number"
-              min={1}
-              max={52}
-              {...register("durationWeeks", { valueAsNumber: true })}
-            />
-            {errors.durationWeeks && (
-              <p className="text-sm text-destructive">{errors.durationWeeks.message}</p>
+            {baseSimId && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <GitCompareArrows className="h-3 w-3" />
+                Vai duplicar e abrir comparacao lado a lado
+              </p>
             )}
           </div>
 

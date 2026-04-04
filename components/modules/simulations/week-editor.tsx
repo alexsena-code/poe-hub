@@ -292,7 +292,7 @@ export function WeekEditor({
   startDayOffset = 0,
 }: WeekEditorProps) {
   const [localWeek, setLocalWeek] = useState<SimulationWeek>(week);
-  const { formatMoney, convert, exchangeRate } = useCurrency();
+  const { formatMoney, convert, exchangeRate, displayCurrency } = useCurrency();
 
   // Sync from parent — update localWeek when parent data changes (e.g. after import)
   useEffect(() => {
@@ -404,6 +404,17 @@ export function WeekEditor({
     return divines * price;
   }
 
+  function calcDayCost(day: SimulationDay): number | null {
+    if (!costConfig) return null;
+    const bots = resolveField(day, "activeBots", localWeek);
+    if (bots === null) return null;
+    const costPerBotDaily =
+      Number(costConfig.expluginsKeyCostDaily) +
+      Number(costConfig.dpbKeyCostDaily) +
+      Number(costConfig.proxyCostPerBotMonthly) / 30;
+    return bots * costPerBotDaily;
+  }
+
   // Filter out locked days (before startDayOffset) from calculations
   const activeDays = localWeek.days.filter((d) => {
     const gi = (localWeek.weekNumber - 1) * 7 + (d.dayNumber - 1);
@@ -476,18 +487,18 @@ export function WeekEditor({
           onSave={(val) => saveWeekDefaults({ defaultHoursPerDay: val } as Partial<SimulationWeek>)}
         />
         <DefaultField
-          label="Preco Divine (USD)"
-          value={localWeek.defaultDivinePriceUsd != null ? Number(localWeek.defaultDivinePriceUsd) : null}
-          prefix="$"
-          tooltip="Preco da divine em USD para esta semana"
-          onSave={(val) => saveWeekDefaults({ defaultDivinePriceUsd: val } as Partial<SimulationWeek>)}
-        />
-        <DefaultField
-          label="Preco Divine (BRL)"
-          value={localWeek.defaultDivinePriceBrl != null ? Number(localWeek.defaultDivinePriceBrl) : null}
-          prefix="R$"
-          tooltip="Preco da divine em BRL para esta semana"
-          onSave={(val) => saveWeekDefaults({ defaultDivinePriceBrl: val } as Partial<SimulationWeek>)}
+          label={`Preco Divine (${displayCurrency === "brl" ? "BRL" : "USD"})`}
+          value={displayCurrency === "brl"
+            ? (localWeek.defaultDivinePriceBrl != null ? Number(localWeek.defaultDivinePriceBrl) : null)
+            : (localWeek.defaultDivinePriceUsd != null ? Number(localWeek.defaultDivinePriceUsd) : null)
+          }
+          prefix={displayCurrency === "brl" ? "R$" : "$"}
+          tooltip="Preco da divine para esta semana"
+          onSave={(val) => saveWeekDefaults(
+            displayCurrency === "brl"
+              ? { defaultDivinePriceBrl: val } as Partial<SimulationWeek>
+              : { defaultDivinePriceUsd: val } as Partial<SimulationWeek>
+          )}
         />
       </div>
 
@@ -500,10 +511,10 @@ export function WeekEditor({
               <TableHead className="text-right">Bots</TableHead>
               <TableHead className="text-right">Div/Hora</TableHead>
               <TableHead className="text-right">Horas/Dia</TableHead>
-              <TableHead className="text-right">Preco USD</TableHead>
-              <TableHead className="text-right">Preco BRL</TableHead>
+              <TableHead className="text-right">Preco</TableHead>
               <TableHead className="text-right bg-muted/30">Divines/Dia</TableHead>
               <TableHead className="text-right bg-muted/30">Receita</TableHead>
+              {costConfig && <TableHead className="text-right bg-muted/30">Custo/Dia</TableHead>}
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
@@ -533,9 +544,9 @@ export function WeekEditor({
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
                     <TableCell className="text-right text-muted-foreground">-</TableCell>
-                    <TableCell className="text-right text-muted-foreground">-</TableCell>
                     <TableCell className="text-right bg-muted/30 text-muted-foreground">0</TableCell>
                     <TableCell className="text-right bg-muted/30 text-muted-foreground">-</TableCell>
+                    {costConfig && <TableCell className="text-right bg-muted/30 text-muted-foreground">-</TableCell>}
                     <TableCell />
                   </TableRow>
                 );
@@ -589,30 +600,31 @@ export function WeekEditor({
                     />
                   </TableCell>
                   <TableCell className="text-right">
-                    <InlineCell
-                      value={resolveField(day, "divinePriceUsd", localWeek)}
-                      inherited={!isOverridden(day, "divinePriceUsd")}
-                      prefix="$"
-                      onSave={(val) => saveDayField(day.dayNumber, "divinePriceUsd", val)}
-                      onReset={
-                        isOverridden(day, "divinePriceUsd")
-                          ? () => resetDayField(day.dayNumber, "divinePriceUsd")
-                          : undefined
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <InlineCell
-                      value={resolveField(day, "divinePriceBrl", localWeek)}
-                      inherited={!isOverridden(day, "divinePriceBrl")}
-                      prefix="R$"
-                      onSave={(val) => saveDayField(day.dayNumber, "divinePriceBrl", val)}
-                      onReset={
-                        isOverridden(day, "divinePriceBrl")
-                          ? () => resetDayField(day.dayNumber, "divinePriceBrl")
-                          : undefined
-                      }
-                    />
+                    {displayCurrency === "brl" ? (
+                      <InlineCell
+                        value={resolveField(day, "divinePriceBrl", localWeek)}
+                        inherited={!isOverridden(day, "divinePriceBrl")}
+                        prefix="R$"
+                        onSave={(val) => saveDayField(day.dayNumber, "divinePriceBrl", val)}
+                        onReset={
+                          isOverridden(day, "divinePriceBrl")
+                            ? () => resetDayField(day.dayNumber, "divinePriceBrl")
+                            : undefined
+                        }
+                      />
+                    ) : (
+                      <InlineCell
+                        value={resolveField(day, "divinePriceUsd", localWeek)}
+                        inherited={!isOverridden(day, "divinePriceUsd")}
+                        prefix="$"
+                        onSave={(val) => saveDayField(day.dayNumber, "divinePriceUsd", val)}
+                        onReset={
+                          isOverridden(day, "divinePriceUsd")
+                            ? () => resetDayField(day.dayNumber, "divinePriceUsd")
+                            : undefined
+                        }
+                      />
+                    )}
                   </TableCell>
                   {/* Calculated columns */}
                   <TableCell className="text-right bg-muted/30 font-mono text-sm">
@@ -625,6 +637,11 @@ export function WeekEditor({
                       ? formatMoney(dayRevUsd, "usd")
                       : "-"}
                   </TableCell>
+                  {costConfig && (
+                    <TableCell className="text-right bg-muted/30 font-mono text-sm text-muted-foreground">
+                      {formatMoney(calcDayCost(day) ?? 0, "usd")}
+                    </TableCell>
+                  )}
                   <TableCell>
                     {hasAnyOverride && (
                       <TooltipProvider>
@@ -651,7 +668,7 @@ export function WeekEditor({
             })}
             {/* Subtotals row */}
             <TableRow className="bg-muted/50 font-bold">
-              <TableCell colSpan={6} className="text-right">
+              <TableCell colSpan={5} className="text-right">
                 Subtotal Semana {localWeek.weekNumber}
               </TableCell>
               <TableCell className="text-right font-mono">
@@ -660,20 +677,16 @@ export function WeekEditor({
               <TableCell className="text-right font-mono">
                 {formatMoney(weekRevenueBrl > 0 ? weekRevenueBrl : weekRevenueUsd, weekRevenueBrl > 0 ? "brl" : "usd")}
               </TableCell>
+              {costConfig && (
+                <TableCell className="text-right font-mono text-muted-foreground">
+                  {formatMoney(weekCost, "usd")}
+                </TableCell>
+              )}
               <TableCell />
             </TableRow>
             {/* Cost + profit row */}
             {costConfig && (
               <>
-                <TableRow className="bg-muted/30">
-                  <TableCell colSpan={7} className="text-right text-sm text-muted-foreground">
-                    Custo semanal
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {formatMoney(weekCost, "usd")}
-                  </TableCell>
-                  <TableCell />
-                </TableRow>
                 <TableRow className="bg-muted/30">
                   <TableCell colSpan={7} className="text-right text-sm font-bold">
                     Lucro semanal

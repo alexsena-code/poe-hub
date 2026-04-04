@@ -42,6 +42,7 @@ const ITEM_LABELS: Record<string, string> = {
 
 const RANGE_OPTIONS = [
   { label: "7d", days: 7 },
+  { label: "14d", days: 14 },
   { label: "30d", days: 30 },
   { label: "90d", days: 90 },
 ];
@@ -65,6 +66,7 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rangeDays, setRangeDays] = useState(30);
+  const [useLogScale, setUseLogScale] = useState(true);
 
   const decimals = channelId === POE2_CHANNEL ? 4 : 2;
 
@@ -75,7 +77,7 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
       try {
         const params = new URLSearchParams();
         params.set("item", item);
-        params.set("limit", String(rangeDays));
+        params.set("days", String(rangeDays));
         if (league) params.set("league", league);
 
         const res = await fetch(`/api/prices/daily?${params}`);
@@ -104,6 +106,24 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
   // Determine whether CNL data exists at all in this range
   const hasCnl = data.some((d) => d.cnlPrice !== null);
 
+  // Detect if log scale would help (max/min ratio > 5x)
+  const allPrices = data.flatMap((d) => [d.median, d.cnlPrice].filter((v): v is number => v !== null && v > 0));
+  const priceMax = Math.max(...allPrices, 1);
+  const priceMin = Math.min(...allPrices, 1);
+  const shouldSuggestLog = priceMax / priceMin > 5;
+
+  // Custom ticks: 0.10 steps up to 1.00, then 1.00 steps up to max
+  const customTicks = (() => {
+    const ticks: number[] = [];
+    for (let v = 0.1; v < 1; v = Math.round((v + 0.1) * 100) / 100) {
+      ticks.push(v);
+    }
+    for (let v = 1; v <= Math.ceil(priceMax); v++) {
+      ticks.push(v);
+    }
+    return ticks.filter((t) => t >= priceMin * 0.5 && t <= priceMax * 1.1);
+  })();
+
   const itemLabel = ITEM_LABELS[item] ?? item;
   const leagueLabel = league ? ` — ${league}` : "";
 
@@ -116,7 +136,18 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
             Mediana de mercado e preco CNL (R$){leagueLabel}
           </CardDescription>
         </div>
-        <div className="flex gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {shouldSuggestLog && (
+            <Button
+              variant={useLogScale ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setUseLogScale(!useLogScale)}
+              title="Escala logaritmica — melhora visualizacao quando ha grande variacao de preco"
+            >
+              Log
+            </Button>
+          )}
           {RANGE_OPTIONS.map((opt) => (
             <Button
               key={opt.label}
@@ -163,6 +194,11 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
                 interval="preserveStartEnd"
               />
               <YAxis
+                scale={useLogScale && shouldSuggestLog ? "log" : "auto"}
+                domain={useLogScale && shouldSuggestLog ? [Math.max(priceMin * 0.8, 0.001), "auto"] : undefined}
+                allowDataOverflow={useLogScale && shouldSuggestLog}
+                ticks={useLogScale && shouldSuggestLog ? customTicks : undefined}
+                tickCount={useLogScale ? undefined : 8}
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}

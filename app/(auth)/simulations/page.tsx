@@ -1,5 +1,6 @@
 import { SimulationList } from "@/components/modules/simulations/simulation-list";
 import { SimulationCreateDialog } from "@/components/modules/simulations/simulation-create-dialog";
+import { SimulationProjectionDialog } from "@/components/modules/simulations/simulation-projection-dialog";
 
 export default function SimulationsPage() {
   return (
@@ -11,7 +12,10 @@ export default function SimulationsPage() {
             Projecoes de receita e lucro por liga/temporada.
           </p>
         </div>
-        <SimulationCreateDialog />
+        <div className="flex gap-2">
+          <SimulationProjectionDialog />
+          <SimulationCreateDialog />
+        </div>
       </div>
       <SimulationList />
     </div>
