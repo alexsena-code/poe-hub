@@ -1,0 +1,30 @@
+name: Deploy PoE Hub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            echo "=== Deploying PoE Hub ==="
+
+            cd /opt/poe-hub
+            git stash 2>/dev/null || true
+            git pull origin main
+            npm install --production=false
+            npm run build
+            pm2 restart poe-hub
+
+            echo "=== Deploy complete ==="
+            pm2 status
