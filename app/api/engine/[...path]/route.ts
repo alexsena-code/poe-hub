@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 const API_URL = process.env.ENGINE_API_URL || "http://localhost:3000/api";
-const API_KEY = process.env.ENGINE_API_KEY || "";
+const API_KEY = process.env.ENGINE_API_KEY || process.env.CONTENT_API_KEY || "";
 
 async function proxy(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await getServerSession(authOptions);
