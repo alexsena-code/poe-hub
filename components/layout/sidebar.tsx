@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Bot,
-  Activity,
   ListTodo,
   DollarSign,
   TrendingUp,
@@ -18,6 +17,19 @@ import {
   User,
   Menu,
   BookOpen,
+  PenTool,
+  MessageSquare,
+  Search,
+  BarChart3,
+  Cpu,
+  FileText,
+  Lightbulb,
+  Wrench,
+  ScrollText,
+  Users,
+  BookOpenCheck,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -31,16 +43,77 @@ import { useCurrency } from "@/hooks/use-currency";
 
 type DisplayCurrency = "usd" | "brl";
 
-const navItems = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Bots", href: "/bots", icon: Bot },
-  { title: "Monitor", href: "/monitor", icon: Activity },
-  { title: "Tarefas", href: "/tasks", icon: ListTodo },
-  { title: "Vendas", href: "/sales", icon: DollarSign },
-  { title: "Precos", href: "/prices", icon: TrendingUp },
-  { title: "Simulacoes", href: "/simulations", icon: Calculator },
-  { title: "Configuracoes", href: "/settings", icon: Settings },
-  { title: "Guides", href: "/guides", icon: BookOpen },
+type NavItem = { title: string; href: string; icon: LucideIcon };
+type NavGroup = { title: string; icon: LucideIcon; children: NavItem[] };
+type NavEntry = NavItem | NavGroup;
+
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return "children" in entry;
+}
+
+const navSections: { label: string; items: NavEntry[] }[] = [
+  {
+    label: "",
+    items: [
+      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      {
+        title: "Operacoes",
+        icon: Bot,
+        children: [
+          { title: "Bots", href: "/bots", icon: Bot },
+          { title: "Tarefas", href: "/tasks", icon: ListTodo },
+          { title: "Vendas", href: "/sales", icon: DollarSign },
+          { title: "Precos", href: "/prices", icon: TrendingUp },
+          { title: "Simulacoes", href: "/simulations", icon: Calculator },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Content Engine",
+    items: [
+      { title: "Novo Post", href: "/new", icon: PenTool },
+      { title: "Guides", href: "/guides", icon: BookOpen },
+      { title: "Q&A", href: "/qa", icon: MessageSquare },
+      {
+        title: "SEO",
+        icon: Search,
+        children: [
+          { title: "Keywords", href: "/seo", icon: Search },
+          { title: "Reddit", href: "/reddit", icon: ScrollText },
+          { title: "YouTube", href: "/youtube", icon: BarChart3 },
+        ],
+      },
+      {
+        title: "Conteudo",
+        icon: FileText,
+        children: [
+          { title: "Templates", href: "/templates", icon: FileText },
+          { title: "Ideas", href: "/ideas", icon: Lightbulb },
+          { title: "Slang", href: "/slang", icon: BookOpenCheck },
+          { title: "People", href: "/people", icon: Users },
+        ],
+      },
+      { title: "Analytics", href: "/analytics", icon: BarChart3 },
+      { title: "Engine Config", href: "/engine-config", icon: Wrench },
+      { title: "Docs", href: "/docs", icon: BookOpen },
+    ],
+  },
+  {
+    label: "",
+    items: [
+      {
+        title: "Configuracoes",
+        icon: Settings,
+        children: [
+          { title: "Custos", href: "/settings/costs", icon: DollarSign },
+          { title: "Proxy", href: "/settings/proxy", icon: Wrench },
+          { title: "Ligas", href: "/settings/leagues", icon: ListTodo },
+          { title: "Usuarios", href: "/settings/users", icon: Users },
+        ],
+      },
+    ],
+  },
 ];
 
 interface SidebarContentProps {
@@ -51,6 +124,84 @@ interface SidebarContentProps {
   exchangeRate: number;
   onSetDisplayCurrency: (c: DisplayCurrency) => void;
   onClose?: () => void;
+}
+
+function NavLink({
+  item,
+  pathname,
+  onClose,
+}: {
+  item: NavItem;
+  pathname: string;
+  onClose?: () => void;
+}) {
+  const isActive =
+    pathname === item.href || pathname.startsWith(item.href + "/");
+  return (
+    <Link
+      href={item.href}
+      onClick={onClose}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+      )}
+    >
+      <item.icon className="h-4 w-4" />
+      {item.title}
+    </Link>
+  );
+}
+
+function NavGroupItem({
+  group,
+  pathname,
+  onClose,
+}: {
+  group: NavGroup;
+  pathname: string;
+  onClose?: () => void;
+}) {
+  const hasActiveChild = group.children.some(
+    (c) => pathname === c.href || pathname.startsWith(c.href + "/")
+  );
+  const [open, setOpen] = useState(hasActiveChild);
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+          hasActiveChild
+            ? "text-sidebar-accent-foreground"
+            : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        )}
+      >
+        <group.icon className="h-4 w-4" />
+        {group.title}
+        <ChevronDown
+          className={cn(
+            "ml-auto h-3.5 w-3.5 transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open && (
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
+          {group.children.map((child) => (
+            <NavLink
+              key={child.href}
+              item={child}
+              pathname={pathname}
+              onClose={onClose}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SidebarContent({
@@ -74,29 +225,41 @@ function SidebarContent({
         </Link>
       </div>
       <Separator />
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.title}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4 scrollbar-none">
+        {navSections.map((section, idx) => (
+          <div key={section.label || `section-${idx}`}>
+            {section.label && (
+              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                {section.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {section.items.map((entry, i) => {
+                if ("children" in entry) {
+                  return (
+                    <NavGroupItem
+                      key={`group-${entry.title}`}
+                      group={entry as NavGroup}
+                      pathname={pathname}
+                      onClose={onClose}
+                    />
+                  );
+                }
+                const item = entry as NavItem;
+                return (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    onClose={onClose}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
-      <div className="px-3 py-2 space-y-1">
+      <div className="px-3 py-2 space-y-1 border-t border-border">
         <div className="flex items-center justify-between px-3">
           <span className="text-[10px] text-muted-foreground/60">USD/BRL</span>
           <span className="text-[10px] font-mono text-muted-foreground">

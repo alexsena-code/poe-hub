@@ -2,7 +2,7 @@ import Link from "next/link";
 import { fetchPosts, type PostSummary } from "@/lib/content-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, ArrowLeft } from "lucide-react";
+import { BookOpen } from "lucide-react";
 
 export const metadata = {
   title: "Guides | Path of Trade",
@@ -73,25 +73,46 @@ export default async function GuidesPage() {
     error = e instanceof Error ? e.message : "Failed to load guides";
   }
 
+  const templateCounts: Record<string, number> = {};
+  for (const p of posts) {
+    templateCounts[p.template] = (templateCounts[p.template] || 0) + 1;
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Home</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold">Guides</h1>
+    <div className="flex flex-col h-full max-w-[1800px] mx-auto">
+      {/* Header */}
+      <div className="shrink-0 pb-4">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              Guides
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Browse Path of Exile guides — build guides, mechanic explanations, and more.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 ml-auto">
+            <div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Published</div>
+              <div className="text-lg font-bold text-foreground">{posts.length}</div>
+            </div>
+            {Object.entries(templateCounts).map(([template, count]) => (
+              <div key={template} className="flex items-center gap-4">
+                <div className="w-px h-8 bg-border" />
+                <div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{templateLabel(template)}</div>
+                  <div className="text-lg font-bold text-foreground">{count}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      {/* Content area */}
+      <div className="flex-1 min-h-0 overflow-auto scrollbar-none">
         {error ? (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
             <p className="text-sm text-destructive-foreground">{error}</p>
@@ -113,7 +134,7 @@ export default async function GuidesPage() {
             ))}
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

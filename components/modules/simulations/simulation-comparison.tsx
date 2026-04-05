@@ -897,7 +897,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                           <TableRow>
                             <TableHead className="w-12">Dia</TableHead>
                             {simNames.map((name) => (
-                              <TableHead key={name} colSpan={3} className="text-center border-l border-border/50 text-xs">{name}</TableHead>
+                              <TableHead key={name} colSpan={4} className="text-center border-l border-border/50 text-xs">{name}</TableHead>
                             ))}
                           </TableRow>
                           <TableRow>
@@ -907,6 +907,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                                 <TableHead className="text-right border-l border-border/50 text-xs font-normal text-muted-foreground">Preco</TableHead>
                                 <TableHead className="text-right text-xs font-normal text-muted-foreground">Divines</TableHead>
                                 <TableHead className="text-right text-xs font-normal text-muted-foreground">Receita</TableHead>
+                                <TableHead className="text-right text-xs font-normal text-muted-foreground">Lucro</TableHead>
                               </React.Fragment>
                             ))}
                           </TableRow>
@@ -926,6 +927,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                                       <TableCell className="text-right border-l border-border/50 text-muted-foreground text-xs">—</TableCell>
                                       <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
                                       <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
+                                      <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
                                     </React.Fragment>
                                   );
 
@@ -933,6 +935,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                                   if (!day) return (
                                     <React.Fragment key={sim.id}>
                                       <TableCell className="text-right border-l border-border/50 text-muted-foreground text-xs">—</TableCell>
+                                      <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
                                       <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
                                       <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
                                     </React.Fragment>
@@ -949,18 +952,30 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                                   const divines = !isLocked && bots && dph && hours ? bots * Number(dph) * Number(hours) : 0;
                                   const revenue = divines * (price ?? 0);
 
+                                  // Daily cost per bot
+                                  const hasCost = sim.proxyCostPerBotMonthly != null && sim.expluginsKeyCostDaily != null && sim.dpbKeyCostDaily != null;
+                                  const costPerBotDaily = hasCost
+                                    ? Number(sim.expluginsKeyCostDaily) + Number(sim.dpbKeyCostDaily) + Number(sim.proxyCostPerBotMonthly) / 30
+                                    : 0;
+                                  const dayCost = bots * costPerBotDaily;
+                                  const profit = revenue - dayCost;
+
                                   const muted = isLocked ? " opacity-40" : "";
+                                  const curr = priceBrl != null ? "brl" as const : "usd" as const;
 
                                   return (
                                     <React.Fragment key={sim.id}>
                                       <TableCell className={`text-right border-l border-border/50 font-mono text-xs tabular-nums${muted}`}>
-                                        {price != null ? formatMoney(price, priceBrl != null ? "brl" : "usd") : "—"}
+                                        {price != null ? formatMoney(price, curr) : "—"}
                                       </TableCell>
                                       <TableCell className={`text-right font-mono text-xs tabular-nums${muted}`}>
                                         {divines > 0 ? divines.toFixed(0) : isLocked ? "—" : "—"}
                                       </TableCell>
                                       <TableCell className={`text-right font-mono text-xs tabular-nums${muted}`}>
-                                        {revenue > 0 ? formatMoney(revenue, priceBrl != null ? "brl" : "usd") : isLocked ? "—" : "—"}
+                                        {revenue > 0 ? formatMoney(revenue, curr) : isLocked ? "—" : "—"}
+                                      </TableCell>
+                                      <TableCell className={`text-right font-mono text-xs tabular-nums${muted} ${!isLocked && revenue > 0 ? (profit >= 0 ? "text-green-500" : "text-destructive") : ""}`}>
+                                        {!isLocked && revenue > 0 ? formatMoney(profit, curr) : "—"}
                                       </TableCell>
                                     </React.Fragment>
                                   );

@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+@utility sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--color-background);
+  padding-top: 2rem;
+  padding-bottom: 1.5rem;
+  margin-top: -2rem;
+}
+
+@utility sticky-thead {
+  & th, & td {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background-color: var(--color-background);
+  }
+}
+
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -36,6 +63,10 @@
   --color-sidebar-border: #27272a;
   --color-sidebar-ring: #d4d4d8;
   --radius: 0.5rem;
+
+  /* Engine compatibility aliases */
+  --color-surface: #141414;
+  --color-surface-hover: #1e1e1e;
 }
 
 @layer base {
