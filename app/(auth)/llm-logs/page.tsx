@@ -85,7 +85,7 @@ const PERIODS = [
 ] as const;
 
 function fmt(n: number | null | undefined, decimals = 2) {
-  return n != null ? n.toFixed(decimals) : '0';
+  return (n != null && !isNaN(n)) ? n.toFixed(decimals) : '0';
 }
 
 function fmtTokens(n: number | null | undefined) {

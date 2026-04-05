@@ -24,7 +24,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto">
-      <div className="sticky-header">
+      <div className="sticky top-0 z-10 bg-background pb-0 pt-2">
         <h1 className="text-2xl font-bold mb-1">Analytics</h1>
         <p className="text-sm text-muted-foreground mb-4">SEO, custos LLM e historico de pipeline</p>
 
