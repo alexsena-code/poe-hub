@@ -240,9 +240,10 @@ function useSort<T>(data: T[], defaultKey: keyof T, defaultDir: SortDir = 'desc'
 // Tabs
 // ---------------------------------------------------------------------------
 
-type Tab = 'top-posts' | 'trending-topics' | 'build-posts';
+type Tab = 'recent' | 'top-posts' | 'trending-topics' | 'build-posts';
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'recent', label: 'Recent (24h)' },
   { key: 'top-posts', label: 'Top Posts' },
   { key: 'trending-topics', label: 'Trending Topics' },
   { key: 'build-posts', label: 'Build Posts' },
@@ -253,7 +254,7 @@ const TABS: { key: Tab; label: string }[] = [
 // ---------------------------------------------------------------------------
 
 export default function RedditDashboardPage() {
-  const [tab, setTab] = useState<Tab>('top-posts');
+  const [tab, setTab] = useState<Tab>('recent');
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -316,12 +317,21 @@ export default function RedditDashboardPage() {
       const params = new URLSearchParams();
       params.set('limit', String(PAGE_SIZE));
       params.set('offset', String(page * PAGE_SIZE));
-      params.set('sortBy', SORT_FIELD_MAP[sortBy] || sortBy);
-      params.set('sortDir', sortDir);
+
+      // Recent tab: force sort by date desc, last 48h
+      if (tab === 'recent') {
+        params.set('sortBy', 'createdUtc');
+        params.set('sortDir', 'desc');
+        const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        params.set('dateFrom', since);
+      } else {
+        params.set('sortBy', SORT_FIELD_MAP[sortBy] || sortBy);
+        params.set('sortDir', sortDir);
+        const dateFrom = getDateFrom(filterPeriod);
+        if (dateFrom) params.set('dateFrom', dateFrom);
+      }
       if (filterSubreddit !== 'all') params.set('subreddit', filterSubreddit);
       if (filterFlair !== 'all') params.set('flair', filterFlair);
-      const dateFrom = getDateFrom(filterPeriod);
-      if (dateFrom) params.set('dateFrom', dateFrom);
 
       const res = await fetch(`${API_URL}/seo/reddit/posts?${params}`);
       if (res.ok) {
@@ -333,7 +343,12 @@ export default function RedditDashboardPage() {
       const countParams = new URLSearchParams();
       if (filterSubreddit !== 'all') countParams.set('subreddit', filterSubreddit);
       if (filterFlair !== 'all') countParams.set('flair', filterFlair);
-      if (dateFrom) countParams.set('dateFrom', dateFrom);
+      if (tab === 'recent') {
+        countParams.set('dateFrom', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString());
+      } else {
+        const dateFrom = getDateFrom(filterPeriod);
+        if (dateFrom) countParams.set('dateFrom', dateFrom);
+      }
       const [countRes, statsRes] = await Promise.all([
         fetch(`${API_URL}/seo/reddit/posts/count?${countParams}`),
         fetch(`${API_URL}/seo/reddit/stats`),
@@ -344,7 +359,7 @@ export default function RedditDashboardPage() {
     setLoading(false);
   }
 
-  useEffect(() => { fetchPosts(); }, [page, sortBy, sortDir, filterSubreddit, filterFlair, filterPeriod]);
+  useEffect(() => { fetchPosts(); }, [tab, page, sortBy, sortDir, filterSubreddit, filterFlair, filterPeriod]);
 
   async function scanRedditKeywords() {
     setScanning(true);
@@ -643,8 +658,8 @@ export default function RedditDashboardPage() {
         <div className="text-center py-12 text-muted-foreground">Loading Reddit data...</div>
       )}
 
-      {/* Tab: Top Posts */}
-      {!loading && tab === 'top-posts' && (<>
+      {/* Tab: Recent + Top Posts (shared table) */}
+      {!loading && (tab === 'top-posts' || tab === 'recent') && (<>
         <div className="flex-1 min-h-0 overflow-auto scrollbar-none">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-background">
