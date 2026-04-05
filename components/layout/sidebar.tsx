@@ -95,6 +95,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         ],
       },
       { title: "Analytics", href: "/analytics", icon: BarChart3 },
+      { title: "LLM Logs", href: "/llm-logs", icon: Cpu },
       { title: "Engine Config", href: "/engine-config", icon: Wrench },
       { title: "Docs", href: "/docs", icon: BookOpen },
     ],
