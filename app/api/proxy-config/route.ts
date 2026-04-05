@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { z } from "zod/v4";
+import { syncProxiesToEngine } from "@/lib/sync-proxies";
 
 const updateProxySchema = z.object({
   port: z.number().int().min(1).max(65535),
@@ -85,6 +86,8 @@ export async function PUT(request: NextRequest) {
       },
     });
   }
+
+  syncProxiesToEngine().catch(console.error);
 
   return NextResponse.json({
     id: config.id,

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/crypto";
 import { createBotSchema } from "@/lib/validations/bot";
+import { syncProxiesToEngine } from "@/lib/sync-proxies";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -83,6 +84,8 @@ export async function POST(request: NextRequest) {
       notes: data.notes ?? null,
     },
   });
+
+  syncProxiesToEngine().catch(console.error);
 
   return NextResponse.json(
     {

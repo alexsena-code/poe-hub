@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { updateBotSchema } from "@/lib/validations/bot";
+import { syncProxiesToEngine } from "@/lib/sync-proxies";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -69,6 +70,8 @@ export async function PUT(_request: NextRequest, { params }: Params) {
     data: updateData,
   });
 
+  syncProxiesToEngine().catch(console.error);
+
   return NextResponse.json({
     ...bot,
     password: "••••••••",
@@ -89,6 +92,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   }
 
   await prisma.bot.delete({ where: { id } });
+
+  syncProxiesToEngine().catch(console.error);
 
   return NextResponse.json({ success: true });
 }
