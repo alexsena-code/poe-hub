@@ -47,6 +47,42 @@ export default function EditorShell({ postId }: { postId: string }) {
     }
   }, []);
 
+  // Load existing post from backend when opening an already-generated post
+  const { loadFromSaved, setPostId: storeSetPostId } = usePostStore();
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (loadedRef.current) return;
+    // If store already has sections for this post, skip loading
+    if (sections.length > 0 && (slug === postId || usePostStore.getState().postId === postId)) return;
+
+    loadedRef.current = true;
+    fetch(`/api/engine/content/posts/${postId}`)
+      .then(async (res) => {
+        if (!res.ok) return; // Post doesn't exist yet (new post flow)
+        const data = await res.json();
+        if (!data || !data.sections || data.sections.length === 0) return;
+
+        loadFromSaved({
+          postId,
+          slug: data.slug || postId,
+          briefing: data.briefing || null,
+          sections: data.sections.map((s: any) => ({
+            sectionId: s.sectionId || s.id,
+            title: s.title || s.heading,
+            status: s.status || (s.content ? 'draft' : 'pending'),
+            draft: s.content || s.draft || null,
+            humanMessages: s.humanMessages || [],
+            lockedParts: s.lockedParts || [],
+            requiresHumanInput: s.requiresHumanInput ?? false,
+            tokensUsed: s.tokensUsed || 0,
+          })),
+          meta: data.meta || null,
+          phase: data.phase || 'writing',
+        });
+      })
+      .catch(() => {}); // Silently fail — new post flow continues
+  }, [postId]);
+
   const doAutoSave = useCallback(async () => {
     if (!briefing || sections.length === 0) return;
     const hasDraftContent = sections.some((s) => s.draft !== null);
