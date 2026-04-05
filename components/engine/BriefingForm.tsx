@@ -7,7 +7,7 @@ import { generateOutline } from '@/lib/content-api';
 import { usePostStore } from '@/lib/engine-store';
 import type { Briefing } from '@/lib/engine-types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_URL = '/api/engine';
 
 // Templates that use topic instead of skill/ascendancy
 const TOPIC_TEMPLATES = ['mechanic_guide', 'qa_page', 'currency_guide', 'atlas_guide', 'faq', 'league_start', 'crafting_guide', 'tier_list', 'meta_report'];

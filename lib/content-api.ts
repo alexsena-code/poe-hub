@@ -1,14 +1,19 @@
 import type { Briefing, GeneratedSection } from './engine-types';
 
-const CONTENT_API_URL =
-  process.env.NEXT_PUBLIC_CONTENT_API_URL || "http://localhost:3000/api";
+const isServer = typeof window === 'undefined';
+const CONTENT_API_URL = isServer
+  ? (process.env.NEXT_PUBLIC_CONTENT_API_URL || "http://localhost:3000/api")
+  : "/api/engine";
 
 function authHeaders(extra?: Record<string, string>): Record<string, string> {
   const headers: Record<string, string> = { ...extra };
-  const apiKey = process.env.CONTENT_API_KEY;
-  if (apiKey) {
-    headers["x-api-key"] = apiKey;
+  if (isServer) {
+    const apiKey = process.env.CONTENT_API_KEY;
+    if (apiKey) {
+      headers["x-api-key"] = apiKey;
+    }
   }
+  // Client-side: proxy at /api/engine adds x-api-key automatically
   return headers;
 }
 
