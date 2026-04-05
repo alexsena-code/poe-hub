@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
 import { SaleForm } from "@/components/modules/sales/sale-form";
 
 interface Props {
@@ -8,19 +8,22 @@ interface Props {
 
 export default async function EditSalePage({ params }: Props) {
   const { id } = await params;
+  const headersList = await headers();
+  const cookie = headersList.get("cookie") ?? "";
 
-  const sale = await prisma.sale.findUnique({
-    where: { id },
-    include: { buyer: true },
-  });
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3002"}/api/sales/${id}`,
+    { headers: { cookie }, cache: "no-store" }
+  );
 
-  if (!sale) {
-    notFound();
-  }
+  if (res.status === 404) notFound();
+  if (!res.ok) throw new Error("Failed to fetch sale");
+
+  const sale = await res.json();
 
   const initialData = {
     id: sale.id,
-    date: sale.date.toISOString(),
+    date: sale.date,
     buyerId: sale.buyerId,
     quantity: Number(sale.quantity),
     unit: sale.unit,

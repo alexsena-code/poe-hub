@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { decrypt } from "@/lib/crypto";
+import { headers } from "next/headers";
 import { BotForm } from "@/components/modules/bots/bot-form";
 
 interface Props {
@@ -9,20 +8,26 @@ interface Props {
 
 export default async function EditBotPage({ params }: Props) {
   const { id } = await params;
+  const headersList = await headers();
+  const cookie = headersList.get("cookie") ?? "";
 
-  const bot = await prisma.bot.findUnique({ where: { id } });
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3002"}/api/bots/${id}?reveal=true`,
+    { headers: { cookie }, cache: "no-store" }
+  );
 
-  if (!bot) {
-    notFound();
-  }
+  if (res.status === 404) notFound();
+  if (!res.ok) throw new Error("Failed to fetch bot");
+
+  const bot = await res.json();
 
   const initialData = {
     id: bot.id,
     nick: bot.nick,
     email: bot.email,
-    password: decrypt(bot.password),
+    password: bot.password,
     proxyIp: bot.proxyIp,
-    proxyEol: bot.proxyEol?.toISOString() ?? null,
+    proxyEol: bot.proxyEol ?? null,
     status: bot.status,
     notes: bot.notes,
   };
