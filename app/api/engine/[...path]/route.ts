@@ -8,7 +8,7 @@ const API_KEY = process.env.ENGINE_API_KEY || "";
 async function proxy(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized (no session)" }, { status: 401 });
   }
 
   const { path } = await params;
@@ -22,6 +22,9 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   headers.set("Content-Type", req.headers.get("Content-Type") || "application/json");
   if (API_KEY) headers.set("x-api-key", API_KEY);
 
+  // Debug log
+  console.log(`[engine-proxy] ${req.method} ${url.toString()} | API_KEY set: ${!!API_KEY} | key length: ${API_KEY.length}`);
+
   const init: RequestInit = {
     method: req.method,
     headers,
@@ -33,6 +36,10 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
 
   const res = await fetch(url.toString(), init);
   const data = await res.text();
+
+  if (res.status !== 200) {
+    console.log(`[engine-proxy] Response ${res.status}: ${data.substring(0, 200)}`);
+  }
 
   return new NextResponse(data, {
     status: res.status,
