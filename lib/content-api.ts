@@ -132,6 +132,7 @@ export async function writeSection(params: {
   previousComments?: Array<{ sectionTitle: string; comment: string }>;
   lockedContent?: string[];
   fromScratch?: boolean;
+  previousSections?: Array<{ sectionId: string; title: string; content: { 'pt-br': string; en: string }; tokensUsed: number }>;
 }) {
   const res = await fetch(`${CONTENT_API_URL}/content/write-section`, {
     method: 'POST',

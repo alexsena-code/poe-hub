@@ -105,6 +105,16 @@ export default function SectionEditor() {
     const previousComments = getPreviousComments();
 
     try {
+      // Build context from previously generated sections for coherence
+      const previousSections = sections
+        .filter((s) => s.sectionId !== section.sectionId && s.draft && (s.draft.en || s.draft['pt-br']))
+        .map((s) => ({
+          sectionId: s.sectionId,
+          title: s.title || s.sectionId,
+          content: { 'pt-br': s.draft?.['pt-br'] || '', en: s.draft?.en || '' },
+          tokensUsed: s.tokensUsed || 0,
+        }));
+
       const result = await writeSection({
         briefing,
         sectionId: section.sectionId,
@@ -113,6 +123,7 @@ export default function SectionEditor() {
         previousComments: previousComments.length > 0 ? previousComments : undefined,
         lockedContent: lockedParts.length > 0 ? lockedParts : undefined,
         fromScratch,
+        previousSections: previousSections.length > 0 ? previousSections : undefined,
       });
 
       if (humanInput.trim()) {
