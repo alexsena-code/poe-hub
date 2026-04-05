@@ -2,51 +2,57 @@
 
 import { usePostStore } from '@/lib/engine-store';
 
-const STATUS_STYLES: Record<string, { dot: string; label: string }> = {
-  pending: { dot: 'bg-gray-500', label: 'Pendente' },
-  generating: { dot: 'bg-blue-500 animate-pulse-accent', label: 'Gerando...' },
-  draft: { dot: 'bg-yellow-500', label: 'Rascunho' },
-  reviewing: { dot: 'bg-orange-500', label: 'Em revisao' },
-  approved: { dot: 'bg-green-500', label: 'Aprovado' },
+const STATUS_CONFIG: Record<string, { dot: string; label: string; textColor: string }> = {
+  pending: { dot: 'bg-zinc-500', label: 'Pendente', textColor: 'text-muted-foreground' },
+  generating: { dot: 'bg-amber-400 animate-pulse', label: 'Gerando...', textColor: 'text-amber-400' },
+  draft: { dot: 'bg-yellow-500', label: 'Rascunho', textColor: 'text-yellow-400' },
+  reviewing: { dot: 'bg-orange-500', label: 'Em revisao', textColor: 'text-orange-400' },
+  approved: { dot: 'bg-green-500', label: 'Aprovado', textColor: 'text-green-400' },
 };
 
 export default function SectionSidebar() {
   const { sections, activeSectionId, setActiveSection } = usePostStore();
+  const approvedCount = sections.filter((s) => s.status === 'approved').length;
 
   return (
-    <aside className="border-r border-border bg-surface overflow-y-auto">
-      <div className="p-4">
-        <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-4">
+    <aside className="w-72 shrink-0 flex flex-col border-r border-border bg-surface min-h-0">
+      <div className="px-5 pt-5 pb-3 shrink-0">
+        <h2 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
           Secoes
         </h2>
-        <ul className="flex flex-col gap-1">
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 pb-3">
+        <ul className="flex flex-col gap-0.5">
           {sections.map((section) => {
             const isActive = section.sectionId === activeSectionId;
-            const style = STATUS_STYLES[section.status] || STATUS_STYLES.pending;
+            const config = STATUS_CONFIG[section.status] || STATUS_CONFIG.pending;
 
             return (
               <li key={section.sectionId}>
                 <button
                   onClick={() => setActiveSection(section.sectionId)}
-                  className={`w-full text-left rounded-lg px-3 py-2.5 transition-colors ${
+                  className={`group w-full text-left rounded-lg px-3 py-2.5 transition-all duration-150 ${
                     isActive
-                      ? 'bg-background border border-border'
-                      : 'hover:bg-surface-hover'
+                      ? 'bg-background border-l-2 border-l-foreground/60 border border-border'
+                      : 'border-l-2 border-l-transparent hover:bg-background/50 hover:border-l-foreground/20'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`}
+                      className={`w-2 h-2 rounded-full shrink-0 ${config.dot}`}
                     />
-                    <span className="text-sm font-medium truncate">
+                    <span className={`text-sm font-medium truncate ${
+                      isActive ? 'text-foreground' : 'text-foreground/80 group-hover:text-foreground'
+                    }`}>
                       {section.title}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-1 ml-4">
-                    <span className="text-xs text-muted-foreground">{style.label}</span>
+                  <div className="flex items-center gap-2 mt-1 ml-[18px]">
+                    <span className={`text-[11px] ${config.textColor}`}>{config.label}</span>
                     {section.requiresHumanInput && section.status === 'pending' && (
-                      <span className="text-xs text-accent font-medium">
-                        Opiniao recomendada
+                      <span className="text-[11px] text-amber-400 font-medium">
+                        Opiniao
                       </span>
                     )}
                   </div>
@@ -55,6 +61,21 @@ export default function SectionSidebar() {
             );
           })}
         </ul>
+      </nav>
+
+      {/* Sidebar footer: progress summary */}
+      <div className="px-5 py-3 border-t border-border shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 rounded-full bg-background overflow-hidden">
+            <div
+              className="h-full rounded-full bg-green-500 transition-all duration-500"
+              style={{ width: sections.length > 0 ? `${(approvedCount / sections.length) * 100}%` : '0%' }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {approvedCount}/{sections.length}
+          </span>
+        </div>
       </div>
     </aside>
   );

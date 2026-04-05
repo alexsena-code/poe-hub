@@ -38,6 +38,15 @@ export default function EditorShell({ postId }: { postId: string }) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Add/remove fullscreen class on #app-main for edge-to-edge editor
+  useEffect(() => {
+    const main = document.getElementById('app-main');
+    if (main) {
+      main.classList.add('editor-fullscreen');
+      return () => main.classList.remove('editor-fullscreen');
+    }
+  }, []);
+
   const doAutoSave = useCallback(async () => {
     if (!briefing || sections.length === 0) return;
     const hasDraftContent = sections.some((s) => s.draft !== null);
@@ -174,11 +183,11 @@ export default function EditorShell({ postId }: { postId: string }) {
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-background">
       {/* Top bar */}
       <header className="flex items-center justify-between h-14 px-6 border-b border-border bg-surface shrink-0">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-bold text-accent">Path of Trade</h1>
+          <h1 className="text-lg font-bold text-foreground">Path of Trade</h1>
           <span className="text-sm text-muted-foreground">|</span>
           <span className="text-sm text-foreground font-medium">
             {briefing?.skill} {briefing?.ascendancy}
@@ -220,7 +229,7 @@ export default function EditorShell({ postId }: { postId: string }) {
           {/* New Post */}
           <button
             onClick={handleNewPost}
-            className="px-3 py-1.5 rounded-lg border border-accent/50 text-accent text-xs hover:bg-accent/10 transition-colors"
+            className="px-3 py-1.5 rounded-lg border border-foreground/30 text-foreground text-xs hover:bg-foreground/10 transition-colors"
           >
             Novo Post
           </button>
@@ -253,15 +262,18 @@ export default function EditorShell({ postId }: { postId: string }) {
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="editor-grid flex-1 min-h-0">
+      {/* Main area: sidebar + editor */}
+      <div className="flex flex-1 min-h-0">
+        {/* Left sidebar: sections list */}
         <SectionSidebar />
-        <div className="flex flex-col min-h-0">
-          <div className="flex-1 overflow-auto">
+
+        {/* Right: active section editor */}
+        <div className="flex flex-col flex-1 min-h-0 min-w-0">
+          <div className="flex-1 overflow-y-auto">
             {activeSection ? (
               <SectionEditor />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                 Selecione uma secao para comecar.
               </div>
             )}
@@ -281,7 +293,7 @@ export default function EditorShell({ postId }: { postId: string }) {
                     {sections.reduce((sum, s) => sum + s.tokensUsed, 0).toLocaleString()} tokens
                   </span>
                   <span>|</span>
-                  <span className="text-accent">
+                  <span className="text-green-400">
                     ~${(sections.reduce((sum, s) => sum + s.tokensUsed, 0) / 1_000_000 * 0.40).toFixed(4)}
                   </span>
                 </>
@@ -292,7 +304,7 @@ export default function EditorShell({ postId }: { postId: string }) {
               {allApproved && phase === 'writing' && (
                 <button
                   onClick={handleSeoPass}
-                  className="px-4 py-1.5 rounded-lg bg-accent text-background font-medium text-sm hover:bg-accent-hover transition-colors"
+                  className="px-4 py-1.5 rounded-lg bg-green-600 text-white font-medium text-sm hover:bg-green-500 transition-colors"
                 >
                   Otimizar SEO e Publicar
                 </button>
