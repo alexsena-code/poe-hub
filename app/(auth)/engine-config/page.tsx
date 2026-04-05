@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 const KeybertPanel = dynamic(() => import('./keybert-tab'), { loading: () => <div className="py-8 text-center text-muted-foreground">Carregando...</div> });
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API = '/api/engine';
 
 // ─── Types ─────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_URL = '/api/engine';
 
 type SlangStatus = 'pending' | 'approved' | 'rejected';
 type SlangCategory = 'crafting' | 'trade' | 'combat' | 'mapping' | 'builds' | 'general';
