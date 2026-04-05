@@ -45,3 +45,5 @@ exports/
 playwright-report/
 
 .vercel
+.env.vercel
+poth_data.sql
