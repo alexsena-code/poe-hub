@@ -1,11 +1,18 @@
-import Link from "next/link";
-import { fetchPosts, type PostSummary } from "@/lib/content-api";
-import { BookOpen, Pencil, Eye, FileEdit } from "lucide-react";
+'use client';
 
-export const metadata = {
-  title: "Posts | Path of Trade",
-  description: "Manage all generated content — view, edit, and track status.",
-};
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { BookOpen, Pencil, Eye, FileEdit, RefreshCw } from "lucide-react";
+
+const API = '/api/engine';
+
+interface PostSummary {
+  slug: string;
+  title: { "pt-br": string; en: string };
+  template: string;
+  status: string;
+  generatedAt: string;
+}
 
 function templateLabel(template: string): string {
   const labels: Record<string, string> = {
@@ -53,15 +60,27 @@ function formatDate(dateStr: string): string {
   }
 }
 
-export default async function GuidesPage() {
-  let posts: PostSummary[] = [];
-  let error: string | null = null;
+export default function GuidesPage() {
+  const [posts, setPosts] = useState<PostSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  try {
-    posts = await fetchPosts();
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Failed to load posts";
+  async function fetchPosts() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/content/posts`);
+      if (!res.ok) throw new Error(`Failed to fetch posts: ${res.status}`);
+      const data = await res.json();
+      setPosts(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load posts");
+    } finally {
+      setLoading(false);
+    }
   }
+
+  useEffect(() => { fetchPosts(); }, []);
 
   const templateCounts: Record<string, number> = {};
   const statusCounts: Record<string, number> = {};
@@ -100,6 +119,14 @@ export default async function GuidesPage() {
               </div>
             ))}
             <div className="w-px h-8 bg-border" />
+            <button
+              onClick={fetchPosts}
+              disabled={loading}
+              className="p-2 rounded text-muted-foreground hover:text-foreground hover:bg-foreground/10 transition-colors disabled:opacity-50"
+              title="Atualizar"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
             <Link
               href="/new"
               className="px-4 py-2 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/80 transition-colors"
@@ -119,6 +146,8 @@ export default async function GuidesPage() {
               Verifique se a API do content engine esta rodando.
             </p>
           </div>
+        ) : loading ? (
+          <div className="py-16 text-center text-muted-foreground">Carregando...</div>
         ) : posts.length === 0 ? (
           <div className="py-16 text-center">
             <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/40" />
