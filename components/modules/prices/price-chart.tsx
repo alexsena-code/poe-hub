@@ -232,7 +232,7 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
               />
               <ChartLegend content={<ChartLegendContent />} />
               <Line
-                type="monotone"
+                type="linear"
                 dataKey="median"
                 stroke="var(--color-median)"
                 strokeWidth={2}
@@ -241,7 +241,7 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
               />
               {hasCnl && (
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey="cnlPrice"
                   stroke="var(--color-cnlPrice)"
                   strokeWidth={2}

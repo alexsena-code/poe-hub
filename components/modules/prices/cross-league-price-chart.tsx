@@ -363,7 +363,7 @@ export function CrossLeaguePriceChart({ item }: CrossLeaguePriceChartProps) {
               {chartLeagues.map((league, idx) => (
                 <Line
                   key={league.name}
-                  type="monotone"
+                  type="linear"
                   dataKey={league.name}
                   stroke={LEAGUE_COLORS[idx % LEAGUE_COLORS.length]}
                   strokeWidth={2}

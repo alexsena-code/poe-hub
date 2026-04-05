@@ -660,7 +660,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                       {simulations.map((_sim, i) => (
                         <Area
                           key={i}
-                          type="monotone"
+                          type="linear"
                           dataKey={simKeys[i]}
                           stroke={colors[i]}
                           strokeWidth={2}

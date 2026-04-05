@@ -117,14 +117,14 @@ export function PriceChart({ data }: { data: PricePoint[] }) {
             />
             <ChartLegend content={<ChartLegendContent />} />
             <Line
-              type="monotone"
+              type="linear"
               dataKey="median"
               stroke="var(--color-median)"
               strokeWidth={2}
               dot={false}
             />
             <Line
-              type="monotone"
+              type="linear"
               dataKey="cnlPrice"
               stroke="var(--color-cnlPrice)"
               strokeWidth={2}

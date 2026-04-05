@@ -430,7 +430,7 @@ export default function AnalyticsTab() {
               {trendKeywords.map((kw, i) => (
                 <Line
                   key={kw}
-                  type="monotone"
+                  type="linear"
                   dataKey={kw}
                   stroke={LINE_COLORS[i % LINE_COLORS.length]}
                   strokeWidth={2}
