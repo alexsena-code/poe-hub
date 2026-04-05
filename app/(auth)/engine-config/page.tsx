@@ -1188,10 +1188,11 @@ const PIPELINES = [
   },
   {
     id: 'reddit-crawl',
-    name: 'Reddit Crawl',
-    description: 'Busca top posts dos subreddits PoE e salva no DB',
+    name: 'Reddit Crawl (New)',
+    description: 'Busca posts mais recentes dos subreddits PoE e salva no DB',
     mode: 'fire' as const,
     endpoint: '/seo/reddit/crawl',
+    body: { sort: 'new', time: 'day', maxPosts: 50, parallel: true },
     statusEndpoint: null,
     configFields: [],
   },
@@ -1589,7 +1590,7 @@ function PipelinesPanel() {
     } else {
       // Fire-and-forget
       try {
-        const body: Record<string, any> = {};
+        const body: Record<string, any> = { ...((pipeline as any).body || {}) };
         pipeline.configFields.forEach((f) => {
           if (f.type === 'number') body[f.key] = Number(cfg[f.key]);
           else if (f.type === 'text' && f.key === 'seeds') {
