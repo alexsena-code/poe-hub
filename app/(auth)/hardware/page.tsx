@@ -521,29 +521,37 @@ export default function HardwarePage() {
     return [...new Set(keywords)];
   };
 
+  const SPEC_LABELS: Record<string, string> = {
+    vram_gb: "VRAM (GB)", tdp_w: "TDP (W)", cuda_cores: "CUDA Cores",
+    memory_type: "Memory Type", pcie_gen: "PCIe Gen", pcie_lanes: "PCIe Lanes", lhr: "LHR",
+    cores: "Cores", threads: "Threads", p_cores: "P-Cores", e_cores: "E-Cores",
+    base_clock_ghz: "Base Clock (GHz)", boost_clock_ghz: "Boost Clock (GHz)",
+    socket: "Socket", hyperthreading: "Hyperthreading", smt: "SMT",
+    capacity_gb: "Capacity (GB)", type: "Type", speed_mhz: "Speed (MHz)", cas_latency: "CAS Latency",
+    color: "Color", rgb: "RGB",
+    form_factor: "Form Factor", interface: "Interface",
+    wattage: "Wattage (W)", efficiency: "Efficiency", modular: "Modular",
+    atx_version: "ATX Version", gpu_connector: "GPU Connector",
+    size_inches: "Size (inches)", resolution: "Resolution", panel: "Panel",
+    refresh_rate: "Refresh Rate (Hz)", refresh_rate_oc: "OC Refresh (Hz)",
+  };
+
   const specsFieldsForCategory = (cat: string): { key: string; label: string }[] => {
-    switch (cat) {
-      case "gpu":
-        return [
-          { key: "vram_gb", label: "VRAM (GB)" },
-          { key: "tdp_w", label: "TDP (W)" },
-          { key: "cuda_cores", label: "CUDA Cores" },
-        ];
-      case "cpu-kit":
-        return [
-          { key: "cores", label: "Cores" },
-          { key: "threads", label: "Threads" },
-          { key: "base_clock_ghz", label: "Base Clock (GHz)" },
-          { key: "boost_clock_ghz", label: "Boost Clock (GHz)" },
-        ];
-      case "ram":
-        return [
-          { key: "capacity_gb", label: "Capacity (GB)" },
-          { key: "type", label: "Type" },
-        ];
-      default:
-        return [];
-    }
+    // Base fields per category
+    const base: Record<string, string[]> = {
+      "gpu": ["vram_gb", "memory_type", "pcie_gen", "tdp_w", "cuda_cores"],
+      "cpu-kit": ["cores", "p_cores", "e_cores", "threads", "socket", "base_clock_ghz", "boost_clock_ghz"],
+      "cpu": ["cores", "p_cores", "e_cores", "threads", "socket", "base_clock_ghz", "boost_clock_ghz"],
+      "ram": ["capacity_gb", "type", "speed_mhz", "cas_latency"],
+      "motherboard": ["socket", "form_factor", "memory_type", "pcie_gen"],
+      "ssd": ["capacity_gb", "form_factor", "interface", "pcie_gen"],
+      "psu": ["wattage", "efficiency", "modular", "gpu_connector"],
+      "monitor": ["size_inches", "resolution", "panel", "refresh_rate"],
+    };
+    const keys = base[cat] || [];
+    // Also include any extra keys from current form specs not in base
+    const extra = Object.keys(itemFormSpecs).filter((k) => !keys.includes(k) && k in SPEC_LABELS);
+    return [...keys, ...extra].map((k) => ({ key: k, label: SPEC_LABELS[k] || k }));
   };
 
   const resetItemForm = () => {
