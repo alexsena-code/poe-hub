@@ -241,6 +241,32 @@ export default function HardwarePage() {
     }
   };
 
+  const [scrapingItemId, setScrapingItemId] = useState<number | null>(null);
+
+  const handleScrapeItem = async (itemId: number, itemName: string) => {
+    setScrapingItemId(itemId);
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/scrape`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: itemId }),
+      });
+      if (res.ok) {
+        toast.success(`Scraping ${itemName}...`);
+        setTimeout(() => {
+          fetchAll();
+          setScrapingItemId(null);
+        }, 10000);
+      } else {
+        toast.error("Failed to start scrape");
+        setScrapingItemId(null);
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+      setScrapingItemId(null);
+    }
+  };
+
   const handleDeleteDeal = async (dealId: number) => {
     try {
       const res = await fetch(`${HARDWARE_API}/api/deals/${dealId}`, {
@@ -1382,6 +1408,20 @@ export default function HardwarePage() {
                                 className="h-7 w-7 p-0"
                               >
                                 <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleScrapeItem(item.id, item.name)}
+                                disabled={scrapingItemId === item.id}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-green-400"
+                                title="Scrape this item"
+                              >
+                                {scrapingItemId === item.id ? (
+                                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Search className="h-3.5 w-3.5" />
+                                )}
                               </Button>
                               <Button
                                 variant="ghost"
