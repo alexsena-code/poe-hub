@@ -35,6 +35,9 @@ import {
   Save,
   X,
   Trash2,
+  Plus,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -65,6 +68,8 @@ interface SummaryItem {
 interface ConfigItem {
   id: number;
   name: string;
+  keywords: string[];
+  max_price: number;
   category: string;
   specs: Record<string, number | string>;
 }
@@ -87,7 +92,7 @@ export default function HardwarePage() {
   const [manualPrices, setManualPrices] = useState<ManualPrice[]>([]);
   const [loading, setLoading] = useState(true);
   const [scraping, setScraping] = useState(false);
-  const [activeTab, setActiveTab] = useState<"deals" | "manual-prices">(
+  const [activeTab, setActiveTab] = useState<"deals" | "manual-prices" | "items">(
     "deals"
   );
 
@@ -105,6 +110,17 @@ export default function HardwarePage() {
   // Manual prices editing
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<ManualPrice>>({});
+
+  // Items tab state
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [editingConfigItem, setEditingConfigItem] = useState<ConfigItem | null>(null);
+  const [itemFormName, setItemFormName] = useState("");
+  const [itemFormCategory, setItemFormCategory] = useState("gpu");
+  const [itemFormMaxPrice, setItemFormMaxPrice] = useState("");
+  const [itemFormKeywords, setItemFormKeywords] = useState<string[]>([]);
+  const [itemFormKeywordInput, setItemFormKeywordInput] = useState("");
+  const [itemFormSpecs, setItemFormSpecs] = useState<Record<string, string>>({});
+  const [showSpecs, setShowSpecs] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -239,6 +255,141 @@ export default function HardwarePage() {
     } catch {
       toast.error("Failed to connect to Hardware API");
     }
+  };
+
+  // --- Items tab helpers ---
+
+  const generateKeywords = (name: string): string[] => {
+    const lower = name.toLowerCase();
+    const keywords = [lower];
+    const noSpaces = lower.replace(/\s+/g, '');
+    if (noSpaces !== lower) keywords.push(noSpaces);
+    const parts = lower.split(' ');
+    if (parts.length > 1) {
+      keywords.push(parts.slice(1).join(' '));
+    }
+    return [...new Set(keywords)];
+  };
+
+  const specsFieldsForCategory = (cat: string): { key: string; label: string }[] => {
+    switch (cat) {
+      case "gpu":
+        return [
+          { key: "vram_gb", label: "VRAM (GB)" },
+          { key: "tdp_w", label: "TDP (W)" },
+          { key: "cuda_cores", label: "CUDA Cores" },
+        ];
+      case "cpu-kit":
+        return [
+          { key: "cores", label: "Cores" },
+          { key: "threads", label: "Threads" },
+          { key: "base_clock_ghz", label: "Base Clock (GHz)" },
+          { key: "boost_clock_ghz", label: "Boost Clock (GHz)" },
+        ];
+      case "ram":
+        return [
+          { key: "capacity_gb", label: "Capacity (GB)" },
+          { key: "type", label: "Type" },
+        ];
+      default:
+        return [];
+    }
+  };
+
+  const resetItemForm = () => {
+    setItemFormName("");
+    setItemFormCategory("gpu");
+    setItemFormMaxPrice("");
+    setItemFormKeywords([]);
+    setItemFormKeywordInput("");
+    setItemFormSpecs({});
+    setShowSpecs(false);
+    setEditingConfigItem(null);
+  };
+
+  const handleItemFormNameChange = (name: string) => {
+    setItemFormName(name);
+    if (!editingConfigItem) {
+      setItemFormKeywords(generateKeywords(name));
+    }
+  };
+
+  const handleAddKeyword = () => {
+    const kw = itemFormKeywordInput.trim().toLowerCase();
+    if (kw && !itemFormKeywords.includes(kw)) {
+      setItemFormKeywords([...itemFormKeywords, kw]);
+    }
+    setItemFormKeywordInput("");
+  };
+
+  const handleRemoveKeyword = (kw: string) => {
+    setItemFormKeywords(itemFormKeywords.filter((k) => k !== kw));
+  };
+
+  const handleSaveItem = async () => {
+    if (!itemFormName.trim()) {
+      toast.error("Item name is required");
+      return;
+    }
+    const maxPrice = parseFloat(itemFormMaxPrice);
+    if (isNaN(maxPrice) || maxPrice <= 0) {
+      toast.error("Valid max price is required");
+      return;
+    }
+
+    const specs: Record<string, number | string> = {};
+    for (const [key, val] of Object.entries(itemFormSpecs)) {
+      if (val.trim()) {
+        const num = parseFloat(val);
+        specs[key] = isNaN(num) ? val.trim() : num;
+      }
+    }
+
+    const payload = {
+      name: itemFormName.trim(),
+      category: itemFormCategory,
+      max_price: maxPrice,
+      keywords: itemFormKeywords,
+      specs,
+    };
+
+    try {
+      const url = editingConfigItem
+        ? `${HARDWARE_API}/api/items/${editingConfigItem.id}`
+        : `${HARDWARE_API}/api/items`;
+      const method = editingConfigItem ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        toast.success(editingConfigItem ? "Item updated" : "Item added");
+        resetItemForm();
+        setShowItemForm(false);
+        fetchAll();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.detail || "Failed to save item");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleEditConfigItem = (item: ConfigItem) => {
+    setEditingConfigItem(item);
+    setItemFormName(item.name);
+    setItemFormCategory(item.category);
+    setItemFormMaxPrice(String(item.max_price));
+    setItemFormKeywords(item.keywords || []);
+    setItemFormSpecs(
+      Object.fromEntries(
+        Object.entries(item.specs || {}).map(([k, v]) => [k, String(v)])
+      )
+    );
+    setShowSpecs(Object.keys(item.specs || {}).length > 0);
+    setShowItemForm(true);
   };
 
   const handleSort = (field: SortField) => {
@@ -463,6 +614,16 @@ export default function HardwarePage() {
             }`}
           >
             Manual Prices
+          </button>
+          <button
+            onClick={() => setActiveTab("items")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "items"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+            }`}
+          >
+            Items
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -955,6 +1116,292 @@ export default function HardwarePage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {activeTab === "items" && (
+        <div className="space-y-4">
+          {/* Add Item button */}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => {
+                if (showItemForm && !editingConfigItem) {
+                  setShowItemForm(false);
+                } else {
+                  resetItemForm();
+                  setShowItemForm(true);
+                }
+              }}
+              className="bg-primary text-primary-foreground"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Add Item
+            </Button>
+          </div>
+
+          {/* Add/Edit form */}
+          {showItemForm && (
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm text-card-foreground">
+                  {editingConfigItem ? `Edit: ${editingConfigItem.name}` : "Add New Item"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Item Name</label>
+                    <Input
+                      placeholder="e.g. RTX 3060 12GB"
+                      value={itemFormName}
+                      onChange={(e) => handleItemFormNameChange(e.target.value)}
+                      className="bg-background border-border"
+                    />
+                  </div>
+                  {/* Category */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Category</label>
+                    <Select value={itemFormCategory} onValueChange={setItemFormCategory}>
+                      <SelectTrigger className="bg-background border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gpu">GPU</SelectItem>
+                        <SelectItem value="cpu-kit">CPU Kit</SelectItem>
+                        <SelectItem value="ram">RAM</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {/* Max Price */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Max Price (R$)</label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 1500"
+                      value={itemFormMaxPrice}
+                      onChange={(e) => setItemFormMaxPrice(e.target.value)}
+                      className="bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                {/* Keywords */}
+                <div className="space-y-1.5">
+                  <label className="text-sm text-muted-foreground">Keywords</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {itemFormKeywords.map((kw) => (
+                      <Badge
+                        key={kw}
+                        variant="secondary"
+                        className="text-xs gap-1 pr-1"
+                      >
+                        {kw}
+                        <button
+                          onClick={() => handleRemoveKeyword(kw)}
+                          className="ml-0.5 hover:text-red-400 transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    {itemFormKeywords.length === 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        Type an item name above to auto-generate keywords
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add custom keyword..."
+                      value={itemFormKeywordInput}
+                      onChange={(e) => setItemFormKeywordInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddKeyword();
+                        }
+                      }}
+                      className="bg-background border-border flex-1 max-w-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddKeyword}
+                      className="border-border"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Specs (collapsible) */}
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => setShowSpecs(!showSpecs)}
+                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showSpecs ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                    Specs (optional)
+                  </button>
+                  {showSpecs && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                      {specsFieldsForCategory(itemFormCategory).map((field) => (
+                        <div key={field.key} className="space-y-1">
+                          <label className="text-xs text-muted-foreground">
+                            {field.label}
+                          </label>
+                          <Input
+                            placeholder={field.label}
+                            value={itemFormSpecs[field.key] || ""}
+                            onChange={(e) =>
+                              setItemFormSpecs((prev) => ({
+                                ...prev,
+                                [field.key]: e.target.value,
+                              }))
+                            }
+                            className="bg-background border-border h-8 text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Save / Cancel */}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveItem}
+                    className="bg-primary text-primary-foreground"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    {editingConfigItem ? "Update Item" : "Save Item"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      resetItemForm();
+                      setShowItemForm(false);
+                    }}
+                    className="border-border"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Items table */}
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-card-foreground">
+                {items.length} items configured
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Keywords</TableHead>
+                      <TableHead>Max Price</TableHead>
+                      <TableHead>Specs</TableHead>
+                      <TableHead className="w-20">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center text-muted-foreground py-8"
+                        >
+                          No items configured. Add one to start tracking deals.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      items.map((item) => (
+                        <TableRow
+                          key={item.id}
+                          className="border-border hover:bg-foreground/5"
+                        >
+                          <TableCell className="font-medium text-card-foreground">
+                            {item.name}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              {categoryIcon(item.category)}
+                              <Badge variant="outline" className="text-xs">
+                                {categoryLabel(item.category)}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[250px]">
+                              {(item.keywords || []).map((kw) => (
+                                <Badge
+                                  key={kw}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {kw}
+                                </Badge>
+                              ))}
+                              {(!item.keywords || item.keywords.length === 0) && (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-medium">
+                              {formatPrice(item.max_price)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">
+                              {Object.entries(item.specs || {})
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join(", ") || "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditConfigItem(item)}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
