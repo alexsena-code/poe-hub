@@ -56,6 +56,14 @@ interface ManualPrice {
   notes: string;
 }
 
+interface NewPriceResult {
+  item_name: string;
+  price_new: number | null;
+  product: string | null;
+  merchant: string | null;
+  source: string;
+}
+
 interface SelectedComponent {
   item: ConfigItem;
   quantity: number;
@@ -86,6 +94,7 @@ export default function PCBuilderPage() {
   const [items, setItems] = useState<ConfigItem[]>([]);
   const [summary, setSummary] = useState<SummaryItem[]>([]);
   const [manualPrices, setManualPrices] = useState<ManualPrice[]>([]);
+  const [newPrices, setNewPrices] = useState<NewPriceResult[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Tab state
@@ -121,16 +130,20 @@ export default function PCBuilderPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [itemsRes, summaryRes, pricesRes] = await Promise.all([
+      const [itemsRes, summaryRes, pricesRes, newPricesRes] = await Promise.all([
         fetch(`${HARDWARE_API}/api/items`).then((r) => r.json()),
         fetch(`${HARDWARE_API}/api/deals/summary`).then((r) => r.json()),
         fetch(`${HARDWARE_API}/api/manual-prices`)
+          .then((r) => r.json())
+          .catch(() => []),
+        fetch(`${HARDWARE_API}/api/new-prices-batch`)
           .then((r) => r.json())
           .catch(() => []),
       ]);
       setItems(Array.isArray(itemsRes) ? itemsRes : []);
       setSummary(Array.isArray(summaryRes) ? summaryRes : []);
       setManualPrices(Array.isArray(pricesRes) ? pricesRes : []);
+      setNewPrices(Array.isArray(newPricesRes) ? newPricesRes : []);
     } catch (error) {
       console.error("Error fetching hardware data:", error);
       toast.error("Failed to connect to Hardware API");
@@ -166,13 +179,19 @@ export default function PCBuilderPage() {
 
   const getPrice = (
     itemName: string
-  ): { best: number; avg: number; newPrice: number } => {
+  ): { best: number; avg: number; newPrice: number; newSource: string; newProduct: string; newMerchant: string } => {
     const s = summary.find((s) => s.item_name === itemName);
+    const np = newPrices.find((p) => p.item_name === itemName);
     const mp = manualPrices.find((p) => p.item_name === itemName);
+    // New price: PCBuildWizard live > manual > 0
+    const newPrice = np?.price_new || mp?.price_new || mp?.price_reference || 0;
     return {
       best: s?.min_price || 0,
       avg: s?.avg_price || 0,
-      newPrice: mp?.price_new || mp?.price_reference || 0,
+      newPrice,
+      newSource: np?.source || (mp?.price_new ? "manual" : ""),
+      newProduct: np?.product || "",
+      newMerchant: np?.merchant || mp?.notes || "",
     };
   };
 
