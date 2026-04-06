@@ -142,6 +142,7 @@ export default function HardwarePage() {
     tag: string | null;
     details: string | null;
     specs: Record<string, number | string | boolean> | null;
+    base_model: string | null;
   }
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
   const [storeCategory, setStoreCategory] = useState("gpu");
@@ -164,6 +165,7 @@ export default function HardwarePage() {
   const [specFormFactor, setSpecFormFactor] = useState("");
   const [specEfficiency, setSpecEfficiency] = useState("");
   const [specManufacturer, setSpecManufacturer] = useState("");
+  const [specBaseModel, setSpecBaseModel] = useState("");
 
   // Extract unique spec values from loaded products
   const specOptions = useMemo(() => {
@@ -191,6 +193,7 @@ export default function HardwarePage() {
       form_factor: extract("form_factor"),
       efficiency: extract("efficiency"),
       manufacturer: [...new Set(storeProducts.map((p) => p.manufacturer).filter(Boolean))].sort(),
+      base_model: [...new Set(storeProducts.map((p) => p.base_model).filter(Boolean) as string[])].sort(),
     };
   }, [storeProducts]);
   const [syncing, setSyncing] = useState(false);
@@ -252,7 +255,7 @@ export default function HardwarePage() {
     // Reset spec filters on category change
     setSpecVram(""); setSpecCapacity(""); setSpecWattage(""); setSpecSocket("");
     setSpecMemType(""); setSpecPanel(""); setSpecRefresh(""); setSpecResolution("");
-    setSpecFormFactor(""); setSpecEfficiency(""); setSpecManufacturer("");
+    setSpecFormFactor(""); setSpecEfficiency(""); setSpecManufacturer(""); setSpecBaseModel("");
     try {
       const res = await fetch(
         `${HARDWARE_API}/api/new-prices/${cat}`
@@ -336,6 +339,7 @@ export default function HardwarePage() {
     if (specFormFactor) result = result.filter((p) => String(p.specs?.form_factor || "") === specFormFactor);
     if (specEfficiency) result = result.filter((p) => String(p.specs?.efficiency || "") === specEfficiency);
     if (specManufacturer) result = result.filter((p) => p.manufacturer === specManufacturer);
+    if (specBaseModel) result = result.filter((p) => p.base_model === specBaseModel);
     // Sort
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -345,7 +349,7 @@ export default function HardwarePage() {
     });
     return result;
   }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice, storeSortField, storeSortDir,
-      specVram, specCapacity, specWattage, specSocket, specMemType, specPanel, specRefresh, specResolution, specFormFactor, specEfficiency, specManufacturer]);
+      specVram, specCapacity, specWattage, specSocket, specMemType, specPanel, specRefresh, specResolution, specFormFactor, specEfficiency, specManufacturer, specBaseModel]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -1699,6 +1703,16 @@ export default function HardwarePage() {
                 </SelectContent>
               </Select>
             )}
+            {/* Base model filter — all categories */}
+            {specOptions.base_model.length > 1 && (
+              <Select value={specBaseModel || "__all__"} onValueChange={(v) => setSpecBaseModel(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-36 border-border text-sm"><SelectValue placeholder="Model" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Models</SelectItem>
+                  {specOptions.base_model.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             {/* Dynamic spec filters based on available values */}
             {specOptions.vram_gb.length > 1 && storeCategory === "gpu" && (
               <Select value={specVram || "__all__"} onValueChange={(v) => setSpecVram(v === "__all__" ? "" : v)}>
@@ -2003,6 +2017,7 @@ export default function HardwarePage() {
                         >
                           <div className="flex items-center gap-1">Store <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
                         </TableHead>
+                        <TableHead>Model</TableHead>
                         <TableHead>Specs</TableHead>
                         <TableHead>Rating</TableHead>
                         <TableHead className="w-10"></TableHead>
@@ -2028,6 +2043,23 @@ export default function HardwarePage() {
                                 <Badge variant="secondary" className="text-[10px] px-1 py-0">Frete</Badge>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <input
+                              className="text-xs bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none w-28 text-muted-foreground"
+                              defaultValue={product.base_model || ""}
+                              placeholder="-"
+                              onBlur={async (e) => {
+                                const val = e.target.value.trim();
+                                if (val !== (product.base_model || "") && product.tag) {
+                                  try {
+                                    await fetch(`${HARDWARE_API}/api/store-products/${product.tag}/base-model?base_model=${encodeURIComponent(val)}`, { method: "PUT" });
+                                    toast.success(`Model updated: ${val}`);
+                                  } catch { toast.error("Failed to update"); }
+                                }
+                              }}
+                              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                            />
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
