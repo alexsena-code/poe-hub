@@ -1839,6 +1839,12 @@ export default function HardwarePage() {
                           setItemFormMaxPrice(String(Math.round(product.cash_price)));
                           setItemFormKeywords(generateKeywords(product.name));
                           setItemFormScrapeEnabled(false);
+                          if (product.specs && Object.keys(product.specs).length > 0) {
+                            setItemFormSpecs(Object.fromEntries(
+                              Object.entries(product.specs).filter(([, v]) => v !== true && v !== false).map(([k, v]) => [k, String(v)])
+                            ));
+                            setShowSpecs(true);
+                          }
                           toast.info(`"${product.name}" loaded into item form`);
                         }}
                       >
