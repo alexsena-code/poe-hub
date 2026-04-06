@@ -38,6 +38,8 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -143,6 +145,9 @@ export default function HardwarePage() {
   const [storeSearch, setStoreSearch] = useState("");
   const [storeMinPrice, setStoreMinPrice] = useState("");
   const [storeMaxPrice, setStoreMaxPrice] = useState("");
+  const [storeView, setStoreView] = useState<"grid" | "table">("grid");
+  const [storeSortField, setStoreSortField] = useState<"cash_price" | "name" | "manufacturer" | "merchant">("cash_price");
+  const [storeSortDir, setStoreSortDir] = useState<"asc" | "desc">("asc");
   const [syncing, setSyncing] = useState(false);
   const [storePage, setStorePage] = useState(1);
   const STORE_PAGE_SIZE = 24;
@@ -270,8 +275,15 @@ export default function HardwarePage() {
     if (!isNaN(minP)) result = result.filter((p) => p.cash_price >= minP);
     const maxP = parseFloat(storeMaxPrice);
     if (!isNaN(maxP)) result = result.filter((p) => p.cash_price <= maxP);
+    // Sort
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      if (storeSortField === "cash_price") cmp = a.cash_price - b.cash_price;
+      else cmp = (a[storeSortField] || "").localeCompare(b[storeSortField] || "");
+      return storeSortDir === "asc" ? cmp : -cmp;
+    });
     return result;
-  }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice]);
+  }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice, storeSortField, storeSortDir]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -1582,6 +1594,20 @@ export default function HardwarePage() {
                 className="w-24 border-border text-sm"
               />
             </div>
+            <div className="flex items-center border border-border rounded-md">
+              <button
+                onClick={() => setStoreView("grid")}
+                className={`p-1.5 rounded-l-md transition-colors ${storeView === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setStoreView("table")}
+                className={`p-1.5 rounded-r-md transition-colors ${storeView === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -1649,6 +1675,7 @@ export default function HardwarePage() {
                 <span>Page {storePage} of {totalStorePages}</span>
               )}
             </div>
+            {storeView === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {pagedStoreProducts.map((product, idx) => (
                 <Card
@@ -1733,6 +1760,104 @@ export default function HardwarePage() {
                 </Card>
               ))}
             </div>
+            ) : (
+            <Card className="bg-card border-border">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-card z-10">
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead
+                          className="cursor-pointer select-none hover:text-foreground"
+                          onClick={() => { setStoreSortField("name"); setStoreSortDir(storeSortField === "name" && storeSortDir === "asc" ? "desc" : "asc"); }}
+                        >
+                          <div className="flex items-center gap-1">Product <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none hover:text-foreground"
+                          onClick={() => { setStoreSortField("manufacturer"); setStoreSortDir(storeSortField === "manufacturer" && storeSortDir === "asc" ? "desc" : "asc"); }}
+                        >
+                          <div className="flex items-center gap-1">Brand <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none hover:text-foreground text-right"
+                          onClick={() => { setStoreSortField("cash_price"); setStoreSortDir(storeSortField === "cash_price" && storeSortDir === "asc" ? "desc" : "asc"); }}
+                        >
+                          <div className="flex items-center gap-1 justify-end">Price <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
+                        </TableHead>
+                        <TableHead>Installment</TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none hover:text-foreground"
+                          onClick={() => { setStoreSortField("merchant"); setStoreSortDir(storeSortField === "merchant" && storeSortDir === "asc" ? "desc" : "asc"); }}
+                        >
+                          <div className="flex items-center gap-1">Store <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
+                        </TableHead>
+                        <TableHead>Rating</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedStoreProducts.map((product, idx) => (
+                        <TableRow key={`${product.name}-${idx}`} className="border-border hover:bg-muted/5">
+                          <TableCell className="max-w-[280px]">
+                            <p className="font-medium text-sm truncate" title={product.name}>{product.name}</p>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{product.manufacturer}</TableCell>
+                          <TableCell className="text-right font-medium text-green-400">
+                            {formatPrice(product.cash_price)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {product.installment_price ? formatPrice(product.installment_price) : "-"}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate max-w-[100px]" title={product.merchant}>{product.merchant}</span>
+                              {product.free_shipping && (
+                                <Badge variant="secondary" className="text-[10px] px-1 py-0">Frete</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {product.rating ? product.rating.toFixed(1) : "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {product.url && (
+                                <a href={product.url} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Button>
+                                </a>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                title="Add to Items"
+                                onClick={() => {
+                                  setActiveTab("items");
+                                  setShowItemForm(true);
+                                  setEditingConfigItem(null);
+                                  setItemFormName(product.name);
+                                  setItemFormCategory(storeCategory === "cpu" ? "cpu-kit" : storeCategory);
+                                  setItemFormMaxPrice(String(Math.round(product.cash_price)));
+                                  setItemFormKeywords(generateKeywords(product.name));
+                                  setItemFormScrapeEnabled(false);
+                                  toast.info(`"${product.name}" loaded into item form`);
+                                }}
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+            )}
 
             {/* Pagination */}
             {totalStorePages > 1 && (
