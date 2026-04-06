@@ -40,6 +40,7 @@ import {
   ChevronUp,
   LayoutGrid,
   List,
+  Ban,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -482,6 +483,21 @@ export default function HardwarePage() {
         toast.success("Deal removed");
       } else {
         toast.error("Failed to delete deal");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleBanDeal = async (dealId: number, title: string) => {
+    if (!window.confirm(`Ban "${title}"? It will be deleted and never re-imported.`)) return;
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/deals/${dealId}/ban`, { method: "POST" });
+      if (res.ok) {
+        setDeals((prev) => prev.filter((d) => d.id !== dealId));
+        toast.success("Deal banned permanently");
+      } else {
+        toast.error("Failed to ban deal");
       }
     } catch {
       toast.error("Failed to connect to Hardware API");
@@ -1066,7 +1082,17 @@ export default function HardwarePage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-orange-400"
+                                title="Ban — never re-import"
+                                onClick={() => handleBanDeal(deal.id, deal.title)}
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400"
+                                title="Delete"
                                 onClick={() => handleDeleteDeal(deal.id)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
