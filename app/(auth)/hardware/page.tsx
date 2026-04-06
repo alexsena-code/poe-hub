@@ -108,6 +108,10 @@ export default function HardwarePage() {
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Deals pagination
+  const [dealsPage, setDealsPage] = useState(1);
+  const DEALS_PAGE_SIZE = 50;
+
   // Sorting
   const [sortField, setSortField] = useState<SortField>("found_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -736,6 +740,12 @@ export default function HardwarePage() {
     sortDir,
   ]);
 
+  // Reset deals page on filter change
+  useEffect(() => { setDealsPage(1); }, [filterName, filterSource, filterCategory, filterMinPrice, filterMaxPrice, searchQuery]);
+
+  const totalDealsPages = Math.ceil(filteredDeals.length / DEALS_PAGE_SIZE);
+  const pagedDeals = filteredDeals.slice((dealsPage - 1) * DEALS_PAGE_SIZE, dealsPage * DEALS_PAGE_SIZE);
+
   const categorySummary = useMemo(() => {
     const validCategories = ["gpu", "cpu-kit", "ram", "psu", "ssd", "motherboard"];
     const cats: Record<
@@ -1017,7 +1027,12 @@ export default function HardwarePage() {
                   className="w-[100px] bg-background border-border"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mb-3">{filteredDeals.length} deals found</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-muted-foreground">{filteredDeals.length} deals found</p>
+                {totalDealsPages > 1 && (
+                  <p className="text-xs text-muted-foreground">Page {dealsPage} of {totalDealsPages}</p>
+                )}
+              </div>
               <div className="rounded-md border border-border overflow-hidden">
                 <div className="max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-none">
                 <Table>
@@ -1043,7 +1058,7 @@ export default function HardwarePage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredDeals.slice(0, 100).map((deal) => (
+                      pagedDeals.map((deal) => (
                         <TableRow
                           key={deal.id}
                           className="border-border hover:bg-foreground/5"
@@ -1123,6 +1138,30 @@ export default function HardwarePage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Deals pagination */}
+          {totalDealsPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <Button variant="outline" size="sm" disabled={dealsPage <= 1} onClick={() => setDealsPage((p) => p - 1)} className="border-border">
+                Previous
+              </Button>
+              {Array.from({ length: Math.min(totalDealsPages, 7) }, (_, i) => {
+                let page: number;
+                if (totalDealsPages <= 7) page = i + 1;
+                else if (dealsPage <= 4) page = i + 1;
+                else if (dealsPage >= totalDealsPages - 3) page = totalDealsPages - 6 + i;
+                else page = dealsPage - 3 + i;
+                return (
+                  <Button key={page} variant={dealsPage === page ? "default" : "outline"} size="sm" onClick={() => setDealsPage(page)} className={`w-8 h-8 p-0 ${dealsPage !== page ? "border-border" : ""}`}>
+                    {page}
+                  </Button>
+                );
+              })}
+              <Button variant="outline" size="sm" disabled={dealsPage >= totalDealsPages} onClick={() => setDealsPage((p) => p + 1)} className="border-border">
+                Next
+              </Button>
+            </div>
+          )}
         </>
       )}
 
