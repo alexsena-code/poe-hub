@@ -93,7 +93,7 @@ export default function HardwarePage() {
   const [manualPrices, setManualPrices] = useState<ManualPrice[]>([]);
   const [loading, setLoading] = useState(true);
   const [scraping, setScraping] = useState(false);
-  const [activeTab, setActiveTab] = useState<"deals" | "manual-prices" | "items">(
+  const [activeTab, setActiveTab] = useState<"deals" | "manual-prices" | "items" | "store">(
     "deals"
   );
 
@@ -125,6 +125,46 @@ export default function HardwarePage() {
   const [itemFormScrapeEnabled, setItemFormScrapeEnabled] = useState(true);
   const [showSpecs, setShowSpecs] = useState(false);
 
+  // Store tab state
+  interface StoreProduct {
+    name: string;
+    manufacturer: string;
+    cash_price: number;
+    installment_price: number | null;
+    merchant: string;
+    url: string | null;
+    category: string;
+    rating: number | null;
+    free_shipping: boolean;
+  }
+  const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
+  const [storeCategory, setStoreCategory] = useState("gpu");
+  const [storeLoading, setStoreLoading] = useState(false);
+  const [storeSearch, setStoreSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  interface SyncResult {
+    item: string;
+    new_price: number;
+    product: string;
+    merchant: string;
+  }
+  const [syncResults, setSyncResults] = useState<SyncResult[]>([]);
+
+  // Price comparison state
+  interface PriceCompItem {
+    item_name: string;
+    category: string;
+    max_price: number;
+    olx_min: number | null;
+    olx_avg: number | null;
+    olx_count: number;
+    price_new: number | null;
+    price_aliexpress: number | null;
+    savings_pct: number | null;
+    notes: string | null;
+  }
+  const [priceComparison, setPriceComparison] = useState<PriceCompItem[]>([]);
+
   useEffect(() => {
     fetchAll();
   }, []);
@@ -151,6 +191,75 @@ export default function HardwarePage() {
       setLoading(false);
     }
   };
+
+  const fetchStoreProducts = async (cat: string) => {
+    setStoreLoading(true);
+    try {
+      const res = await fetch(
+        `${HARDWARE_API}/api/new-prices/${cat}?limit=50`
+      );
+      const data = await res.json();
+      setStoreProducts(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Failed to fetch store prices");
+      setStoreProducts([]);
+    } finally {
+      setStoreLoading(false);
+    }
+  };
+
+  const fetchPriceComparison = async () => {
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/analytics/price-comparison`);
+      const data = await res.json();
+      setPriceComparison(Array.isArray(data) ? data : []);
+    } catch {
+      setPriceComparison([]);
+    }
+  };
+
+  const handleSyncNewPrices = async () => {
+    setSyncing(true);
+    setSyncResults([]);
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/sync-new-prices`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        toast.success(`Synced ${data.updated} prices from PCBuildWizard`);
+        setSyncResults(data.items || []);
+        fetchAll();
+        fetchPriceComparison();
+      } else {
+        toast.error("Sync failed");
+      }
+    } catch {
+      toast.error("Failed to sync prices");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "store") {
+      fetchStoreProducts(storeCategory);
+    }
+    if (activeTab === "manual-prices") {
+      fetchPriceComparison();
+    }
+  }, [activeTab, storeCategory]);
+
+  const filteredStoreProducts = useMemo(() => {
+    if (!storeSearch.trim()) return storeProducts;
+    const q = storeSearch.toLowerCase();
+    return storeProducts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.manufacturer.toLowerCase().includes(q) ||
+        p.merchant.toLowerCase().includes(q)
+    );
+  }, [storeProducts, storeSearch]);
 
   const handleScrape = async () => {
     setScraping(true);
@@ -665,6 +774,16 @@ export default function HardwarePage() {
             }`}
           >
             Items
+          </button>
+          <button
+            onClick={() => setActiveTab("store")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "store"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+            }`}
+          >
+            Store Prices
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -1391,6 +1510,245 @@ export default function HardwarePage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {activeTab === "store" && (
+        <div className="space-y-4">
+          {/* Controls */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Select value={storeCategory} onValueChange={setStoreCategory}>
+              <SelectTrigger className="w-[180px] border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gpu">GPUs</SelectItem>
+                <SelectItem value="cpu">CPUs</SelectItem>
+                <SelectItem value="ram">RAM</SelectItem>
+                <SelectItem value="motherboard">Motherboards</SelectItem>
+                <SelectItem value="ssd">SSDs</SelectItem>
+                <SelectItem value="psu">Power Supplies</SelectItem>
+                <SelectItem value="cooler">CPU Coolers</SelectItem>
+                <SelectItem value="case">Cases</SelectItem>
+                <SelectItem value="monitor">Monitors</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products..."
+                value={storeSearch}
+                onChange={(e) => setStoreSearch(e.target.value)}
+                className="pl-9 border-border"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchStoreProducts(storeCategory)}
+              disabled={storeLoading}
+              className="border-border"
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${storeLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSyncNewPrices}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Package className="h-4 w-4 mr-1" />
+              )}
+              {syncing ? "Syncing..." : "Sync to Manual Prices"}
+            </Button>
+          </div>
+
+          {/* Sync results */}
+          {syncResults.length > 0 && (
+            <Card className="bg-card border-green-500/30">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-sm font-medium text-green-400 mb-2">
+                  Synced {syncResults.length} prices:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {syncResults.map((r) => (
+                    <Badge key={r.item} variant="secondary" className="text-xs">
+                      {r.item}: {formatPrice(r.new_price)} @ {r.merchant}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Products grid */}
+          {storeLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-40 rounded-lg" />
+              ))}
+            </div>
+          ) : filteredStoreProducts.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No products found for this category.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {filteredStoreProducts.map((product, idx) => (
+                <Card
+                  key={`${product.name}-${idx}`}
+                  className="bg-card border-border hover:border-primary/50 transition-colors"
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm leading-tight truncate" title={product.name}>
+                          {product.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {product.manufacturer}
+                        </p>
+                      </div>
+                      {product.rating && (
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          {product.rating.toFixed(1)}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-end justify-between mt-3">
+                      <div>
+                        <p className="text-lg font-bold text-green-400">
+                          {formatPrice(product.cash_price)}
+                        </p>
+                        {product.installment_price && (
+                          <p className="text-xs text-muted-foreground">
+                            ou {formatPrice(product.installment_price)} parcelado
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground truncate max-w-[100px]" title={product.merchant}>
+                          {product.merchant}
+                        </p>
+                        {product.free_shipping && (
+                          <Badge variant="secondary" className="text-xs mt-0.5">
+                            Frete gratis
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5 mt-3">
+                      {product.url && (
+                        <a
+                          href={product.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1"
+                        >
+                          <Button variant="outline" size="sm" className="w-full h-7 text-xs border-border">
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </a>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 h-7 text-xs border-border hover:bg-primary/10 hover:text-primary"
+                        onClick={() => {
+                          setActiveTab("items");
+                          setShowItemForm(true);
+                          setEditingConfigItem(null);
+                          setItemFormName(product.name);
+                          setItemFormCategory(storeCategory === "cpu" ? "cpu-kit" : storeCategory);
+                          setItemFormMaxPrice(String(Math.round(product.cash_price)));
+                          setItemFormKeywords(generateKeywords(product.name));
+                          setItemFormScrapeEnabled(false);
+                          toast.info(`"${product.name}" loaded into item form`);
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Item
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Price Comparison: Used vs New */}
+          {priceComparison.length > 0 && (
+            <Card className="bg-card border-border mt-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Used vs New — Price Comparison</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border">
+                        <TableHead>Item</TableHead>
+                        <TableHead>OLX Min</TableHead>
+                        <TableHead>OLX Avg</TableHead>
+                        <TableHead>Deals</TableHead>
+                        <TableHead>New Price</TableHead>
+                        <TableHead>Savings</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {priceComparison.map((item) => (
+                        <TableRow key={item.item_name} className="border-border">
+                          <TableCell className="font-medium">{item.item_name}</TableCell>
+                          <TableCell>
+                            {item.olx_min ? formatPrice(item.olx_min) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {item.olx_avg ? formatPrice(item.olx_avg) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{item.olx_count}</TableCell>
+                          <TableCell>
+                            {item.price_new ? (
+                              <span className="text-green-400">{formatPrice(item.price_new)}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {item.savings_pct !== null ? (
+                              <Badge
+                                variant={item.savings_pct > 0 ? "default" : "destructive"}
+                                className={item.savings_pct > 30 ? "bg-green-600" : item.savings_pct > 0 ? "bg-yellow-600" : ""}
+                              >
+                                {item.savings_pct > 0 ? `-${item.savings_pct}%` : `+${Math.abs(item.savings_pct)}%`}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                            {item.notes || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
