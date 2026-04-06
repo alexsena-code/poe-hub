@@ -75,7 +75,6 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Deals", href: "/hardware", icon: Monitor },
           { title: "Builder & VMs", href: "/hardware/builder", icon: Wrench },
           { title: "Analytics", href: "/hardware/analytics", icon: BarChart3 },
-          { title: "Settings", href: "/hardware/settings", icon: Settings },
         ],
       },
     ],
@@ -118,6 +117,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         title: "Configuracoes",
         icon: Settings,
         children: [
+          { title: "Hardware", href: "/hardware/settings", icon: Monitor },
           { title: "Custos", href: "/settings/costs", icon: DollarSign },
           { title: "Proxy", href: "/settings/proxy", icon: Wrench },
           { title: "Ligas", href: "/settings/leagues", icon: ListTodo },
