@@ -1680,91 +1680,91 @@ export default function HardwarePage() {
             </div>
             {/* Dynamic spec filters based on available values */}
             {specOptions.vram_gb.length > 1 && storeCategory === "gpu" && (
-              <Select value={specVram} onValueChange={setSpecVram}>
+              <Select value={specVram || "__all__"} onValueChange={(v) => setSpecVram(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="VRAM" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All VRAM</SelectItem>
+                  <SelectItem value="__all__">All VRAM</SelectItem>
                   {specOptions.vram_gb.map((v) => <SelectItem key={v} value={v}>{v} GB</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.capacity_gb.length > 1 && (storeCategory === "ram" || storeCategory === "ssd") && (
-              <Select value={specCapacity} onValueChange={setSpecCapacity}>
+              <Select value={specCapacity || "__all__"} onValueChange={(v) => setSpecCapacity(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Capacity" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Sizes</SelectItem>
+                  <SelectItem value="__all__">All Sizes</SelectItem>
                   {specOptions.capacity_gb.map((v) => <SelectItem key={v} value={v}>{Number(v) >= 1000 ? `${Number(v)/1000} TB` : `${v} GB`}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.memory_type.length > 1 && (storeCategory === "ram" || storeCategory === "motherboard") && (
-              <Select value={specMemType} onValueChange={setSpecMemType}>
+              <Select value={specMemType || "__all__"} onValueChange={(v) => setSpecMemType(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="DDR" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All DDR</SelectItem>
+                  <SelectItem value="__all__">All DDR</SelectItem>
                   {specOptions.memory_type.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.socket.length > 1 && (storeCategory === "cpu" || storeCategory === "motherboard") && (
-              <Select value={specSocket} onValueChange={setSpecSocket}>
+              <Select value={specSocket || "__all__"} onValueChange={(v) => setSpecSocket(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Socket" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Sockets</SelectItem>
+                  <SelectItem value="__all__">All Sockets</SelectItem>
                   {specOptions.socket.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.form_factor.length > 1 && (storeCategory === "motherboard" || storeCategory === "ssd") && (
-              <Select value={specFormFactor} onValueChange={setSpecFormFactor}>
+              <Select value={specFormFactor || "__all__"} onValueChange={(v) => setSpecFormFactor(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Form" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Forms</SelectItem>
+                  <SelectItem value="__all__">All Forms</SelectItem>
                   {specOptions.form_factor.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.wattage.length > 1 && storeCategory === "psu" && (
-              <Select value={specWattage} onValueChange={setSpecWattage}>
+              <Select value={specWattage || "__all__"} onValueChange={(v) => setSpecWattage(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Watts" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Watts</SelectItem>
+                  <SelectItem value="__all__">All Watts</SelectItem>
                   {specOptions.wattage.map((v) => <SelectItem key={v} value={v}>{v} W</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.efficiency.length > 1 && storeCategory === "psu" && (
-              <Select value={specEfficiency} onValueChange={setSpecEfficiency}>
+              <Select value={specEfficiency || "__all__"} onValueChange={(v) => setSpecEfficiency(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-32 border-border text-sm"><SelectValue placeholder="Efficiency" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="__all__">All</SelectItem>
                   {specOptions.efficiency.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.panel.length > 1 && storeCategory === "monitor" && (
-              <Select value={specPanel} onValueChange={setSpecPanel}>
+              <Select value={specPanel || "__all__"} onValueChange={(v) => setSpecPanel(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Panel" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="__all__">All</SelectItem>
                   {specOptions.panel.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.resolution.length > 1 && storeCategory === "monitor" && (
-              <Select value={specResolution} onValueChange={setSpecResolution}>
+              <Select value={specResolution || "__all__"} onValueChange={(v) => setSpecResolution(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Res" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="__all__">All</SelectItem>
                   {specOptions.resolution.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
             {specOptions.refresh_rate.length > 1 && storeCategory === "monitor" && (
-              <Select value={specRefresh} onValueChange={setSpecRefresh}>
+              <Select value={specRefresh || "__all__"} onValueChange={(v) => setSpecRefresh(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Hz" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Hz</SelectItem>
+                  <SelectItem value="__all__">All Hz</SelectItem>
                   {specOptions.refresh_rate.map((v) => <SelectItem key={v} value={v}>{v} Hz</SelectItem>)}
                 </SelectContent>
               </Select>
