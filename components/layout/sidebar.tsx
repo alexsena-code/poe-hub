@@ -75,6 +75,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Deals", href: "/hardware", icon: Monitor },
           { title: "Builder & VMs", href: "/hardware/builder", icon: Wrench },
           { title: "Analytics", href: "/hardware/analytics", icon: BarChart3 },
+          { title: "Settings", href: "/hardware/settings", icon: Settings },
         ],
       },
     ],
