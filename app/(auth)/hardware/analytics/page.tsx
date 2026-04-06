@@ -140,31 +140,58 @@ export default function HardwareAnalyticsPage() {
     load();
   }, []);
 
-  // Fetch history when tab/category changes
+  // Available products for the selected category (from store_products DB)
+  const [availableProducts, setAvailableProducts] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  // Fetch history + available products when tab/category changes
   useEffect(() => {
     if (tab !== "history") return;
     async function loadHistory() {
       try {
-        const res = await fetch(`${HARDWARE_API}/api/new-prices-history/${historyCategory}?days=90`);
-        const data = await res.json();
-        setStoreHistory(Array.isArray(data) ? data : []);
+        const [histRes, productsRes] = await Promise.all([
+          fetch(`${HARDWARE_API}/api/new-prices-history/${historyCategory}?days=180`).then((r) => r.json()).catch(() => []),
+          fetch(`${HARDWARE_API}/api/new-prices/${historyCategory}?limit=500`).then((r) => r.json()).catch(() => []),
+        ]);
+        setStoreHistory(Array.isArray(histRes) ? histRes : []);
+        const names = [...new Set((productsRes as { name: string }[]).map((p) => p.name))].sort();
+        setAvailableProducts(names);
         setSelectedProducts([]);
       } catch {
         setStoreHistory([]);
+        setAvailableProducts([]);
       }
     }
     loadHistory();
   }, [tab, historyCategory]);
 
-  // Derived: unique products in history
-  const historyProducts = useMemo(() => {
-    const names = [...new Set(storeHistory.map((p) => p.product_name))].sort();
+  const handleImportHistory = async () => {
+    setImporting(true);
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/import-price-history/${historyCategory}`, { method: "POST" });
+      const data = await res.json();
+      toast.success(`Imported ${data.imported || 0} history points for ${historyCategory}`);
+      // Reload
+      const histRes = await fetch(`${HARDWARE_API}/api/new-prices-history/${historyCategory}?days=180`).then((r) => r.json());
+      setStoreHistory(Array.isArray(histRes) ? histRes : []);
+    } catch {
+      toast.error("Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Products available for selection (from store_products, filtered by search)
+  const filteredProducts = useMemo(() => {
+    const names = availableProducts.length > 0
+      ? availableProducts
+      : [...new Set(storeHistory.map((p) => p.product_name))].sort();
     if (historySearch) {
       const q = historySearch.toLowerCase();
       return names.filter((n) => n.toLowerCase().includes(q));
     }
     return names;
-  }, [storeHistory, historySearch]);
+  }, [availableProducts, storeHistory, historySearch]);
 
   // History chart data
   const historyChartData = useMemo(() => {
@@ -346,8 +373,20 @@ export default function HardwareAnalyticsPage() {
               className="px-3 py-1.5 text-sm bg-background border border-border rounded-md w-60"
             />
             <span className="text-xs text-muted-foreground">
-              {historyProducts.length} products, {storeHistory.length} data points
+              {filteredProducts.length} products, {storeHistory.length} data points
             </span>
+            {storeHistory.length === 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleImportHistory}
+                disabled={importing}
+                className="border-border text-xs"
+              >
+                {importing ? <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> : <History className="h-3 w-3 mr-1" />}
+                Import 3-month history
+              </Button>
+            )}
           </div>
 
           {/* Product selector */}
@@ -361,7 +400,7 @@ export default function HardwareAnalyticsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__pick__" disabled>Add product to compare...</SelectItem>
-                {historyProducts.map((name) => (
+                {filteredProducts.map((name) => (
                   <SelectItem key={name} value={name}>
                     {selectedProducts.includes(name) ? `✓ ${name}` : name}
                   </SelectItem>
