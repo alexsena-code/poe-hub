@@ -100,6 +100,7 @@ export default function HardwarePage() {
   const [filterName, setFilterName] = useState("all");
   const [filterSource, setFilterSource] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
+  const [filterMinPrice, setFilterMinPrice] = useState("");
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -439,6 +440,12 @@ export default function HardwarePage() {
     if (filterCategory !== "all") {
       result = result.filter((d) => d.category === filterCategory);
     }
+    if (filterMinPrice) {
+      const min = parseFloat(filterMinPrice);
+      if (!isNaN(min)) {
+        result = result.filter((d) => d.price >= min);
+      }
+    }
     if (filterMaxPrice) {
       const max = parseFloat(filterMaxPrice);
       if (!isNaN(max)) {
@@ -484,6 +491,7 @@ export default function HardwarePage() {
     filterName,
     filterSource,
     filterCategory,
+    filterMinPrice,
     filterMaxPrice,
     searchQuery,
     sortField,
@@ -821,11 +829,18 @@ export default function HardwarePage() {
                   </SelectContent>
                 </Select>
                 <Input
-                  placeholder="Max price"
+                  placeholder="Min R$"
+                  type="number"
+                  value={filterMinPrice}
+                  onChange={(e) => setFilterMinPrice(e.target.value)}
+                  className="w-[100px] bg-background border-border"
+                />
+                <Input
+                  placeholder="Max R$"
                   type="number"
                   value={filterMaxPrice}
                   onChange={(e) => setFilterMaxPrice(e.target.value)}
-                  className="w-[120px] bg-background border-border"
+                  className="w-[100px] bg-background border-border"
                 />
               </div>
             </CardContent>
