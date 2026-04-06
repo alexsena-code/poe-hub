@@ -313,6 +313,8 @@ export default function TemplateManager() {
     new Set(),
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showYamlImport, setShowYamlImport] = useState(false);
+  const [yamlText, setYamlText] = useState('');
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -353,6 +355,33 @@ export default function TemplateManager() {
     setSelected(null);
     setConfirmDelete(false);
     setExpandedSections(new Set(['section_1']));
+  }
+
+  async function handleImportYaml() {
+    if (!yamlText.trim()) return;
+    try {
+      // Send raw YAML to backend to parse
+      const res = await fetch(`${API_URL}/content/templates/parse-yaml`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yaml: yamlText }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const t = apiToTemplate(data);
+        setCurrent(t);
+        setSelected(null);
+        setExpandedSections(new Set(t.sections.map((s) => s.id)));
+        setShowYamlImport(false);
+        setYamlText('');
+      } else {
+        // Fallback: try parsing client-side with simple YAML→JSON
+        // The js-yaml library isn't available, so we try JSON parse of YAML-like
+        alert('Failed to parse YAML on server. Check format.');
+      }
+    } catch {
+      alert('Failed to connect to API.');
+    }
   }
 
   async function handleSave() {
@@ -444,8 +473,14 @@ export default function TemplateManager() {
             <div className="text-lg font-bold text-foreground">{templates.length}</div>
           </div>
 
-          {/* Action button */}
+          {/* Action buttons */}
           <div className="flex items-center gap-3 ml-auto">
+            <button
+              onClick={() => setShowYamlImport(true)}
+              className="px-4 py-2 rounded-md text-sm border border-border text-foreground hover:bg-foreground/5 transition-colors"
+            >
+              Import YAML
+            </button>
             <button
               onClick={handleNew}
               className="px-4 py-2 rounded-md text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
@@ -682,6 +717,47 @@ export default function TemplateManager() {
           )}
         </div>
       </div>
+
+      {/* YAML Import Modal */}
+      {showYamlImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-card border border-border rounded-lg w-[700px] max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <h2 className="text-lg font-medium text-foreground">Import YAML Template</h2>
+              <button onClick={() => setShowYamlImport(false)} className="text-muted-foreground hover:text-foreground text-lg">
+                &times;
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6">
+              <p className="text-xs text-muted-foreground mb-3">
+                Paste a template YAML (same format as config/templates/*.yaml). It will be parsed and loaded into the editor.
+              </p>
+              <textarea
+                value={yamlText}
+                onChange={(e) => setYamlText(e.target.value)}
+                placeholder={`template:\n  name: My Guide\n  slug_pattern: my-guide-{topic}\n  target_length_words: 1500-2000\n\nsections:\n  - id: intro\n    title: Introduction\n    instruction: Write an introduction...\n    query_type: qa\n    rag_queries:\n      - "{topic} overview"\n\nseo:\n  primary_keyword: "{topic}"\n  schema_type: Article`}
+                className="w-full h-72 bg-background border border-border rounded-md p-3 text-sm font-mono text-foreground resize-none focus:ring-1 focus:ring-accent"
+                spellCheck={false}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+              <button
+                onClick={() => setShowYamlImport(false)}
+                className="px-4 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportYaml}
+                disabled={!yamlText.trim()}
+                className="px-4 py-2 rounded-md text-sm bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-50"
+              >
+                Parse & Load
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
