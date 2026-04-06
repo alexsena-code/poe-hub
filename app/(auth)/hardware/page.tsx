@@ -141,6 +141,8 @@ export default function HardwarePage() {
   const [storeCategory, setStoreCategory] = useState("gpu");
   const [storeLoading, setStoreLoading] = useState(false);
   const [storeSearch, setStoreSearch] = useState("");
+  const [storeMinPrice, setStoreMinPrice] = useState("");
+  const [storeMaxPrice, setStoreMaxPrice] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [storePage, setStorePage] = useState(1);
   const STORE_PAGE_SIZE = 24;
@@ -264,13 +266,17 @@ export default function HardwarePage() {
           p.merchant.toLowerCase().includes(q)
       );
     }
+    const minP = parseFloat(storeMinPrice);
+    if (!isNaN(minP)) result = result.filter((p) => p.cash_price >= minP);
+    const maxP = parseFloat(storeMaxPrice);
+    if (!isNaN(maxP)) result = result.filter((p) => p.cash_price <= maxP);
     return result;
-  }, [storeProducts, storeSearch]);
+  }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice]);
 
-  // Reset page when search changes
+  // Reset page when filters change
   useEffect(() => {
     setStorePage(1);
-  }, [storeSearch]);
+  }, [storeSearch, storeMinPrice, storeMaxPrice]);
 
   const totalStorePages = Math.ceil(filteredStoreProducts.length / STORE_PAGE_SIZE);
   const pagedStoreProducts = filteredStoreProducts.slice(
@@ -1550,13 +1556,30 @@ export default function HardwarePage() {
                 <SelectItem value="monitor">Monitors</SelectItem>
               </SelectContent>
             </Select>
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search products..."
                 value={storeSearch}
                 onChange={(e) => setStoreSearch(e.target.value)}
                 className="pl-9 border-border"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                placeholder="Min R$"
+                value={storeMinPrice}
+                onChange={(e) => setStoreMinPrice(e.target.value)}
+                className="w-24 border-border text-sm"
+              />
+              <span className="text-muted-foreground text-xs">-</span>
+              <Input
+                type="number"
+                placeholder="Max R$"
+                value={storeMaxPrice}
+                onChange={(e) => setStoreMaxPrice(e.target.value)}
+                className="w-24 border-border text-sm"
               />
             </div>
             <Button
