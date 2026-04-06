@@ -23,6 +23,8 @@ import {
   DollarSign,
   Percent,
   Zap,
+  HardDrive,
+  CircuitBoard,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -60,6 +62,9 @@ interface BuildConfig {
   gpu: SelectedComponent | null;
   cpuKit: SelectedComponent | null;
   ram: SelectedComponent | null;
+  psu: SelectedComponent | null;
+  ssd: SelectedComponent | null;
+  motherboard: SelectedComponent | null;
 }
 
 interface BuildTotals {
@@ -83,6 +88,9 @@ export default function PCBuilderPage() {
   const [selectedCpuKit, setSelectedCpuKit] = useState<string>("");
   const [selectedRam, setSelectedRam] = useState<string>("");
   const [ramQty, setRamQty] = useState(1);
+  const [selectedPsu, setSelectedPsu] = useState<string>("");
+  const [selectedSsd, setSelectedSsd] = useState<string>("");
+  const [selectedMotherboard, setSelectedMotherboard] = useState<string>("");
 
   useEffect(() => {
     fetchData();
@@ -121,6 +129,18 @@ export default function PCBuilderPage() {
     () => items.filter((i) => i.category === "ram"),
     [items]
   );
+  const psus = useMemo(
+    () => items.filter((i) => i.category === "psu"),
+    [items]
+  );
+  const ssds = useMemo(
+    () => items.filter((i) => i.category === "ssd"),
+    [items]
+  );
+  const motherboards = useMemo(
+    () => items.filter((i) => i.category === "motherboard"),
+    [items]
+  );
 
   const getPrice = (
     itemName: string
@@ -143,13 +163,19 @@ export default function PCBuilderPage() {
     const gpuItem = gpus.find((g) => g.name === selectedGpu) || null;
     const cpuItem = cpuKits.find((c) => c.name === selectedCpuKit) || null;
     const ramItem = rams.find((r) => r.name === selectedRam) || null;
+    const psuItem = psus.find((p) => p.name === selectedPsu) || null;
+    const ssdItem = ssds.find((s) => s.name === selectedSsd) || null;
+    const moboItem = motherboards.find((m) => m.name === selectedMotherboard) || null;
 
     return {
       gpu: gpuItem ? { item: gpuItem, quantity: gpuQty } : null,
       cpuKit: cpuItem ? { item: cpuItem, quantity: 1 } : null,
       ram: ramItem ? { item: ramItem, quantity: ramQty } : null,
+      psu: psuItem ? { item: psuItem, quantity: 1 } : null,
+      ssd: ssdItem ? { item: ssdItem, quantity: 1 } : null,
+      motherboard: moboItem ? { item: moboItem, quantity: 1 } : null,
     };
-  }, [selectedGpu, gpuQty, selectedCpuKit, selectedRam, ramQty, gpus, cpuKits, rams]);
+  }, [selectedGpu, gpuQty, selectedCpuKit, selectedRam, ramQty, selectedPsu, selectedSsd, selectedMotherboard, gpus, cpuKits, rams, psus, ssds, motherboards]);
 
   const totals = useMemo((): BuildTotals => {
     let vramTotal = 0;
@@ -187,6 +213,27 @@ export default function PCBuilderPage() {
       usedBestTotal += prices.best * build.ram.quantity;
       usedAvgTotal += prices.avg * build.ram.quantity;
       newTotal += prices.newPrice * build.ram.quantity;
+    }
+
+    if (build.psu) {
+      const prices = getPrice(build.psu.item.name);
+      usedBestTotal += prices.best;
+      usedAvgTotal += prices.avg;
+      newTotal += prices.newPrice;
+    }
+
+    if (build.ssd) {
+      const prices = getPrice(build.ssd.item.name);
+      usedBestTotal += prices.best;
+      usedAvgTotal += prices.avg;
+      newTotal += prices.newPrice;
+    }
+
+    if (build.motherboard) {
+      const prices = getPrice(build.motherboard.item.name);
+      usedBestTotal += prices.best;
+      usedAvgTotal += prices.avg;
+      newTotal += prices.newPrice;
     }
 
     return {
@@ -449,6 +496,99 @@ export default function PCBuilderPage() {
                 </div>
               )}
             </div>
+
+            {/* Motherboard */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                <CircuitBoard className="h-4 w-4 text-muted-foreground" />
+                Motherboard
+              </label>
+              <Select
+                value={selectedMotherboard}
+                onValueChange={setSelectedMotherboard}
+              >
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder="Select Motherboard..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {motherboards.map((m) => {
+                    const price = getPrice(m.name);
+                    return (
+                      <SelectItem key={m.name} value={m.name}>
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <span>{m.name}</span>
+                          {price.avg > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ~{formatPrice(price.avg)}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* PSU */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                PSU
+              </label>
+              <Select value={selectedPsu} onValueChange={setSelectedPsu}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder="Select PSU..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {psus.map((p) => {
+                    const price = getPrice(p.name);
+                    return (
+                      <SelectItem key={p.name} value={p.name}>
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <span>{p.name}</span>
+                          {price.avg > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ~{formatPrice(price.avg)}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* SSD */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-card-foreground flex items-center gap-2">
+                <HardDrive className="h-4 w-4 text-muted-foreground" />
+                SSD
+              </label>
+              <Select value={selectedSsd} onValueChange={setSelectedSsd}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder="Select SSD..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ssds.map((s) => {
+                    const price = getPrice(s.name);
+                    return (
+                      <SelectItem key={s.name} value={s.name}>
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <span>{s.name}</span>
+                          {price.avg > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ~{formatPrice(price.avg)}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
@@ -544,7 +684,46 @@ export default function PCBuilderPage() {
                     </span>
                   </div>
                 )}
-                {!build.gpu && !build.cpuKit && !build.ram && (
+                {build.motherboard && (
+                  <div className="flex items-center justify-between p-2 rounded border border-border/50">
+                    <div className="flex items-center gap-2">
+                      <CircuitBoard className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        {build.motherboard.item.name}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium text-green-500">
+                      {formatPrice(getPrice(build.motherboard.item.name).avg)}
+                    </span>
+                  </div>
+                )}
+                {build.psu && (
+                  <div className="flex items-center justify-between p-2 rounded border border-border/50">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        {build.psu.item.name}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium text-green-500">
+                      {formatPrice(getPrice(build.psu.item.name).avg)}
+                    </span>
+                  </div>
+                )}
+                {build.ssd && (
+                  <div className="flex items-center justify-between p-2 rounded border border-border/50">
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        {build.ssd.item.name}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium text-green-500">
+                      {formatPrice(getPrice(build.ssd.item.name).avg)}
+                    </span>
+                  </div>
+                )}
+                {!build.gpu && !build.cpuKit && !build.ram && !build.psu && !build.ssd && !build.motherboard && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Select components to see breakdown
                   </p>
