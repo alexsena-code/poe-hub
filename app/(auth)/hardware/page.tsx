@@ -63,6 +63,7 @@ interface SummaryItem {
 }
 
 interface ConfigItem {
+  id: number;
   name: string;
   category: string;
   specs: Record<string, number | string>;
@@ -180,6 +181,44 @@ export default function HardwarePage() {
         fetchAll();
       } else {
         toast.error("Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleClearAllDeals = async () => {
+    if (!window.confirm("Are you sure you want to delete ALL scraped deals? This cannot be undone.")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/deals/all`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        toast.success("All deals cleared");
+        fetchAll();
+      } else {
+        toast.error("Failed to clear deals");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleDeleteItem = async (itemId: number) => {
+    if (!window.confirm("Delete this item? Its deals will also be removed.")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/items/${itemId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        toast.success("Item deleted");
+        fetchAll();
+      } else {
+        toast.error("Failed to delete item");
       }
     } catch {
       toast.error("Failed to connect to Hardware API");
@@ -448,6 +487,14 @@ export default function HardwarePage() {
               <Search className="h-4 w-4 mr-1" />
             )}
             {scraping ? "Scraping..." : "Scrape Now"}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleClearAllDeals}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Clear All
           </Button>
         </div>
       </div>
@@ -888,6 +935,15 @@ export default function HardwarePage() {
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="h-7 w-7 p-0 text-red-400 hover:text-red-500"
+                                title="Delete item from DB"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           )}
                         </TableCell>
