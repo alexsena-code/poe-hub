@@ -163,6 +163,7 @@ export default function HardwarePage() {
   const [specResolution, setSpecResolution] = useState("");
   const [specFormFactor, setSpecFormFactor] = useState("");
   const [specEfficiency, setSpecEfficiency] = useState("");
+  const [specManufacturer, setSpecManufacturer] = useState("");
 
   // Extract unique spec values from loaded products
   const specOptions = useMemo(() => {
@@ -189,6 +190,7 @@ export default function HardwarePage() {
       resolution: extract("resolution"),
       form_factor: extract("form_factor"),
       efficiency: extract("efficiency"),
+      manufacturer: [...new Set(storeProducts.map((p) => p.manufacturer).filter(Boolean))].sort(),
     };
   }, [storeProducts]);
   const [syncing, setSyncing] = useState(false);
@@ -250,7 +252,7 @@ export default function HardwarePage() {
     // Reset spec filters on category change
     setSpecVram(""); setSpecCapacity(""); setSpecWattage(""); setSpecSocket("");
     setSpecMemType(""); setSpecPanel(""); setSpecRefresh(""); setSpecResolution("");
-    setSpecFormFactor(""); setSpecEfficiency("");
+    setSpecFormFactor(""); setSpecEfficiency(""); setSpecManufacturer("");
     try {
       const res = await fetch(
         `${HARDWARE_API}/api/new-prices/${cat}`
@@ -333,6 +335,7 @@ export default function HardwarePage() {
     if (specResolution) result = result.filter((p) => String(p.specs?.resolution || "") === specResolution);
     if (specFormFactor) result = result.filter((p) => String(p.specs?.form_factor || "") === specFormFactor);
     if (specEfficiency) result = result.filter((p) => String(p.specs?.efficiency || "") === specEfficiency);
+    if (specManufacturer) result = result.filter((p) => p.manufacturer === specManufacturer);
     // Sort
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -342,7 +345,7 @@ export default function HardwarePage() {
     });
     return result;
   }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice, storeSortField, storeSortDir,
-      specVram, specCapacity, specWattage, specSocket, specMemType, specPanel, specRefresh, specResolution, specFormFactor, specEfficiency]);
+      specVram, specCapacity, specWattage, specSocket, specMemType, specPanel, specRefresh, specResolution, specFormFactor, specEfficiency, specManufacturer]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -1678,6 +1681,16 @@ export default function HardwarePage() {
                 className="w-24 border-border text-sm"
               />
             </div>
+            {/* Brand filter — all categories */}
+            {specOptions.manufacturer.length > 1 && (
+              <Select value={specManufacturer || "__all__"} onValueChange={(v) => setSpecManufacturer(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-32 border-border text-sm"><SelectValue placeholder="Brand" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Brands</SelectItem>
+                  {specOptions.manufacturer.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             {/* Dynamic spec filters based on available values */}
             {specOptions.vram_gb.length > 1 && storeCategory === "gpu" && (
               <Select value={specVram || "__all__"} onValueChange={(v) => setSpecVram(v === "__all__" ? "" : v)}>
