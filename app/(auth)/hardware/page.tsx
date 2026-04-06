@@ -151,15 +151,45 @@ export default function HardwarePage() {
   const [storeView, setStoreView] = useState<"grid" | "table">("grid");
   const [storeSortField, setStoreSortField] = useState<"cash_price" | "name" | "manufacturer" | "merchant">("cash_price");
   const [storeSortDir, setStoreSortDir] = useState<"asc" | "desc">("asc");
-  // Spec filters
-  const [specMinVram, setSpecMinVram] = useState("");
-  const [specMaxVram, setSpecMaxVram] = useState("");
-  const [specMinCapacity, setSpecMinCapacity] = useState("");
-  const [specMinWattage, setSpecMinWattage] = useState("");
+  // Spec filters (select-based, values derived from loaded products)
+  const [specVram, setSpecVram] = useState("");
+  const [specCapacity, setSpecCapacity] = useState("");
+  const [specWattage, setSpecWattage] = useState("");
   const [specSocket, setSpecSocket] = useState("");
   const [specMemType, setSpecMemType] = useState("");
   const [specPanel, setSpecPanel] = useState("");
-  const [specMinRefresh, setSpecMinRefresh] = useState("");
+  const [specRefresh, setSpecRefresh] = useState("");
+  const [specResolution, setSpecResolution] = useState("");
+  const [specFormFactor, setSpecFormFactor] = useState("");
+  const [specEfficiency, setSpecEfficiency] = useState("");
+
+  // Extract unique spec values from loaded products
+  const specOptions = useMemo(() => {
+    const extract = (key: string) => {
+      const vals = new Set<string>();
+      for (const p of storeProducts) {
+        const v = p.specs?.[key];
+        if (v !== undefined && v !== null && v !== true && v !== false) vals.add(String(v));
+      }
+      return [...vals].sort((a, b) => {
+        const na = parseFloat(a), nb = parseFloat(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.localeCompare(b);
+      });
+    };
+    return {
+      vram_gb: extract("vram_gb"),
+      capacity_gb: extract("capacity_gb"),
+      wattage: extract("wattage"),
+      socket: extract("socket"),
+      memory_type: [...new Set([...extract("memory_type"), ...extract("type")])].sort(),
+      panel: extract("panel"),
+      refresh_rate: extract("refresh_rate"),
+      resolution: extract("resolution"),
+      form_factor: extract("form_factor"),
+      efficiency: extract("efficiency"),
+    };
+  }, [storeProducts]);
   const [syncing, setSyncing] = useState(false);
   const [storePage, setStorePage] = useState(1);
   const STORE_PAGE_SIZE = 24;
@@ -216,6 +246,10 @@ export default function HardwarePage() {
   const fetchStoreProducts = async (cat: string) => {
     setStoreLoading(true);
     setStorePage(1);
+    // Reset spec filters on category change
+    setSpecVram(""); setSpecCapacity(""); setSpecWattage(""); setSpecSocket("");
+    setSpecMemType(""); setSpecPanel(""); setSpecRefresh(""); setSpecResolution("");
+    setSpecFormFactor(""); setSpecEfficiency("");
     try {
       const res = await fetch(
         `${HARDWARE_API}/api/new-prices/${cat}`
@@ -287,20 +321,17 @@ export default function HardwarePage() {
     if (!isNaN(minP)) result = result.filter((p) => p.cash_price >= minP);
     const maxP = parseFloat(storeMaxPrice);
     if (!isNaN(maxP)) result = result.filter((p) => p.cash_price <= maxP);
-    // Spec filters
-    const mv = parseInt(specMinVram);
-    if (!isNaN(mv)) result = result.filter((p) => (p.specs?.vram_gb as number || 0) >= mv);
-    const xv = parseInt(specMaxVram);
-    if (!isNaN(xv)) result = result.filter((p) => (p.specs?.vram_gb as number || 999) <= xv);
-    const mc = parseInt(specMinCapacity);
-    if (!isNaN(mc)) result = result.filter((p) => (p.specs?.capacity_gb as number || 0) >= mc);
-    const mw = parseInt(specMinWattage);
-    if (!isNaN(mw)) result = result.filter((p) => (p.specs?.wattage as number || 0) >= mw);
-    const mr = parseInt(specMinRefresh);
-    if (!isNaN(mr)) result = result.filter((p) => (p.specs?.refresh_rate as number || 0) >= mr);
-    if (specSocket) result = result.filter((p) => String(p.specs?.socket || "").includes(specSocket));
+    // Spec filters (exact match from selects)
+    if (specVram) result = result.filter((p) => String(p.specs?.vram_gb) === specVram);
+    if (specCapacity) result = result.filter((p) => String(p.specs?.capacity_gb) === specCapacity);
+    if (specWattage) result = result.filter((p) => String(p.specs?.wattage) === specWattage);
+    if (specSocket) result = result.filter((p) => String(p.specs?.socket || "") === specSocket);
     if (specMemType) result = result.filter((p) => (p.specs?.memory_type || p.specs?.type || "") === specMemType);
-    if (specPanel) result = result.filter((p) => (p.specs?.panel || "") === specPanel);
+    if (specPanel) result = result.filter((p) => String(p.specs?.panel || "") === specPanel);
+    if (specRefresh) result = result.filter((p) => String(p.specs?.refresh_rate) === specRefresh);
+    if (specResolution) result = result.filter((p) => String(p.specs?.resolution || "") === specResolution);
+    if (specFormFactor) result = result.filter((p) => String(p.specs?.form_factor || "") === specFormFactor);
+    if (specEfficiency) result = result.filter((p) => String(p.specs?.efficiency || "") === specEfficiency);
     // Sort
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -310,12 +341,12 @@ export default function HardwarePage() {
     });
     return result;
   }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice, storeSortField, storeSortDir,
-      specMinVram, specMaxVram, specMinCapacity, specMinWattage, specSocket, specMemType, specPanel, specMinRefresh]);
+      specVram, specCapacity, specWattage, specSocket, specMemType, specPanel, specRefresh, specResolution, specFormFactor, specEfficiency]);
 
   // Reset page when filters change
   useEffect(() => {
     setStorePage(1);
-  }, [storeSearch, storeMinPrice, storeMaxPrice, specMinVram, specMaxVram, specMinCapacity, specMinWattage, specSocket, specMemType, specPanel, specMinRefresh]);
+  }, [storeSearch, storeMinPrice, storeMaxPrice, specVram, specCapacity, specWattage, specSocket, specMemType, specPanel, specRefresh, specResolution, specFormFactor, specEfficiency]);
 
   const totalStorePages = Math.ceil(filteredStoreProducts.length / STORE_PAGE_SIZE);
   const pagedStoreProducts = filteredStoreProducts.slice(
@@ -1621,59 +1652,96 @@ export default function HardwarePage() {
                 className="w-24 border-border text-sm"
               />
             </div>
-            {/* Spec filters — shown per category */}
-            {storeCategory === "gpu" && (
-              <div className="flex items-center gap-1.5">
-                <Input type="number" placeholder="Min VRAM" value={specMinVram} onChange={(e) => setSpecMinVram(e.target.value)} className="w-24 border-border text-sm" />
-                <span className="text-muted-foreground text-xs">-</span>
-                <Input type="number" placeholder="Max VRAM" value={specMaxVram} onChange={(e) => setSpecMaxVram(e.target.value)} className="w-24 border-border text-sm" />
-                <span className="text-muted-foreground text-xs">GB</span>
-              </div>
-            )}
-            {storeCategory === "ram" && (
-              <div className="flex items-center gap-1.5">
-                <Input type="number" placeholder="Min GB" value={specMinCapacity} onChange={(e) => setSpecMinCapacity(e.target.value)} className="w-20 border-border text-sm" />
-                <Select value={specMemType} onValueChange={setSpecMemType}>
-                  <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="DDR" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All</SelectItem>
-                    <SelectItem value="DDR4">DDR4</SelectItem>
-                    <SelectItem value="DDR5">DDR5</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {storeCategory === "ssd" && (
-              <Input type="number" placeholder="Min GB" value={specMinCapacity} onChange={(e) => setSpecMinCapacity(e.target.value)} className="w-24 border-border text-sm" />
-            )}
-            {storeCategory === "psu" && (
-              <Input type="number" placeholder="Min W" value={specMinWattage} onChange={(e) => setSpecMinWattage(e.target.value)} className="w-24 border-border text-sm" />
-            )}
-            {(storeCategory === "cpu" || storeCategory === "motherboard") && (
-              <Select value={specSocket} onValueChange={setSpecSocket}>
-                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Socket" /></SelectTrigger>
+            {/* Dynamic spec filters based on available values */}
+            {specOptions.vram_gb.length > 1 && storeCategory === "gpu" && (
+              <Select value={specVram} onValueChange={setSpecVram}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="VRAM" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="AM4">AM4</SelectItem>
-                  <SelectItem value="AM5">AM5</SelectItem>
-                  <SelectItem value="LGA1700">LGA 1700</SelectItem>
-                  <SelectItem value="LGA1851">LGA 1851</SelectItem>
+                  <SelectItem value="">All VRAM</SelectItem>
+                  {specOptions.vram_gb.map((v) => <SelectItem key={v} value={v}>{v} GB</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
-            {storeCategory === "monitor" && (
-              <div className="flex items-center gap-1.5">
-                <Input type="number" placeholder="Min Hz" value={specMinRefresh} onChange={(e) => setSpecMinRefresh(e.target.value)} className="w-22 border-border text-sm" />
-                <Select value={specPanel} onValueChange={setSpecPanel}>
-                  <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Panel" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All</SelectItem>
-                    <SelectItem value="IPS">IPS</SelectItem>
-                    <SelectItem value="VA">VA</SelectItem>
-                    <SelectItem value="OLED">OLED</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {specOptions.capacity_gb.length > 1 && (storeCategory === "ram" || storeCategory === "ssd") && (
+              <Select value={specCapacity} onValueChange={setSpecCapacity}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Capacity" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Sizes</SelectItem>
+                  {specOptions.capacity_gb.map((v) => <SelectItem key={v} value={v}>{Number(v) >= 1000 ? `${Number(v)/1000} TB` : `${v} GB`}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.memory_type.length > 1 && (storeCategory === "ram" || storeCategory === "motherboard") && (
+              <Select value={specMemType} onValueChange={setSpecMemType}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="DDR" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All DDR</SelectItem>
+                  {specOptions.memory_type.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.socket.length > 1 && (storeCategory === "cpu" || storeCategory === "motherboard") && (
+              <Select value={specSocket} onValueChange={setSpecSocket}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Socket" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Sockets</SelectItem>
+                  {specOptions.socket.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.form_factor.length > 1 && (storeCategory === "motherboard" || storeCategory === "ssd") && (
+              <Select value={specFormFactor} onValueChange={setSpecFormFactor}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Form" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Forms</SelectItem>
+                  {specOptions.form_factor.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.wattage.length > 1 && storeCategory === "psu" && (
+              <Select value={specWattage} onValueChange={setSpecWattage}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Watts" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Watts</SelectItem>
+                  {specOptions.wattage.map((v) => <SelectItem key={v} value={v}>{v} W</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.efficiency.length > 1 && storeCategory === "psu" && (
+              <Select value={specEfficiency} onValueChange={setSpecEfficiency}>
+                <SelectTrigger className="w-32 border-border text-sm"><SelectValue placeholder="Efficiency" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All</SelectItem>
+                  {specOptions.efficiency.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.panel.length > 1 && storeCategory === "monitor" && (
+              <Select value={specPanel} onValueChange={setSpecPanel}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Panel" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All</SelectItem>
+                  {specOptions.panel.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.resolution.length > 1 && storeCategory === "monitor" && (
+              <Select value={specResolution} onValueChange={setSpecResolution}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Res" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All</SelectItem>
+                  {specOptions.resolution.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {specOptions.refresh_rate.length > 1 && storeCategory === "monitor" && (
+              <Select value={specRefresh} onValueChange={setSpecRefresh}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Hz" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Hz</SelectItem>
+                  {specOptions.refresh_rate.map((v) => <SelectItem key={v} value={v}>{v} Hz</SelectItem>)}
+                </SelectContent>
+              </Select>
             )}
             <div className="flex items-center border border-border rounded-md">
               <button
