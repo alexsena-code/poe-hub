@@ -1024,94 +1024,48 @@ export default function PCBuilderPage() {
                     Component Breakdown
                   </h4>
                   <div className="space-y-2">
-                    {build.gpu && (
-                      <div className="flex items-center justify-between p-2 rounded border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {build.gpu.item.name} x{build.gpu.quantity}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-green-500">
-                          {formatPrice(
-                            getPrice(build.gpu.item.name).avg *
-                              build.gpu.quantity
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    {build.cpuKit && (
-                      <div className="flex items-center justify-between p-2 rounded border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Cpu className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {build.cpuKit.item.name}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-green-500">
-                          {formatPrice(getPrice(build.cpuKit.item.name).avg)}
-                        </span>
-                      </div>
-                    )}
-                    {build.ram && (
-                      <div className="flex items-center justify-between p-2 rounded border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <MemoryStick className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {build.ram.item.name} x{build.ram.quantity}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-green-500">
-                          {formatPrice(
-                            getPrice(build.ram.item.name).avg * build.ram.quantity
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    {build.motherboard && (
-                      <div className="flex items-center justify-between p-2 rounded border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <CircuitBoard className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {build.motherboard.item.name}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-green-500">
-                          {formatPrice(getPrice(build.motherboard.item.name).avg)}
-                        </span>
-                      </div>
-                    )}
-                    {build.psu && (
-                      <div className="flex items-center justify-between p-2 rounded border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {build.psu.item.name}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-green-500">
-                          {formatPrice(getPrice(build.psu.item.name).avg)}
-                        </span>
-                      </div>
-                    )}
-                    {build.ssd && (
-                      <div className="flex items-center justify-between p-2 rounded border border-border/50">
-                        <div className="flex items-center gap-2">
-                          <HardDrive className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {build.ssd.item.name}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-green-500">
-                          {formatPrice(getPrice(build.ssd.item.name).avg)}
-                        </span>
-                      </div>
-                    )}
-                    {!build.gpu && !build.cpuKit && !build.ram && !build.psu && !build.ssd && !build.motherboard && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Select components to see breakdown
-                      </p>
-                    )}
+                    {(() => {
+                      const components: { icon: typeof Monitor; name: string; qty: number }[] = [];
+                      if (build.gpu) components.push({ icon: Monitor, name: build.gpu.item.name, qty: build.gpu.quantity });
+                      if (build.cpuKit) components.push({ icon: Cpu, name: build.cpuKit.item.name, qty: 1 });
+                      if (build.ram) components.push({ icon: MemoryStick, name: build.ram.item.name, qty: build.ram.quantity });
+                      if (build.motherboard) components.push({ icon: CircuitBoard, name: build.motherboard.item.name, qty: 1 });
+                      if (build.psu) components.push({ icon: Zap, name: build.psu.item.name, qty: 1 });
+                      if (build.ssd) components.push({ icon: HardDrive, name: build.ssd.item.name, qty: 1 });
+
+                      if (components.length === 0) {
+                        return (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Select components to see breakdown
+                          </p>
+                        );
+                      }
+
+                      return components.map((comp) => {
+                        const prices = getPrice(comp.name);
+                        const bestPrice = prices.best || prices.newPrice || 0;
+                        const priceLabel = prices.best > 0
+                          ? `OLX ${formatPrice(prices.best * comp.qty)}`
+                          : prices.newPrice > 0
+                          ? `Novo ${formatPrice(prices.newPrice * comp.qty)}`
+                          : "-";
+                        const priceColor = prices.best > 0 ? "text-emerald-400" : prices.newPrice > 0 ? "text-purple-400" : "text-muted-foreground";
+
+                        return (
+                          <div key={comp.name} className="flex items-center justify-between p-2 rounded border border-border/50">
+                            <div className="flex items-center gap-2">
+                              <comp.icon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">
+                                {comp.name}{comp.qty > 1 ? ` x${comp.qty}` : ""}
+                              </span>
+                            </div>
+                            <span className={`text-sm font-medium ${priceColor}`}>
+                              {priceLabel}
+                            </span>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
