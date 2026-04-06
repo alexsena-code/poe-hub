@@ -138,6 +138,9 @@ export default function HardwarePage() {
     category: string;
     rating: number | null;
     free_shipping: boolean;
+    tag: string | null;
+    details: string | null;
+    specs: Record<string, number | string | boolean> | null;
   }
   const [storeProducts, setStoreProducts] = useState<StoreProduct[]>([]);
   const [storeCategory, setStoreCategory] = useState("gpu");
@@ -148,6 +151,15 @@ export default function HardwarePage() {
   const [storeView, setStoreView] = useState<"grid" | "table">("grid");
   const [storeSortField, setStoreSortField] = useState<"cash_price" | "name" | "manufacturer" | "merchant">("cash_price");
   const [storeSortDir, setStoreSortDir] = useState<"asc" | "desc">("asc");
+  // Spec filters
+  const [specMinVram, setSpecMinVram] = useState("");
+  const [specMaxVram, setSpecMaxVram] = useState("");
+  const [specMinCapacity, setSpecMinCapacity] = useState("");
+  const [specMinWattage, setSpecMinWattage] = useState("");
+  const [specSocket, setSpecSocket] = useState("");
+  const [specMemType, setSpecMemType] = useState("");
+  const [specPanel, setSpecPanel] = useState("");
+  const [specMinRefresh, setSpecMinRefresh] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [storePage, setStorePage] = useState(1);
   const STORE_PAGE_SIZE = 24;
@@ -275,6 +287,20 @@ export default function HardwarePage() {
     if (!isNaN(minP)) result = result.filter((p) => p.cash_price >= minP);
     const maxP = parseFloat(storeMaxPrice);
     if (!isNaN(maxP)) result = result.filter((p) => p.cash_price <= maxP);
+    // Spec filters
+    const mv = parseInt(specMinVram);
+    if (!isNaN(mv)) result = result.filter((p) => (p.specs?.vram_gb as number || 0) >= mv);
+    const xv = parseInt(specMaxVram);
+    if (!isNaN(xv)) result = result.filter((p) => (p.specs?.vram_gb as number || 999) <= xv);
+    const mc = parseInt(specMinCapacity);
+    if (!isNaN(mc)) result = result.filter((p) => (p.specs?.capacity_gb as number || 0) >= mc);
+    const mw = parseInt(specMinWattage);
+    if (!isNaN(mw)) result = result.filter((p) => (p.specs?.wattage as number || 0) >= mw);
+    const mr = parseInt(specMinRefresh);
+    if (!isNaN(mr)) result = result.filter((p) => (p.specs?.refresh_rate as number || 0) >= mr);
+    if (specSocket) result = result.filter((p) => String(p.specs?.socket || "").includes(specSocket));
+    if (specMemType) result = result.filter((p) => (p.specs?.memory_type || p.specs?.type || "") === specMemType);
+    if (specPanel) result = result.filter((p) => (p.specs?.panel || "") === specPanel);
     // Sort
     result = [...result].sort((a, b) => {
       let cmp = 0;
@@ -283,12 +309,13 @@ export default function HardwarePage() {
       return storeSortDir === "asc" ? cmp : -cmp;
     });
     return result;
-  }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice, storeSortField, storeSortDir]);
+  }, [storeProducts, storeSearch, storeMinPrice, storeMaxPrice, storeSortField, storeSortDir,
+      specMinVram, specMaxVram, specMinCapacity, specMinWattage, specSocket, specMemType, specPanel, specMinRefresh]);
 
   // Reset page when filters change
   useEffect(() => {
     setStorePage(1);
-  }, [storeSearch, storeMinPrice, storeMaxPrice]);
+  }, [storeSearch, storeMinPrice, storeMaxPrice, specMinVram, specMaxVram, specMinCapacity, specMinWattage, specSocket, specMemType, specPanel, specMinRefresh]);
 
   const totalStorePages = Math.ceil(filteredStoreProducts.length / STORE_PAGE_SIZE);
   const pagedStoreProducts = filteredStoreProducts.slice(
@@ -1594,6 +1621,60 @@ export default function HardwarePage() {
                 className="w-24 border-border text-sm"
               />
             </div>
+            {/* Spec filters — shown per category */}
+            {storeCategory === "gpu" && (
+              <div className="flex items-center gap-1.5">
+                <Input type="number" placeholder="Min VRAM" value={specMinVram} onChange={(e) => setSpecMinVram(e.target.value)} className="w-24 border-border text-sm" />
+                <span className="text-muted-foreground text-xs">-</span>
+                <Input type="number" placeholder="Max VRAM" value={specMaxVram} onChange={(e) => setSpecMaxVram(e.target.value)} className="w-24 border-border text-sm" />
+                <span className="text-muted-foreground text-xs">GB</span>
+              </div>
+            )}
+            {storeCategory === "ram" && (
+              <div className="flex items-center gap-1.5">
+                <Input type="number" placeholder="Min GB" value={specMinCapacity} onChange={(e) => setSpecMinCapacity(e.target.value)} className="w-20 border-border text-sm" />
+                <Select value={specMemType} onValueChange={setSpecMemType}>
+                  <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="DDR" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All</SelectItem>
+                    <SelectItem value="DDR4">DDR4</SelectItem>
+                    <SelectItem value="DDR5">DDR5</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {storeCategory === "ssd" && (
+              <Input type="number" placeholder="Min GB" value={specMinCapacity} onChange={(e) => setSpecMinCapacity(e.target.value)} className="w-24 border-border text-sm" />
+            )}
+            {storeCategory === "psu" && (
+              <Input type="number" placeholder="Min W" value={specMinWattage} onChange={(e) => setSpecMinWattage(e.target.value)} className="w-24 border-border text-sm" />
+            )}
+            {(storeCategory === "cpu" || storeCategory === "motherboard") && (
+              <Select value={specSocket} onValueChange={setSpecSocket}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Socket" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="AM4">AM4</SelectItem>
+                  <SelectItem value="AM5">AM5</SelectItem>
+                  <SelectItem value="LGA1700">LGA 1700</SelectItem>
+                  <SelectItem value="LGA1851">LGA 1851</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {storeCategory === "monitor" && (
+              <div className="flex items-center gap-1.5">
+                <Input type="number" placeholder="Min Hz" value={specMinRefresh} onChange={(e) => setSpecMinRefresh(e.target.value)} className="w-22 border-border text-sm" />
+                <Select value={specPanel} onValueChange={setSpecPanel}>
+                  <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Panel" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All</SelectItem>
+                    <SelectItem value="IPS">IPS</SelectItem>
+                    <SelectItem value="VA">VA</SelectItem>
+                    <SelectItem value="OLED">OLED</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center border border-border rounded-md">
               <button
                 onClick={() => setStoreView("grid")}
@@ -1698,6 +1779,15 @@ export default function HardwarePage() {
                         </Badge>
                       )}
                     </div>
+                    {product.specs && Object.keys(product.specs).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {Object.entries(product.specs).filter(([, v]) => v !== true && v !== false).slice(0, 4).map(([k, v]) => (
+                          <span key={k} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                            {String(v)}{k.includes("gb") ? "GB" : k.includes("mhz") ? "MHz" : k === "wattage" ? "W" : k === "refresh_rate" ? "Hz" : k.includes("inches") ? '"' : ""}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex items-end justify-between mt-3">
                       <div>
@@ -1792,6 +1882,7 @@ export default function HardwarePage() {
                         >
                           <div className="flex items-center gap-1">Store <ArrowUpDown className="h-3 w-3 opacity-50" /></div>
                         </TableHead>
+                        <TableHead>Specs</TableHead>
                         <TableHead>Rating</TableHead>
                         <TableHead className="w-10"></TableHead>
                       </TableRow>
@@ -1814,6 +1905,18 @@ export default function HardwarePage() {
                               <span className="truncate max-w-[100px]" title={product.merchant}>{product.merchant}</span>
                               {product.free_shipping && (
                                 <Badge variant="secondary" className="text-[10px] px-1 py-0">Frete</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {product.specs && Object.entries(product.specs).filter(([, v]) => v !== true && v !== false).slice(0, 4).map(([k, v]) => (
+                                <span key={k} className="text-[10px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                                  {String(v)}{k.includes("gb") ? "GB" : k.includes("mhz") ? "MHz" : k === "wattage" ? "W" : k === "refresh_rate" ? "Hz" : k.includes("inches") ? '"' : ""}
+                                </span>
+                              ))}
+                              {(!product.specs || Object.keys(product.specs).length === 0) && (
+                                <span className="text-xs text-muted-foreground">-</span>
                               )}
                             </div>
                           </TableCell>
