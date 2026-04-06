@@ -698,82 +698,6 @@ export default function HardwarePage() {
 
       {activeTab === "deals" && (
         <>
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(categorySummary).map(([cat, data]) => (
-              <Card key={cat} className="bg-card border-border">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      {categoryIcon(cat)}
-                      <span className="font-medium text-card-foreground">
-                        {categoryLabel(cat)}
-                      </span>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {data.total} deals
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Best Price
-                      </p>
-                      <p className="text-lg font-semibold text-green-500">
-                        {formatPrice(data.best)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Avg Price
-                      </p>
-                      <p className="text-lg font-semibold text-card-foreground">
-                        {formatPrice(data.avg)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Per-item summary */}
-          {summary.length > 0 && (
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm text-card-foreground">
-                  Price Summary by Item
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {summary.map((s) => (
-                    <div
-                      key={s.item_name}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-background/50"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-card-foreground">
-                          {s.item_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {s.total_deals} deals
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-green-500">
-                          {formatPrice(s.min_price)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          avg {formatPrice(s.avg_price)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Filters + Deals Table */}
           <Card className="bg-card border-border">
@@ -847,7 +771,7 @@ export default function HardwarePage() {
               </div>
               <p className="text-xs text-muted-foreground mb-3">{filteredDeals.length} deals found</p>
               <div className="rounded-md border border-border overflow-hidden">
-                <div className="max-h-[60vh] overflow-y-auto">
+                <div className="max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-none">
                 <Table>
                   <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow className="border-border hover:bg-transparent">
