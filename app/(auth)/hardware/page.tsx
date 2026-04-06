@@ -1,0 +1,849 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "sonner";
+import {
+  RefreshCw,
+  ExternalLink,
+  Search,
+  Package,
+  Cpu,
+  MemoryStick,
+  Monitor,
+  ArrowUpDown,
+  Edit2,
+  Save,
+  X,
+} from "lucide-react";
+
+const HARDWARE_API =
+  process.env.NEXT_PUBLIC_HARDWARE_API_URL || "http://localhost:8001";
+
+interface Deal {
+  id: number;
+  item_name: string;
+  title: string;
+  price: number;
+  currency: string;
+  source: string;
+  url: string;
+  location: string;
+  found_at: string;
+  category: string;
+}
+
+interface SummaryItem {
+  item_name: string;
+  category: string;
+  total_deals: number;
+  min_price: number;
+  avg_price: number;
+  max_price: number;
+}
+
+interface ConfigItem {
+  name: string;
+  category: string;
+  specs: Record<string, number | string>;
+}
+
+interface ManualPrice {
+  item_name: string;
+  price_new: number | null;
+  price_aliexpress: number | null;
+  price_reference: number | null;
+  notes: string;
+}
+
+type SortField = "price" | "found_at" | "title" | "source" | "location";
+type SortDir = "asc" | "desc";
+
+export default function HardwarePage() {
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [summary, setSummary] = useState<SummaryItem[]>([]);
+  const [items, setItems] = useState<ConfigItem[]>([]);
+  const [manualPrices, setManualPrices] = useState<ManualPrice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [scraping, setScraping] = useState(false);
+  const [activeTab, setActiveTab] = useState<"deals" | "manual-prices">(
+    "deals"
+  );
+
+  // Filters
+  const [filterName, setFilterName] = useState("all");
+  const [filterSource, setFilterSource] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterMaxPrice, setFilterMaxPrice] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Sorting
+  const [sortField, setSortField] = useState<SortField>("found_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // Manual prices editing
+  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Partial<ManualPrice>>({});
+
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const [dealsRes, summaryRes, itemsRes, pricesRes] = await Promise.all([
+        fetch(`${HARDWARE_API}/api/deals`).then((r) => r.json()),
+        fetch(`${HARDWARE_API}/api/deals/summary`).then((r) => r.json()),
+        fetch(`${HARDWARE_API}/api/items`).then((r) => r.json()),
+        fetch(`${HARDWARE_API}/api/manual-prices`)
+          .then((r) => r.json())
+          .catch(() => []),
+      ]);
+      setDeals(Array.isArray(dealsRes) ? dealsRes : []);
+      setSummary(Array.isArray(summaryRes) ? summaryRes : []);
+      setItems(Array.isArray(itemsRes) ? itemsRes : []);
+      setManualPrices(Array.isArray(pricesRes) ? pricesRes : []);
+    } catch (error) {
+      console.error("Error fetching hardware data:", error);
+      toast.error("Failed to connect to Hardware API");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleScrape = async () => {
+    setScraping(true);
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/scrape`, { method: "POST" });
+      if (res.ok) {
+        toast.success("Scrape started successfully");
+        setTimeout(() => fetchAll(), 5000);
+      } else {
+        toast.error("Failed to start scrape");
+      }
+    } catch (error) {
+      toast.error("Failed to connect to Hardware API");
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const handleSaveManualPrice = async (itemName: string) => {
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/manual-prices`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_name: itemName, ...editValues }),
+      });
+      if (res.ok) {
+        toast.success(`Price updated for ${itemName}`);
+        setEditingItem(null);
+        setEditValues({});
+        fetchAll();
+      } else {
+        toast.error("Failed to save price");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const filteredDeals = useMemo(() => {
+    let result = [...deals];
+
+    if (filterName !== "all") {
+      result = result.filter((d) => d.item_name === filterName);
+    }
+    if (filterSource !== "all") {
+      result = result.filter((d) => d.source === filterSource);
+    }
+    if (filterCategory !== "all") {
+      result = result.filter((d) => d.category === filterCategory);
+    }
+    if (filterMaxPrice) {
+      const max = parseFloat(filterMaxPrice);
+      if (!isNaN(max)) {
+        result = result.filter((d) => d.price <= max);
+      }
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (d) =>
+          d.title.toLowerCase().includes(q) ||
+          d.item_name.toLowerCase().includes(q) ||
+          d.location?.toLowerCase().includes(q)
+      );
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "price":
+          cmp = a.price - b.price;
+          break;
+        case "found_at":
+          cmp =
+            new Date(a.found_at).getTime() - new Date(b.found_at).getTime();
+          break;
+        case "title":
+          cmp = a.title.localeCompare(b.title);
+          break;
+        case "source":
+          cmp = a.source.localeCompare(b.source);
+          break;
+        case "location":
+          cmp = (a.location || "").localeCompare(b.location || "");
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  }, [
+    deals,
+    filterName,
+    filterSource,
+    filterCategory,
+    filterMaxPrice,
+    searchQuery,
+    sortField,
+    sortDir,
+  ]);
+
+  const categorySummary = useMemo(() => {
+    const cats: Record<
+      string,
+      { total: number; best: number; avg: number; label: string }
+    > = {};
+    for (const s of summary) {
+      const cat = s.category || "other";
+      if (!cats[cat]) {
+        cats[cat] = { total: 0, best: Infinity, avg: 0, label: cat };
+      }
+      cats[cat].total += s.total_deals;
+      cats[cat].best = Math.min(cats[cat].best, s.min_price);
+      cats[cat].avg += s.avg_price * s.total_deals;
+    }
+    for (const cat of Object.values(cats)) {
+      cat.avg = cat.total > 0 ? cat.avg / cat.total : 0;
+      if (cat.best === Infinity) cat.best = 0;
+    }
+    return cats;
+  }, [summary]);
+
+  const uniqueNames = useMemo(
+    () => Array.from(new Set(deals.map((d) => d.item_name))).sort(),
+    [deals]
+  );
+  const uniqueSources = useMemo(
+    () => Array.from(new Set(deals.map((d) => d.source))).sort(),
+    [deals]
+  );
+  const uniqueCategories = useMemo(
+    () => Array.from(new Set(deals.map((d) => d.category))).sort(),
+    [deals]
+  );
+
+  const categoryIcon = (cat: string) => {
+    switch (cat) {
+      case "gpu":
+        return <Monitor className="h-4 w-4" />;
+      case "cpu-kit":
+        return <Cpu className="h-4 w-4" />;
+      case "ram":
+        return <MemoryStick className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
+    }
+  };
+
+  const categoryLabel = (cat: string) => {
+    switch (cat) {
+      case "gpu":
+        return "GPU";
+      case "cpu-kit":
+        return "CPU Kit";
+      case "ram":
+        return "RAM";
+      default:
+        return cat.toUpperCase();
+    }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(price);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const SortHeader = ({
+    field,
+    children,
+  }: {
+    field: SortField;
+    children: React.ReactNode;
+  }) => (
+    <TableHead
+      className="cursor-pointer select-none hover:text-foreground transition-colors"
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        <ArrowUpDown className="h-3 w-3 opacity-50" />
+      </div>
+    </TableHead>
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Hardware Deals</h1>
+          <p className="text-muted-foreground">Monitor used hardware prices from OLX and eBay.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="bg-card border-border">
+              <CardContent className="pt-6">
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card className="bg-card border-border">
+          <CardContent className="pt-6">
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Page header */}
+      <div>
+        <h1 className="text-3xl font-bold">Hardware Deals</h1>
+        <p className="text-muted-foreground">Monitor used hardware prices from OLX and eBay.</p>
+      </div>
+
+      {/* Header with actions */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("deals")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "deals"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+            }`}
+          >
+            Deals
+          </button>
+          <button
+            onClick={() => setActiveTab("manual-prices")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "manual-prices"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+            }`}
+          >
+            Manual Prices
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchAll}
+            className="border-border"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleScrape}
+            disabled={scraping}
+            className="bg-primary text-primary-foreground"
+          >
+            {scraping ? (
+              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4 mr-1" />
+            )}
+            {scraping ? "Scraping..." : "Scrape Now"}
+          </Button>
+        </div>
+      </div>
+
+      {activeTab === "deals" && (
+        <>
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Object.entries(categorySummary).map(([cat, data]) => (
+              <Card key={cat} className="bg-card border-border">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      {categoryIcon(cat)}
+                      <span className="font-medium text-card-foreground">
+                        {categoryLabel(cat)}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {data.total} deals
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Best Price
+                      </p>
+                      <p className="text-lg font-semibold text-green-500">
+                        {formatPrice(data.best)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Avg Price
+                      </p>
+                      <p className="text-lg font-semibold text-card-foreground">
+                        {formatPrice(data.avg)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Per-item summary */}
+          {summary.length > 0 && (
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm text-card-foreground">
+                  Price Summary by Item
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {summary.map((s) => (
+                    <div
+                      key={s.item_name}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-background/50"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-card-foreground">
+                          {s.item_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {s.total_deals} deals
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-green-500">
+                          {formatPrice(s.min_price)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          avg {formatPrice(s.avg_price)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Filters */}
+          <Card className="bg-card border-border">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search deals..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 bg-background border-border"
+                  />
+                </div>
+                <Select value={filterName} onValueChange={setFilterName}>
+                  <SelectTrigger className="w-[180px] bg-background border-border">
+                    <SelectValue placeholder="Item" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Items</SelectItem>
+                    {uniqueNames.map((n) => (
+                      <SelectItem key={n} value={n}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filterSource} onValueChange={setFilterSource}>
+                  <SelectTrigger className="w-[140px] bg-background border-border">
+                    <SelectValue placeholder="Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    {uniqueSources.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filterCategory}
+                  onValueChange={setFilterCategory}
+                >
+                  <SelectTrigger className="w-[140px] bg-background border-border">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {uniqueCategories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {categoryLabel(c)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Max price"
+                  type="number"
+                  value={filterMaxPrice}
+                  onChange={(e) => setFilterMaxPrice(e.target.value)}
+                  className="w-[120px] bg-background border-border"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Deals table */}
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm text-card-foreground">
+                  {filteredDeals.length} deals found
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <SortHeader field="title">Title</SortHeader>
+                      <TableHead>Item</TableHead>
+                      <SortHeader field="price">Price</SortHeader>
+                      <SortHeader field="source">Source</SortHeader>
+                      <SortHeader field="location">Location</SortHeader>
+                      <SortHeader field="found_at">Found</SortHeader>
+                      <TableHead className="w-10"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDeals.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="text-center text-muted-foreground py-8"
+                        >
+                          No deals found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredDeals.slice(0, 100).map((deal) => (
+                        <TableRow
+                          key={deal.id}
+                          className="border-border hover:bg-foreground/5"
+                        >
+                          <TableCell className="max-w-[300px]">
+                            <p className="text-sm truncate text-card-foreground">
+                              {deal.title}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="text-xs whitespace-nowrap"
+                            >
+                              {deal.item_name}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-semibold text-green-500 whitespace-nowrap">
+                              {formatPrice(deal.price)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                deal.source === "olx"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="text-xs"
+                            >
+                              {deal.source.toUpperCase()}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                            {deal.location || "-"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {formatDate(deal.found_at)}
+                          </TableCell>
+                          <TableCell>
+                            <a
+                              href={deal.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              {filteredDeals.length > 100 && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Showing first 100 of {filteredDeals.length} results
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {activeTab === "manual-prices" && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-card-foreground">
+              Manual Reference Prices
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead>Item</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>New Price</TableHead>
+                    <TableHead>AliExpress</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-20">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => {
+                    const mp = manualPrices.find(
+                      (p) => p.item_name === item.name
+                    );
+                    const isEditing = editingItem === item.name;
+
+                    return (
+                      <TableRow
+                        key={item.name}
+                        className="border-border hover:bg-foreground/5"
+                      >
+                        <TableCell className="font-medium text-card-foreground">
+                          {item.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {categoryLabel(item.category)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              className="w-24 h-8 bg-background border-border"
+                              defaultValue={mp?.price_new ?? ""}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  price_new: e.target.value
+                                    ? parseFloat(e.target.value)
+                                    : null,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm">
+                              {mp?.price_new ? formatPrice(mp.price_new) : "-"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              className="w-24 h-8 bg-background border-border"
+                              defaultValue={mp?.price_aliexpress ?? ""}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  price_aliexpress: e.target.value
+                                    ? parseFloat(e.target.value)
+                                    : null,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm">
+                              {mp?.price_aliexpress
+                                ? formatPrice(mp.price_aliexpress)
+                                : "-"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              type="number"
+                              className="w-24 h-8 bg-background border-border"
+                              defaultValue={mp?.price_reference ?? ""}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  price_reference: e.target.value
+                                    ? parseFloat(e.target.value)
+                                    : null,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm">
+                              {mp?.price_reference
+                                ? formatPrice(mp.price_reference)
+                                : "-"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              className="w-32 h-8 bg-background border-border"
+                              defaultValue={mp?.notes ?? ""}
+                              onChange={(e) =>
+                                setEditValues((v) => ({
+                                  ...v,
+                                  notes: e.target.value,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
+                              {mp?.notes || "-"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleSaveManualPrice(item.name)
+                                }
+                                className="h-7 w-7 p-0"
+                              >
+                                <Save className="h-3.5 w-3.5 text-green-500" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingItem(null);
+                                  setEditValues({});
+                                }}
+                                className="h-7 w-7 p-0"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingItem(item.name);
+                                setEditValues({
+                                  price_new: mp?.price_new ?? null,
+                                  price_aliexpress:
+                                    mp?.price_aliexpress ?? null,
+                                  price_reference: mp?.price_reference ?? null,
+                                  notes: mp?.notes ?? "",
+                                });
+                              }}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

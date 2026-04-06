@@ -29,6 +29,8 @@ import {
   Users,
   BookOpenCheck,
   ChevronDown,
+  Monitor,
+  Server,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,6 +67,15 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Vendas", href: "/sales", icon: DollarSign },
           { title: "Precos", href: "/prices", icon: TrendingUp },
           { title: "Simulacoes", href: "/simulations", icon: Calculator },
+        ],
+      },
+      {
+        title: "Hardware",
+        icon: Monitor,
+        children: [
+          { title: "Deals", href: "/hardware", icon: Monitor },
+          { title: "PC Builder", href: "/hardware/builder", icon: Wrench },
+          { title: "VM Calculator", href: "/hardware/vms", icon: Server },
         ],
       },
     ],
