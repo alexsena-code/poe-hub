@@ -72,6 +72,7 @@ interface ConfigItem {
   max_price: number;
   category: string;
   specs: Record<string, number | string>;
+  scrape_enabled: boolean;
 }
 
 interface ManualPrice {
@@ -121,6 +122,7 @@ export default function HardwarePage() {
   const [itemFormKeywords, setItemFormKeywords] = useState<string[]>([]);
   const [itemFormKeywordInput, setItemFormKeywordInput] = useState("");
   const [itemFormSpecs, setItemFormSpecs] = useState<Record<string, string>>({});
+  const [itemFormScrapeEnabled, setItemFormScrapeEnabled] = useState(true);
   const [showSpecs, setShowSpecs] = useState(false);
 
   useEffect(() => {
@@ -330,6 +332,7 @@ export default function HardwarePage() {
     setItemFormKeywords([]);
     setItemFormKeywordInput("");
     setItemFormSpecs({});
+    setItemFormScrapeEnabled(true);
     setShowSpecs(false);
     setEditingConfigItem(null);
   };
@@ -378,6 +381,7 @@ export default function HardwarePage() {
       max_price: maxPrice,
       keywords: itemFormKeywords,
       specs,
+      scrape_enabled: itemFormScrapeEnabled,
     };
 
     try {
@@ -416,6 +420,7 @@ export default function HardwarePage() {
       )
     );
     setShowSpecs(Object.keys(item.specs || {}).length > 0);
+    setItemFormScrapeEnabled(item.scrape_enabled !== false);
     setShowItemForm(true);
   };
 
@@ -1122,6 +1127,9 @@ export default function HardwarePage() {
                         <SelectItem value="gpu">GPU</SelectItem>
                         <SelectItem value="cpu-kit">CPU Kit</SelectItem>
                         <SelectItem value="ram">RAM</SelectItem>
+                        <SelectItem value="psu">PSU (Fonte)</SelectItem>
+                        <SelectItem value="ssd">SSD</SelectItem>
+                        <SelectItem value="motherboard">Placa Mae</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1222,6 +1230,22 @@ export default function HardwarePage() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Scrape toggle */}
+                <div className="flex items-center gap-2 pt-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={itemFormScrapeEnabled}
+                      onChange={(e) => setItemFormScrapeEnabled(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    Enable scraping for this item
+                  </label>
+                  <span className="text-xs text-muted-foreground">
+                    (disable for manual-price-only items like PSU, SSD)
+                  </span>
                 </div>
 
                 {/* Save / Cancel */}
