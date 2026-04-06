@@ -142,6 +142,8 @@ export default function HardwarePage() {
   const [storeLoading, setStoreLoading] = useState(false);
   const [storeSearch, setStoreSearch] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [storePage, setStorePage] = useState(1);
+  const STORE_PAGE_SIZE = 24;
   interface SyncResult {
     item: string;
     new_price: number;
@@ -194,9 +196,10 @@ export default function HardwarePage() {
 
   const fetchStoreProducts = async (cat: string) => {
     setStoreLoading(true);
+    setStorePage(1);
     try {
       const res = await fetch(
-        `${HARDWARE_API}/api/new-prices/${cat}?limit=50`
+        `${HARDWARE_API}/api/new-prices/${cat}`
       );
       const data = await res.json();
       setStoreProducts(Array.isArray(data) ? data : []);
@@ -251,15 +254,29 @@ export default function HardwarePage() {
   }, [activeTab, storeCategory]);
 
   const filteredStoreProducts = useMemo(() => {
-    if (!storeSearch.trim()) return storeProducts;
-    const q = storeSearch.toLowerCase();
-    return storeProducts.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.manufacturer.toLowerCase().includes(q) ||
-        p.merchant.toLowerCase().includes(q)
-    );
+    let result = storeProducts;
+    if (storeSearch.trim()) {
+      const q = storeSearch.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.manufacturer.toLowerCase().includes(q) ||
+          p.merchant.toLowerCase().includes(q)
+      );
+    }
+    return result;
   }, [storeProducts, storeSearch]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setStorePage(1);
+  }, [storeSearch]);
+
+  const totalStorePages = Math.ceil(filteredStoreProducts.length / STORE_PAGE_SIZE);
+  const pagedStoreProducts = filteredStoreProducts.slice(
+    (storePage - 1) * STORE_PAGE_SIZE,
+    storePage * STORE_PAGE_SIZE
+  );
 
   const handleScrape = async () => {
     setScraping(true);
@@ -1598,8 +1615,19 @@ export default function HardwarePage() {
               </CardContent>
             </Card>
           ) : (
+            <>
+            {/* Product count + pagination info */}
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                {filteredStoreProducts.length} products
+                {storeSearch.trim() ? ` matching "${storeSearch}"` : ""}
+              </span>
+              {totalStorePages > 1 && (
+                <span>Page {storePage} of {totalStorePages}</span>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filteredStoreProducts.map((product, idx) => (
+              {pagedStoreProducts.map((product, idx) => (
                 <Card
                   key={`${product.name}-${idx}`}
                   className="bg-card border-border hover:border-primary/50 transition-colors"
@@ -1682,6 +1710,54 @@ export default function HardwarePage() {
                 </Card>
               ))}
             </div>
+
+            {/* Pagination */}
+            {totalStorePages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={storePage <= 1}
+                  onClick={() => setStorePage((p) => p - 1)}
+                  className="border-border"
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: Math.min(totalStorePages, 7) }, (_, i) => {
+                  let page: number;
+                  if (totalStorePages <= 7) {
+                    page = i + 1;
+                  } else if (storePage <= 4) {
+                    page = i + 1;
+                  } else if (storePage >= totalStorePages - 3) {
+                    page = totalStorePages - 6 + i;
+                  } else {
+                    page = storePage - 3 + i;
+                  }
+                  return (
+                    <Button
+                      key={page}
+                      variant={storePage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setStorePage(page)}
+                      className={`w-8 h-8 p-0 ${storePage !== page ? "border-border" : ""}`}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={storePage >= totalStorePages}
+                  onClick={() => setStorePage((p) => p + 1)}
+                  className="border-border"
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+            </>
           )}
 
           {/* Price Comparison: Used vs New */}
