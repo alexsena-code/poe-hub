@@ -300,7 +300,7 @@ export default function QAChat() {
   const groups = groupConversationsByDate(conversations);
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-screen fixed inset-0 md:left-64 z-10 bg-background">
       {/* Sidebar */}
       <aside
         className={`${

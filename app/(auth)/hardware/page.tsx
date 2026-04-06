@@ -34,6 +34,7 @@ import {
   Edit2,
   Save,
   X,
+  Trash2,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -162,6 +163,39 @@ export default function HardwarePage() {
         fetchAll();
       } else {
         toast.error("Failed to save price");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleDeleteManualPrice = async (itemName: string) => {
+    try {
+      const res = await fetch(
+        `${HARDWARE_API}/api/manual-prices/${encodeURIComponent(itemName)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        toast.success(`Deleted ${itemName}`);
+        fetchAll();
+      } else {
+        toast.error("Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to connect to Hardware API");
+    }
+  };
+
+  const handleDeleteDeal = async (dealId: number) => {
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/deals/${dealId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setDeals((prev) => prev.filter((d) => d.id !== dealId));
+        toast.success("Deal removed");
+      } else {
+        toast.error("Failed to delete deal");
       }
     } catch {
       toast.error("Failed to connect to Hardware API");
@@ -639,14 +673,24 @@ export default function HardwarePage() {
                             {formatDate(deal.found_at)}
                           </TableCell>
                           <TableCell>
-                            <a
-                              href={deal.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={deal.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400"
+                                onClick={() => handleDeleteDeal(deal.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -816,23 +860,35 @@ export default function HardwarePage() {
                               </Button>
                             </div>
                           ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingItem(item.name);
-                                setEditValues({
-                                  price_new: mp?.price_new ?? null,
-                                  price_aliexpress:
-                                    mp?.price_aliexpress ?? null,
-                                  price_reference: mp?.price_reference ?? null,
-                                  notes: mp?.notes ?? "",
-                                });
-                              }}
-                              className="h-7 w-7 p-0"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingItem(item.name);
+                                  setEditValues({
+                                    price_new: mp?.price_new ?? null,
+                                    price_aliexpress:
+                                      mp?.price_aliexpress ?? null,
+                                    price_reference: mp?.price_reference ?? null,
+                                    notes: mp?.notes ?? "",
+                                  });
+                                }}
+                                className="h-7 w-7 p-0"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                              {mp && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteManualPrice(item.name)}
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
