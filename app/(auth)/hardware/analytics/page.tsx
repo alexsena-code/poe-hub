@@ -141,8 +141,17 @@ export default function HardwareAnalyticsPage() {
   }, []);
 
   // Available products for the selected category (from store_products DB)
-  const [availableProducts, setAvailableProducts] = useState<string[]>([]);
+  interface StoreProd { name: string; manufacturer: string; specs: Record<string, number | string | boolean> | null }
+  const [availableProductsFull, setAvailableProductsFull] = useState<StoreProd[]>([]);
   const [importing, setImporting] = useState(false);
+
+  // Spec filters for history product list
+  const [hBrand, setHBrand] = useState("");
+  const [hVram, setHVram] = useState("");
+  const [hSocket, setHSocket] = useState("");
+  const [hMemType, setHMemType] = useState("");
+  const [hCapacity, setHCapacity] = useState("");
+  const [hWattage, setHWattage] = useState("");
 
   // Fetch history + available products when tab/category changes
   useEffect(() => {
@@ -154,12 +163,12 @@ export default function HardwareAnalyticsPage() {
           fetch(`${HARDWARE_API}/api/new-prices/${historyCategory}?limit=500`).then((r) => r.json()).catch(() => []),
         ]);
         setStoreHistory(Array.isArray(histRes) ? histRes : []);
-        const names = [...new Set((productsRes as { name: string }[]).map((p) => p.name))].sort();
-        setAvailableProducts(names);
+        setAvailableProductsFull(Array.isArray(productsRes) ? productsRes : []);
         setSelectedProducts([]);
+        setHBrand(""); setHVram(""); setHSocket(""); setHMemType(""); setHCapacity(""); setHWattage("");
       } catch {
         setStoreHistory([]);
-        setAvailableProducts([]);
+        setAvailableProductsFull([]);
       }
     }
     loadHistory();
@@ -181,17 +190,49 @@ export default function HardwareAnalyticsPage() {
     }
   };
 
-  // Products available for selection (from store_products, filtered by search)
+  // Spec options for filters (dynamic from loaded products)
+  const hSpecOptions = useMemo(() => {
+    const extract = (key: string) => {
+      const vals = new Set<string>();
+      for (const p of availableProductsFull) {
+        const v = p.specs?.[key];
+        if (v !== undefined && v !== null && v !== true && v !== false) vals.add(String(v));
+      }
+      return [...vals].sort((a, b) => { const na = parseFloat(a), nb = parseFloat(b); return !isNaN(na) && !isNaN(nb) ? na - nb : a.localeCompare(b); });
+    };
+    return {
+      brand: [...new Set(availableProductsFull.map((p) => p.manufacturer).filter(Boolean))].sort(),
+      vram_gb: extract("vram_gb"),
+      socket: extract("socket"),
+      memory_type: [...new Set([...extract("memory_type"), ...extract("type")])].filter(Boolean).sort(),
+      capacity_gb: extract("capacity_gb"),
+      wattage: extract("wattage"),
+    };
+  }, [availableProductsFull]);
+
+  // Products available for selection (filtered by search + specs)
   const filteredProducts = useMemo(() => {
-    const names = availableProducts.length > 0
-      ? availableProducts
-      : [...new Set(storeHistory.map((p) => p.product_name))].sort();
+    let prods = availableProductsFull.length > 0
+      ? availableProductsFull
+      : storeHistory.map((p) => ({ name: p.product_name, manufacturer: "", specs: null } as StoreProd));
+
+    // Deduplicate by name
+    const seen = new Set<string>();
+    prods = prods.filter((p) => { if (seen.has(p.name)) return false; seen.add(p.name); return true; });
+
     if (historySearch) {
       const q = historySearch.toLowerCase();
-      return names.filter((n) => n.toLowerCase().includes(q));
+      prods = prods.filter((p) => p.name.toLowerCase().includes(q) || p.manufacturer.toLowerCase().includes(q));
     }
-    return names;
-  }, [availableProducts, storeHistory, historySearch]);
+    if (hBrand) prods = prods.filter((p) => p.manufacturer === hBrand);
+    if (hVram) prods = prods.filter((p) => String(p.specs?.vram_gb) === hVram);
+    if (hSocket) prods = prods.filter((p) => String(p.specs?.socket || "") === hSocket);
+    if (hMemType) prods = prods.filter((p) => (p.specs?.memory_type || p.specs?.type || "") === hMemType);
+    if (hCapacity) prods = prods.filter((p) => String(p.specs?.capacity_gb) === hCapacity);
+    if (hWattage) prods = prods.filter((p) => String(p.specs?.wattage) === hWattage);
+
+    return prods.map((p) => p.name).sort();
+  }, [availableProductsFull, storeHistory, historySearch, hBrand, hVram, hSocket, hMemType, hCapacity, hWattage]);
 
   // History chart data
   const historyChartData = useMemo(() => {
@@ -372,6 +413,61 @@ export default function HardwareAnalyticsPage() {
               onChange={(e) => setHistorySearch(e.target.value)}
               className="px-3 py-1.5 text-sm bg-background border border-border rounded-md w-60"
             />
+            {/* Dynamic spec filters */}
+            {hSpecOptions.brand.length > 1 && (
+              <Select value={hBrand || "__all__"} onValueChange={(v) => setHBrand(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Brand" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Brands</SelectItem>
+                  {hSpecOptions.brand.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {hSpecOptions.vram_gb.length > 1 && historyCategory === "gpu" && (
+              <Select value={hVram || "__all__"} onValueChange={(v) => setHVram(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="VRAM" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All VRAM</SelectItem>
+                  {hSpecOptions.vram_gb.map((v) => <SelectItem key={v} value={v}>{v} GB</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {hSpecOptions.socket.length > 1 && (historyCategory === "cpu" || historyCategory === "motherboard") && (
+              <Select value={hSocket || "__all__"} onValueChange={(v) => setHSocket(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-28 border-border text-sm"><SelectValue placeholder="Socket" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Sockets</SelectItem>
+                  {hSpecOptions.socket.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {hSpecOptions.memory_type.length > 1 && (historyCategory === "ram" || historyCategory === "motherboard") && (
+              <Select value={hMemType || "__all__"} onValueChange={(v) => setHMemType(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="DDR" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All DDR</SelectItem>
+                  {hSpecOptions.memory_type.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {hSpecOptions.capacity_gb.length > 1 && (historyCategory === "ram" || historyCategory === "ssd") && (
+              <Select value={hCapacity || "__all__"} onValueChange={(v) => setHCapacity(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Size" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Sizes</SelectItem>
+                  {hSpecOptions.capacity_gb.map((v) => <SelectItem key={v} value={v}>{Number(v) >= 1000 ? `${Number(v)/1000} TB` : `${v} GB`}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {hSpecOptions.wattage.length > 1 && historyCategory === "psu" && (
+              <Select value={hWattage || "__all__"} onValueChange={(v) => setHWattage(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-24 border-border text-sm"><SelectValue placeholder="Watts" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Watts</SelectItem>
+                  {hSpecOptions.wattage.map((v) => <SelectItem key={v} value={v}>{v} W</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
             <span className="text-xs text-muted-foreground">
               {filteredProducts.length} products, {storeHistory.length} data points
             </span>
