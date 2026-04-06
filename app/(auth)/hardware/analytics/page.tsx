@@ -601,24 +601,22 @@ export default function HardwareAnalyticsPage() {
           )}
 
           {/* Distribution chart for selected item */}
-          {distItem && (
+          {distItem && distData.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-muted-foreground">
                 Price Distribution — {distItem}
               </h3>
-              {distData.length === 0 ? (
-                <p className="text-muted-foreground text-xs py-4 text-center">No deals for this item.</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={distData} margin={{ left: 10, right: 10, bottom: 30 }}>
+              <div style={{ width: "100%", height: "calc(100vh - 450px)", minHeight: 250 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={distData} margin={{ left: 10, right: 20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                    <XAxis dataKey="range" angle={-30} textAnchor="end" height={50} stroke="#666" tick={{ fill: "#aaa", fontSize: 10 }} tickLine={false} />
+                    <XAxis dataKey="range" stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
                     <YAxis stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} allowDecimals={false} tickLine={false} />
                     <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8 }} />
-                    <Bar dataKey="count" name="Deals" fill="#60a5fa" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Line type="monotone" dataKey="count" name="Deals" stroke="#22d3ee" strokeWidth={2} dot={{ r: 4, fill: "#22d3ee" }} activeDot={{ r: 6 }} />
+                  </LineChart>
                 </ResponsiveContainer>
-              )}
+              </div>
             </div>
           )}
         </section>
