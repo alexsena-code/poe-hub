@@ -74,6 +74,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         children: [
           { title: "Deals", href: "/hardware", icon: Monitor },
           { title: "Builder & VMs", href: "/hardware/builder", icon: Wrench },
+          { title: "Analytics", href: "/hardware/analytics", icon: BarChart3 },
         ],
       },
     ],
