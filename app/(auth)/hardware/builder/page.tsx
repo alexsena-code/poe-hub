@@ -177,6 +177,62 @@ export default function PCBuilderPage() {
     [items]
   );
 
+  // === Compatibility filters ===
+  // Get socket from selected CPU
+  const selectedCpuSocket = useMemo(() => {
+    const cpu = cpuKits.find((c) => c.name === selectedCpuKit);
+    return cpu?.specs?.socket as string || "";
+  }, [cpuKits, selectedCpuKit]);
+
+  // Get DDR type from selected RAM
+  const selectedRamType = useMemo(() => {
+    const ram = rams.find((r) => r.name === selectedRam);
+    const t = ram?.specs?.type as string || "";
+    // Extract DDR4/DDR5 from "DDR4 ECC" etc
+    const m = t.match(/DDR\d/);
+    return m ? m[0] : "";
+  }, [rams, selectedRam]);
+
+  // Get socket + DDR from selected motherboard
+  const selectedMoboSocket = useMemo(() => {
+    const mobo = motherboards.find((m) => m.name === selectedMotherboard);
+    return mobo?.specs?.socket as string || "";
+  }, [motherboards, selectedMotherboard]);
+  const selectedMoboDdr = useMemo(() => {
+    const mobo = motherboards.find((m) => m.name === selectedMotherboard);
+    return mobo?.specs?.memory_type as string || "";
+  }, [motherboards, selectedMotherboard]);
+
+  // Filtered motherboards: match CPU socket AND RAM DDR type
+  const compatMotherboards = useMemo(() => {
+    return motherboards.filter((m) => {
+      const moboSocket = m.specs?.socket as string || "";
+      const moboDdr = m.specs?.memory_type as string || "";
+      if (selectedCpuSocket && moboSocket && moboSocket !== selectedCpuSocket) return false;
+      if (selectedRamType && moboDdr && moboDdr !== selectedRamType) return false;
+      return true;
+    });
+  }, [motherboards, selectedCpuSocket, selectedRamType]);
+
+  // Filtered CPUs: match motherboard socket
+  const compatCpuKits = useMemo(() => {
+    return cpuKits.filter((c) => {
+      const cpuSocket = c.specs?.socket as string || "";
+      if (selectedMoboSocket && cpuSocket && cpuSocket !== selectedMoboSocket) return false;
+      return true;
+    });
+  }, [cpuKits, selectedMoboSocket]);
+
+  // Filtered RAM: match motherboard DDR type
+  const compatRams = useMemo(() => {
+    return rams.filter((r) => {
+      const ramType = r.specs?.type as string || "";
+      const ramDdr = ramType.match(/DDR\d/)?.[0] || "";
+      if (selectedMoboDdr && ramDdr && ramDdr !== selectedMoboDdr) return false;
+      return true;
+    });
+  }, [rams, selectedMoboDdr]);
+
   const getPrice = (
     itemName: string
   ): { best: number; avg: number; newPrice: number; newSource: string; newProduct: string; newMerchant: string } => {
@@ -734,17 +790,16 @@ export default function PCBuilderPage() {
                       <SelectValue placeholder="Select CPU Kit..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {cpuKits.map((c) => {
+                      {compatCpuKits.map((c) => {
                         const price = getPrice(c.name);
+                        const socket = c.specs?.socket as string || "";
                         return (
                           <SelectItem key={c.name} value={c.name}>
                             <div className="flex items-center justify-between w-full gap-4">
                               <span>{c.name}</span>
-                              {price.avg > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  ~{formatPrice(price.avg)}
-                                </span>
-                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {socket}{price.avg > 0 ? ` ~${formatPrice(price.avg)}` : ""}
+                              </span>
                             </div>
                           </SelectItem>
                         );
@@ -794,17 +849,16 @@ export default function PCBuilderPage() {
                       <SelectValue placeholder="Select RAM..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {rams.map((r) => {
+                      {compatRams.map((r) => {
                         const price = getPrice(r.name);
+                        const ramType = r.specs?.type as string || "";
                         return (
                           <SelectItem key={r.name} value={r.name}>
                             <div className="flex items-center justify-between w-full gap-4">
                               <span>{r.name}</span>
-                              {price.avg > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  ~{formatPrice(price.avg)}
-                                </span>
-                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {ramType}{price.avg > 0 ? ` ~${formatPrice(price.avg)}` : ""}
+                              </span>
                             </div>
                           </SelectItem>
                         );
@@ -841,17 +895,17 @@ export default function PCBuilderPage() {
                       <SelectValue placeholder="Select Motherboard..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {motherboards.map((m) => {
+                      {compatMotherboards.map((m) => {
                         const price = getPrice(m.name);
+                        const socket = m.specs?.socket as string || "";
+                        const ddr = m.specs?.memory_type as string || "";
                         return (
                           <SelectItem key={m.name} value={m.name}>
                             <div className="flex items-center justify-between w-full gap-4">
                               <span>{m.name}</span>
-                              {price.avg > 0 && (
-                                <span className="text-xs text-muted-foreground">
-                                  ~{formatPrice(price.avg)}
-                                </span>
-                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {[socket, ddr].filter(Boolean).join(" ")}{price.avg > 0 ? ` ~${formatPrice(price.avg)}` : ""}
+                              </span>
                             </div>
                           </SelectItem>
                         );
