@@ -89,10 +89,10 @@ const COLORS = [
   "#fb923c", "#60a5fa", "#e879f9", "#4ade80", "#f87171",
 ];
 
-type Tab = "comparison" | "history" | "deals";
+type Tab = "history" | "deals";
 
 export default function HardwareAnalyticsPage() {
-  const [tab, setTab] = useState<Tab>("comparison");
+  const [tab, setTab] = useState<Tab>("history");
   const [loading, setLoading] = useState(true);
 
   // Data
@@ -210,7 +210,12 @@ export default function HardwareAnalyticsPage() {
     };
   }, [availableProductsFull]);
 
-  // Products available for selection (filtered by search + specs)
+  // Products that actually have history data
+  const productsWithHistory = useMemo(() => {
+    return new Set(storeHistory.map((p) => p.product_name));
+  }, [storeHistory]);
+
+  // Products available for selection (filtered by search + specs + must have history)
   const filteredProducts = useMemo(() => {
     let prods = availableProductsFull.length > 0
       ? availableProductsFull
@@ -219,6 +224,11 @@ export default function HardwareAnalyticsPage() {
     // Deduplicate by name
     const seen = new Set<string>();
     prods = prods.filter((p) => { if (seen.has(p.name)) return false; seen.add(p.name); return true; });
+
+    // Only show products that have history data
+    if (storeHistory.length > 0) {
+      prods = prods.filter((p) => productsWithHistory.has(p.name));
+    }
 
     if (historySearch) {
       const q = historySearch.toLowerCase();
@@ -315,7 +325,6 @@ export default function HardwareAnalyticsPage() {
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "comparison", label: "Usado vs Novo" },
     { id: "history", label: "Price History" },
     { id: "deals", label: "OLX Deals" },
   ];
@@ -357,46 +366,7 @@ export default function HardwareAnalyticsPage() {
         ))}
       </div>
 
-      {/* ========== TAB: Usado vs Novo ========== */}
-      {tab === "comparison" && (
-        <section className="space-y-4">
-          {compChartData.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-8 text-center">No comparison data. Run a sync first.</p>
-          ) : (
-            <>
-              <div style={{ width: "100%", height: "calc(100vh - 300px)", minHeight: 350 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={compChartData} margin={{ left: 10, right: 10, bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                  <XAxis dataKey="item" angle={-25} textAnchor="end" height={60} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
-                  <YAxis tickFormatter={(v: number) => `R$${v}`} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
-                  <Tooltip formatter={(v: unknown) => fmt(Number(v))} contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8, fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="OLX Min" fill="#22d3ee" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Novo" fill="#a78bfa" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Target" fill="#444" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-              </div>
-
-              {/* Savings */}
-              <div className="flex flex-wrap gap-2">
-                {comparison.filter((p) => p.savings_pct !== null).map((p) => (
-                  <span key={p.item_name} className={`px-2 py-1 text-xs rounded border ${
-                    (p.savings_pct ?? 0) > 30 ? "bg-emerald-900/30 text-emerald-300 border-emerald-800/40"
-                    : (p.savings_pct ?? 0) > 0 ? "bg-yellow-900/30 text-yellow-300 border-yellow-800/40"
-                    : "bg-red-900/30 text-red-300 border-red-800/40"
-                  }`}>
-                    {p.item_name}: {(p.savings_pct ?? 0) > 0 ? `-${p.savings_pct}%` : `+${Math.abs(p.savings_pct ?? 0)}%`}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      )}
-
-      {/* ========== TAB: Price History ========== */}
+      {/* ========== TAB: Price History (includes Usado vs Novo) ========== */}
       {tab === "history" && (
         <section className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
@@ -523,6 +493,22 @@ export default function HardwareAnalyticsPage() {
                 >
                   {name} ✕
                 </Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Usado vs Novo — savings overview */}
+          {comparison.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {comparison.filter((p) => p.savings_pct !== null).map((p) => (
+                <span key={p.item_name} className={`px-2 py-1 text-xs rounded border ${
+                  (p.savings_pct ?? 0) > 30 ? "bg-emerald-900/30 text-emerald-300 border-emerald-800/40"
+                  : (p.savings_pct ?? 0) > 0 ? "bg-yellow-900/30 text-yellow-300 border-yellow-800/40"
+                  : "bg-red-900/30 text-red-300 border-red-800/40"
+                }`}>
+                  {p.item_name}: OLX {p.olx_min ? fmt(p.olx_min) : "—"} vs Novo {p.price_new ? fmt(p.price_new) : "—"}
+                  {p.savings_pct !== null && ` (${(p.savings_pct ?? 0) > 0 ? `-${p.savings_pct}%` : `+${Math.abs(p.savings_pct ?? 0)}%`})`}
+                </span>
               ))}
             </div>
           )}
