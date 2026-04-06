@@ -89,7 +89,7 @@ const COLORS = [
   "#fb923c", "#60a5fa", "#e879f9", "#4ade80", "#f87171",
 ];
 
-type Tab = "comparison" | "history" | "distribution" | "stats";
+type Tab = "comparison" | "history" | "deals";
 
 export default function HardwareAnalyticsPage() {
   const [tab, setTab] = useState<Tab>("comparison");
@@ -249,8 +249,7 @@ export default function HardwareAnalyticsPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "comparison", label: "Usado vs Novo" },
     { id: "history", label: "Price History" },
-    { id: "distribution", label: "Distribution" },
-    { id: "stats", label: "Deal Stats" },
+    { id: "deals", label: "OLX Deals" },
   ];
 
   if (loading) {
@@ -297,16 +296,16 @@ export default function HardwareAnalyticsPage() {
             <p className="text-muted-foreground text-sm py-8 text-center">No comparison data. Run a sync first.</p>
           ) : (
             <>
-              <ResponsiveContainer width="100%" height={compChartData.length * 60 + 60}>
-                <BarChart data={compChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={compChartData} margin={{ left: 10, right: 10, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                  <XAxis type="number" tickFormatter={(v: number) => `R$${v}`} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
-                  <YAxis type="category" dataKey="item" width={120} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
+                  <XAxis dataKey="item" angle={-25} textAnchor="end" height={60} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
+                  <YAxis tickFormatter={(v: number) => `R$${v}`} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
                   <Tooltip formatter={(v: unknown) => fmt(Number(v))} contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8, fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="OLX Min" fill="#22d3ee" barSize={14} radius={[0, 3, 3, 0]} />
-                  <Bar dataKey="Novo" fill="#a78bfa" barSize={14} radius={[0, 3, 3, 0]} />
-                  <Bar dataKey="Target" fill="#444" barSize={14} radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="OLX Min" fill="#22d3ee" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Novo" fill="#a78bfa" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Target" fill="#444" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
 
@@ -352,21 +351,44 @@ export default function HardwareAnalyticsPage() {
           </div>
 
           {/* Product selector */}
-          <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-            {historyProducts.slice(0, 50).map((name) => (
-              <Badge
-                key={name}
-                variant={selectedProducts.includes(name) ? "default" : "outline"}
-                className="cursor-pointer text-xs"
-                onClick={() => toggleProduct(name)}
-              >
-                {name}
-              </Badge>
-            ))}
-            {historyProducts.length > 50 && (
-              <span className="text-xs text-muted-foreground self-center">+{historyProducts.length - 50} more (use search)</span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Select
+              value="__pick__"
+              onValueChange={(v) => { if (v !== "__pick__") toggleProduct(v); }}
+            >
+              <SelectTrigger className="w-72 border-border text-sm">
+                <SelectValue placeholder="Add product to compare..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__pick__" disabled>Add product to compare...</SelectItem>
+                {historyProducts.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {selectedProducts.includes(name) ? `✓ ${name}` : name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedProducts.length > 0 && (
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setSelectedProducts([])}>
+                Clear all
+              </Button>
             )}
           </div>
+          {/* Selected products as removable badges */}
+          {selectedProducts.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedProducts.map((name, i) => (
+                <Badge
+                  key={name}
+                  className="cursor-pointer text-xs gap-1"
+                  style={{ backgroundColor: COLORS[i % COLORS.length] + "30", color: COLORS[i % COLORS.length], borderColor: COLORS[i % COLORS.length] + "50" }}
+                  onClick={() => toggleProduct(name)}
+                >
+                  {name} ✕
+                </Badge>
+              ))}
+            </div>
+          )}
 
           {/* Chart */}
           {selectedProducts.length === 0 ? (
@@ -402,38 +424,11 @@ export default function HardwareAnalyticsPage() {
         </section>
       )}
 
-      {/* ========== TAB: Distribution ========== */}
-      {tab === "distribution" && (
-        <section className="space-y-4">
-          <Select value={distItem || "__none__"} onValueChange={setDistItem}>
-            <SelectTrigger className="w-64 border-border text-sm"><SelectValue placeholder="Select item" /></SelectTrigger>
-            <SelectContent>
-              {itemNames.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {distData.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-8 text-center">No deals for this item.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={distData} margin={{ left: 10, right: 10, bottom: 30 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
-                <XAxis dataKey="range" angle={-30} textAnchor="end" height={50} stroke="#666" tick={{ fill: "#aaa", fontSize: 10 }} tickLine={false} />
-                <YAxis stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} allowDecimals={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8 }} />
-                <Bar dataKey="count" name="Deals" fill="#60a5fa" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </section>
-      )}
-
-      {/* ========== TAB: Deal Stats ========== */}
-      {tab === "stats" && (
-        <section>
-          {statsData.length === 0 ? (
-            <p className="text-muted-foreground text-sm py-8 text-center">No data.</p>
-          ) : (
+      {/* ========== TAB: OLX Deals (Distribution + Stats) ========== */}
+      {tab === "deals" && (
+        <section className="space-y-6">
+          {/* Stats table */}
+          {statsData.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -459,7 +454,11 @@ export default function HardwareAnalyticsPage() {
                 </thead>
                 <tbody>
                   {statsData.map((row) => (
-                    <tr key={row.item_name} className="border-b border-border/50 hover:bg-border/10">
+                    <tr
+                      key={row.item_name}
+                      className={`border-b border-border/50 hover:bg-border/10 cursor-pointer ${distItem === row.item_name ? "bg-border/10" : ""}`}
+                      onClick={() => setDistItem(row.item_name)}
+                    >
                       <td className="py-2 px-3 font-medium">{row.item_name}</td>
                       <td className="py-2 px-3 text-right text-muted-foreground">{row.count}</td>
                       <td className="py-2 px-3 text-right text-emerald-400">{fmt(row.min_price)}</td>
@@ -473,6 +472,28 @@ export default function HardwareAnalyticsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Distribution chart for selected item */}
+          {distItem && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-muted-foreground">
+                Price Distribution — {distItem}
+              </h3>
+              {distData.length === 0 ? (
+                <p className="text-muted-foreground text-xs py-4 text-center">No deals for this item.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={distData} margin={{ left: 10, right: 10, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+                    <XAxis dataKey="range" angle={-30} textAnchor="end" height={50} stroke="#666" tick={{ fill: "#aaa", fontSize: 10 }} tickLine={false} />
+                    <YAxis stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} allowDecimals={false} tickLine={false} />
+                    <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8 }} />
+                    <Bar dataKey="count" name="Deals" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           )}
         </section>
