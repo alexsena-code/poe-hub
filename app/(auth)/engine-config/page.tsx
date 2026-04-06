@@ -569,6 +569,7 @@ function StylePanel({
 }) {
   const [newPhrase, setNewPhrase] = useState('');
   const [newRule, setNewRule] = useState('');
+  const [newFormatting, setNewFormatting] = useState('');
 
   const addPhrase = () => {
     const trimmed = newPhrase.trim().toLowerCase();
@@ -592,6 +593,18 @@ function StylePanel({
 
   const removeRule = (idx: number) => {
     onChange({ ...guide, rules: guide.rules.filter((_, i) => i !== idx) });
+  };
+
+  const addFormatting = () => {
+    const trimmed = newFormatting.trim();
+    if (trimmed) {
+      onChange({ ...guide, formatting: [...(guide.formatting || []), trimmed] });
+      setNewFormatting('');
+    }
+  };
+
+  const removeFormatting = (idx: number) => {
+    onChange({ ...guide, formatting: (guide.formatting || []).filter((_, i) => i !== idx) });
   };
 
   return (
@@ -697,13 +710,37 @@ function StylePanel({
 
       {/* Formatting */}
       <div className="bg-surface border border-border rounded-lg p-4">
-        <h3 className="text-sm font-medium text-foreground mb-3">Formatting Rules</h3>
-        <div className="space-y-2">
+        <h3 className="text-sm font-medium text-foreground mb-3">
+          Formatting Rules
+          <span className="text-xs text-muted-foreground font-normal ml-2">({guide.formatting?.length || 0})</span>
+        </h3>
+        <div className="space-y-2 mb-3">
           {(guide.formatting || []).map((rule, idx) => (
-            <div key={idx} className="text-xs text-foreground bg-background rounded p-2">
-              {rule}
+            <div key={idx} className="flex items-start gap-2 bg-background rounded p-2">
+              <span className="text-xs text-foreground flex-1">{rule}</span>
+              <button
+                onClick={() => removeFormatting(idx)}
+                className="text-muted-foreground hover:text-red-400 text-xs shrink-0"
+              >
+                x
+              </button>
             </div>
           ))}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={newFormatting}
+            onChange={(e) => setNewFormatting(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addFormatting()}
+            placeholder="Adicionar regra de formatação..."
+            className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm text-foreground"
+          />
+          <button
+            onClick={addFormatting}
+            className="px-3 py-1 bg-foreground/10 border border-border rounded text-sm text-foreground hover:bg-foreground/20"
+          >
+            +
+          </button>
         </div>
       </div>
     </div>
