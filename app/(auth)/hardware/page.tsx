@@ -499,12 +499,14 @@ export default function HardwarePage() {
   ]);
 
   const categorySummary = useMemo(() => {
+    const validCategories = ["gpu", "cpu-kit", "ram", "psu", "ssd", "motherboard"];
     const cats: Record<
       string,
       { total: number; best: number; avg: number; label: string }
     > = {};
     for (const s of summary) {
       const cat = s.category || "other";
+      if (!validCategories.includes(cat)) continue;
       if (!cats[cat]) {
         cats[cat] = { total: 0, best: Infinity, avg: 0, label: cat };
       }
@@ -773,10 +775,10 @@ export default function HardwarePage() {
             </Card>
           )}
 
-          {/* Filters */}
+          {/* Filters + Deals Table */}
           <Card className="bg-card border-border">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-wrap items-center gap-3">
+            <CardContent className="pt-4 pb-0">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -843,22 +845,11 @@ export default function HardwarePage() {
                   className="w-[100px] bg-background border-border"
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Deals table */}
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm text-card-foreground">
-                  {filteredDeals.length} deals found
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
+              <p className="text-xs text-muted-foreground mb-3">{filteredDeals.length} deals found</p>
               <div className="rounded-md border border-border overflow-hidden">
+                <div className="max-h-[60vh] overflow-y-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow className="border-border hover:bg-transparent">
                       <SortHeader field="title">Title</SortHeader>
                       <TableHead>Item</TableHead>
@@ -946,12 +937,8 @@ export default function HardwarePage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </div>
-              {filteredDeals.length > 100 && (
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Showing first 100 of {filteredDeals.length} results
-                </p>
-              )}
             </CardContent>
           </Card>
         </>
