@@ -364,7 +364,8 @@ export default function HardwareAnalyticsPage() {
             <p className="text-muted-foreground text-sm py-8 text-center">No comparison data. Run a sync first.</p>
           ) : (
             <>
-              <ResponsiveContainer width="100%" height={350}>
+              <div style={{ width: "100%", height: "calc(100vh - 300px)", minHeight: 350 }}>
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={compChartData} margin={{ left: 10, right: 10, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
                   <XAxis dataKey="item" angle={-25} textAnchor="end" height={60} stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
@@ -376,6 +377,7 @@ export default function HardwareAnalyticsPage() {
                   <Bar dataKey="Target" fill="#444" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
 
               {/* Savings */}
               <div className="flex flex-wrap gap-2">
@@ -531,7 +533,8 @@ export default function HardwareAnalyticsPage() {
           ) : historyChartData.length === 0 ? (
             <p className="text-muted-foreground text-sm py-8 text-center">No history data yet. Run a sync to populate.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={350}>
+            <div style={{ width: "100%", height: "calc(100vh - 340px)", minHeight: 350 }}>
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={historyChartData} margin={{ left: 10, right: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
                 <XAxis dataKey="date" stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
@@ -543,6 +546,7 @@ export default function HardwareAnalyticsPage() {
                 ))}
               </LineChart>
             </ResponsiveContainer>
+            </div>
           )}
 
           {/* Sync stats */}
