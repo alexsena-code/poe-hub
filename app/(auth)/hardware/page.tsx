@@ -57,6 +57,7 @@ interface Deal {
   location: string;
   found_at: string;
   category: string;
+  image_url: string | null;
 }
 
 interface SummaryItem {
@@ -108,9 +109,10 @@ export default function HardwarePage() {
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Deals pagination
+  // Deals pagination + view
   const [dealsPage, setDealsPage] = useState(1);
   const DEALS_PAGE_SIZE = 50;
+  const [dealsView, setDealsView] = useState<"list" | "cards">("list");
 
   // Sorting
   const [sortField, setSortField] = useState<SortField>("found_at");
@@ -1028,11 +1030,78 @@ export default function HardwarePage() {
                 />
               </div>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-muted-foreground">{filteredDeals.length} deals found</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-muted-foreground">{filteredDeals.length} deals found</p>
+                  <div className="flex items-center border border-border rounded-md">
+                    <button
+                      onClick={() => setDealsView("list")}
+                      className={`p-1.5 rounded-l-md transition-colors ${dealsView === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setDealsView("cards")}
+                      className={`p-1.5 rounded-r-md transition-colors ${dealsView === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
                 {totalDealsPages > 1 && (
                   <p className="text-xs text-muted-foreground">Page {dealsPage} of {totalDealsPages}</p>
                 )}
               </div>
+
+              {/* Cards view */}
+              {dealsView === "cards" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
+                  {pagedDeals.length === 0 ? (
+                    <p className="col-span-full text-sm text-muted-foreground text-center py-8">No deals found</p>
+                  ) : pagedDeals.map((deal) => (
+                    <Card key={deal.id} className="bg-card border-border hover:border-primary/50 transition-colors overflow-hidden">
+                      {deal.image_url && (
+                        <div className="aspect-[4/3] bg-muted/20 overflow-hidden">
+                          <img
+                            src={deal.image_url}
+                            alt={deal.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        </div>
+                      )}
+                      <CardContent className="p-3">
+                        <p className="font-medium text-sm leading-tight line-clamp-2 mb-1" title={deal.title}>
+                          {deal.title}
+                        </p>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-[10px]">{deal.item_name}</Badge>
+                          <Badge variant="secondary" className="text-[10px]">{deal.source.toUpperCase()}</Badge>
+                        </div>
+                        <p className="text-lg font-bold text-green-400">{formatPrice(deal.price)}</p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{deal.location}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(deal.found_at)}</p>
+                        <div className="flex gap-1.5 mt-2">
+                          <a href={deal.url} target="_blank" rel="noopener noreferrer" className="flex-1">
+                            <Button variant="outline" size="sm" className="w-full h-7 text-xs border-border">
+                              <ExternalLink className="h-3 w-3 mr-1" /> View
+                            </Button>
+                          </a>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-orange-400" onClick={() => handleBanDeal(deal.id, deal.title)}>
+                            <Ban className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400" onClick={() => handleDeleteDeal(deal.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* List/table view */}
+              {dealsView === "list" && (
               <div className="rounded-md border border-border overflow-hidden">
                 <div className="max-h-[calc(100vh-280px)] overflow-y-auto scrollbar-none">
                 <Table>
@@ -1136,6 +1205,7 @@ export default function HardwarePage() {
                 </Table>
                 </div>
               </div>
+              )}
             </CardContent>
           </Card>
 
