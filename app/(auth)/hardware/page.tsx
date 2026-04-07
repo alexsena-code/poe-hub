@@ -58,6 +58,7 @@ interface Deal {
   found_at: string;
   category: string;
   image_url: string | null;
+  image_urls: string[];
 }
 
 interface SummaryItem {
@@ -89,6 +90,48 @@ interface ManualPrice {
 
 type SortField = "price" | "found_at" | "title" | "source" | "location";
 type SortDir = "asc" | "desc";
+
+function DealImageCarousel({ deal }: { deal: Deal }) {
+  const [idx, setIdx] = useState(0);
+  const images = (deal.image_urls && deal.image_urls.length > 0)
+    ? deal.image_urls
+    : (deal.image_url ? [deal.image_url] : []);
+
+  if (images.length === 0) return null;
+
+  const total = images.length;
+
+  return (
+    <div className="relative aspect-[4/3] bg-muted/20 overflow-hidden group">
+      <img
+        src={images[idx]}
+        alt={deal.title}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+      {total > 1 && (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + total) % total); }}
+            className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full w-7 h-7 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            ‹
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % total); }}
+            className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white rounded-full w-7 h-7 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            ›
+          </button>
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+            {idx + 1}/{total}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function HardwarePage() {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -1059,17 +1102,7 @@ export default function HardwarePage() {
                     <p className="col-span-full text-sm text-muted-foreground text-center py-8">No deals found</p>
                   ) : pagedDeals.map((deal) => (
                     <Card key={deal.id} className="bg-card border-border hover:border-primary/50 transition-colors overflow-hidden">
-                      {deal.image_url && (
-                        <div className="aspect-[4/3] bg-muted/20 overflow-hidden">
-                          <img
-                            src={deal.image_url}
-                            alt={deal.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                          />
-                        </div>
-                      )}
+                      <DealImageCarousel deal={deal} />
                       <CardContent className="p-3">
                         <p className="font-medium text-sm leading-tight line-clamp-2 mb-1" title={deal.title}>
                           {deal.title}
