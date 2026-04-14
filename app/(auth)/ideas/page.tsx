@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 const API = '/api/engine';
 
@@ -70,11 +70,22 @@ export default function IdeasPage() {
 
   // Model selection
   const MODEL_OPTIONS = [
-    { label: 'Grok 4.1 Fast', provider: 'grok', model: 'grok-4.1-fast' },
-    { label: 'Gemini 3 Flash', provider: 'gemini', model: 'gemini-3-flash-preview' },
-    { label: 'Claude Sonnet 4', provider: 'claude', model: 'claude-sonnet-4-20250514' },
+    { label: 'Gemini 2.5 Flash Lite', model: 'google/gemini-2.5-flash-lite' },
+    { label: 'Gemini 2.5 Flash', model: 'google/gemini-2.5-flash' },
+    { label: 'Claude Sonnet 4', model: 'anthropic/claude-sonnet-4-20250514' },
   ];
   const [selectedModel, setSelectedModel] = useState(0);
+
+  // Track polling intervals so we can clean up on unmount
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const contentPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (contentPollIntervalRef.current) clearInterval(contentPollIntervalRef.current);
+    };
+  }, []);
 
   const fetchBriefs = useCallback(async () => {
     try {
@@ -100,23 +111,53 @@ export default function IdeasPage() {
       const res = await fetch(`${API}/ideation/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: opt.provider, model: opt.model }),
+        body: JSON.stringify({ model: opt.model }),
       });
       const data = await res.json();
       if (data.error) {
         setMsg(`Error: ${data.error}`);
-      } else {
-        const count = data.briefCount ?? data.briefs?.length ?? data.count ?? 0;
-        const prov = data.provider ?? opt.provider;
-        const mdl = data.model ?? opt.model;
-        const cost = data.costUsd ?? data.cost ?? 0;
-        setMsg(`Generated ${count} briefs (${prov}/${mdl}) — $${Number(cost).toFixed(4)}`);
-        fetchBriefs();
+        setGenerating(false);
+        return;
       }
+      const { jobId } = data;
+      setMsg('Generating... 0%');
+
+      // Poll for job status
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API}/ideation/jobs/${jobId}`);
+          const job = await pollRes.json();
+
+          if (job.status === 'active' || job.status === 'waiting') {
+            setMsg(`Generating... ${job.progress ?? 0}%`);
+          } else if (job.status === 'completed') {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            const result = job.result ?? {};
+            const count = result.briefCount ?? result.briefs?.length ?? result.count ?? 0;
+            const mdl = result.model ?? opt.model;
+            const cost = result.costUsd ?? result.cost ?? 0;
+            setMsg(`Generated ${count} briefs (${mdl}) — $${Number(cost).toFixed(4)}`);
+            fetchBriefs();
+            setGenerating(false);
+          } else if (job.status === 'failed') {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            setMsg(`Error: ${job.error ?? 'Generation failed'}`);
+            setGenerating(false);
+          }
+        } catch {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          setMsg('Failed to check job status');
+          setGenerating(false);
+        }
+      }, 2000);
     } catch (e) {
       setMsg('Failed to generate');
+      setGenerating(false);
     }
-    setGenerating(false);
   }
 
   async function clearBriefs() {
@@ -151,15 +192,46 @@ export default function IdeasPage() {
       const data = await res.json();
       if (data.error) {
         setMsg(`Generation failed: ${data.error}`);
-      } else {
-        setMsg(`Content generated: "${data.post?.slug || 'done'}"`);
-        setGeneratedPosts(prev => ({ ...prev, [id]: data.post }));
-        fetchBriefs();
+        setGeneratingContent(null);
+        return;
       }
+      const { jobId } = data;
+      setMsg('Generating content... 0%');
+
+      // Poll for job status
+      if (contentPollIntervalRef.current) clearInterval(contentPollIntervalRef.current);
+      contentPollIntervalRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API}/ideation/jobs/${jobId}`);
+          const job = await pollRes.json();
+
+          if (job.status === 'active' || job.status === 'waiting') {
+            setMsg(`Generating content... ${job.progress ?? 0}%`);
+          } else if (job.status === 'completed') {
+            if (contentPollIntervalRef.current) clearInterval(contentPollIntervalRef.current);
+            contentPollIntervalRef.current = null;
+            const result = job.result ?? {};
+            setMsg(`Content generated: "${result.post?.slug || 'done'}"`);
+            setGeneratedPosts(prev => ({ ...prev, [id]: result.post }));
+            fetchBriefs();
+            setGeneratingContent(null);
+          } else if (job.status === 'failed') {
+            if (contentPollIntervalRef.current) clearInterval(contentPollIntervalRef.current);
+            contentPollIntervalRef.current = null;
+            setMsg(`Generation failed: ${job.error ?? 'Unknown error'}`);
+            setGeneratingContent(null);
+          }
+        } catch {
+          if (contentPollIntervalRef.current) clearInterval(contentPollIntervalRef.current);
+          contentPollIntervalRef.current = null;
+          setMsg('Failed to check job status');
+          setGeneratingContent(null);
+        }
+      }, 2000);
     } catch {
       setMsg('Failed to generate content');
+      setGeneratingContent(null);
     }
-    setGeneratingContent(null);
   }
 
   function exportContent(id: number, format: 'json' | 'md' | 'md-pt' | 'md-en') {
@@ -230,7 +302,7 @@ export default function IdeasPage() {
                   disabled={generating}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-md text-sm font-medium transition-colors"
                 >
-                  {generating ? 'Generating...' : 'Generate Ideas'}
+                  {generating ? (msg?.startsWith('Generating...') ? msg : 'Generating...') : 'Generate Ideas'}
                 </button>
                 {briefs.length > 0 && (
                   <button
@@ -400,7 +472,7 @@ export default function IdeasPage() {
                         </div>
                         <div>
                           <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Model</div>
-                          <span className="text-[10px] font-mono text-muted-foreground">{b.provider}/{b.model}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground">{b.model}</span>
                         </div>
                         {b.status === 'pending' && (
                           <div className="flex gap-2 pt-2">
@@ -425,7 +497,7 @@ export default function IdeasPage() {
                               disabled={generatingContent === b.id}
                               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded text-xs font-medium transition-colors"
                             >
-                              {generatingContent === b.id ? 'Generating...' : 'Generate Content'}
+                              {generatingContent === b.id ? (msg?.startsWith('Generating content...') ? msg : 'Generating...') : 'Generate Content'}
                             </button>
                             <a
                               href={`/new?topic=${encodeURIComponent(b.primaryKeyword)}&template=${encodeURIComponent(b.templateType)}&notes=${encodeURIComponent(b.rationale + '\nKeywords: ' + b.secondaryKeywords.join(', '))}`}
