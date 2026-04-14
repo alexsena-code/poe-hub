@@ -68,11 +68,18 @@ export default function IdeasPage() {
   const [generatedPosts, setGeneratedPosts] = useState<Record<number, any>>({});
   const [showFilters, setShowFilters] = useState(false);
 
-  // Model selection
+  // Model selection (OpenRouter format) — default uses YAML config
   const MODEL_OPTIONS = [
+    { label: 'Default (config YAML)', model: '' },
+    { label: 'GPT-4.1 Mini', model: 'openai/gpt-4.1-mini' },
+    { label: 'GPT-4.1', model: 'openai/gpt-4.1' },
+    { label: 'GPT-5 Mini', model: 'openai/gpt-5-mini' },
     { label: 'Gemini 2.5 Flash Lite', model: 'google/gemini-2.5-flash-lite' },
     { label: 'Gemini 2.5 Flash', model: 'google/gemini-2.5-flash' },
+    { label: 'Gemini 3 Flash', model: 'google/gemini-3-flash-preview' },
+    { label: 'DeepSeek V3.2', model: 'deepseek/deepseek-v3.2' },
     { label: 'Claude Sonnet 4', model: 'anthropic/claude-sonnet-4-20250514' },
+    { label: 'Grok 4.1 Fast', model: 'x-ai/grok-4.1-fast' },
   ];
   const [selectedModel, setSelectedModel] = useState(0);
 
