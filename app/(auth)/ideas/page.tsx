@@ -481,6 +481,7 @@ export default function IdeasPage() {
                           <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Model</div>
                           <span className="text-[10px] font-mono text-muted-foreground">{b.model}</span>
                         </div>
+                        {/* Status-specific actions */}
                         {b.status === 'pending' && (
                           <div className="flex gap-2 pt-2">
                             <button
@@ -498,7 +499,7 @@ export default function IdeasPage() {
                           </div>
                         )}
                         {b.status === 'accepted' && (
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex gap-2 pt-2 flex-wrap">
                             <button
                               onClick={(e) => { e.stopPropagation(); generateContent(b.id); }}
                               disabled={generatingContent === b.id}
@@ -513,6 +514,28 @@ export default function IdeasPage() {
                             >
                               Open in Co-Writer
                             </a>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); updateStatus(b.id, 'pending'); }}
+                              className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded text-xs transition-colors"
+                            >
+                              Back to Pending
+                            </button>
+                          </div>
+                        )}
+                        {b.status === 'rejected' && (
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); updateStatus(b.id, 'accepted'); }}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition-colors"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); updateStatus(b.id, 'pending'); }}
+                              className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded text-xs transition-colors"
+                            >
+                              Back to Pending
+                            </button>
                           </div>
                         )}
                         {b.status === 'generated' && (
@@ -538,6 +561,14 @@ export default function IdeasPage() {
                                 JSON
                               </button>
                             </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); updateStatus(b.id, 'accepted'); }}
+                                className="px-3 py-1 bg-amber-700 hover:bg-amber-600 text-white rounded text-xs transition-colors"
+                              >
+                                Re-generate
+                              </button>
+                            </div>
                             {b.generatedPostSlug && (
                               <div className="text-[10px] text-muted-foreground">
                                 Slug: <span className="font-mono text-foreground/70">{b.generatedPostSlug}</span>
@@ -545,6 +576,23 @@ export default function IdeasPage() {
                             )}
                           </div>
                         )}
+
+                        {/* Delete — always available */}
+                        <div className="flex justify-end pt-2 border-t border-border/50 mt-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Delete idea #${b.id} "${b.title}"? This cannot be undone.`)) {
+                                fetch(`${API}/ideation/briefs/${b.id}`, { method: 'DELETE' })
+                                  .then(() => { setMsg(`Deleted #${b.id}`); fetchBriefs(); })
+                                  .catch(() => setMsg('Failed to delete'));
+                              }
+                            }}
+                            className="px-3 py-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded text-xs transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
