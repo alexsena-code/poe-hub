@@ -17,13 +17,13 @@ export default function PipelinePage() {
         headers={['#', 'Etapa', 'Descricao', 'Tempo']}
         rows={[
           ['1', 'Reddit Crawl', '3 subs, hot/day, top 100 posts com comments (top 30 por score)', '~100s'],
-          ['2', 'YouTube Smart Scan', '26+ canais, Gemini classifica, top 10 transcripts', '~20s'],
+          ['2', 'YouTube Smart Scan', '26+ canais, LLM classifica (via OpenRouter), top 10 transcripts', '~20s'],
           ['3', 'Reddit Keyword Extraction', 'Extracao de noun-phrases dos top posts', '~0.5s'],
           ['4', 'YouTube Keyword Import', 'Import da tabela YouTubeKeyword', '~0.5s'],
           ['5', 'Keyword Dedup', 'Cosine similarity 0.92 + filtro versao/PoE2', '~35s'],
           ['6', 'poe.ninja Validation', 'Match skills/classes, popularity scoring', '~1s'],
           ['7', 'TEI Health Check + Qdrant Ingest', 'Espera TEI, depois ingere Reddit + YouTube no Qdrant', '~5s'],
-          ['8', 'LLM Validation', 'Gemini + evidencia Qdrant (limit 1500)', '~1s'],
+          ['8', 'LLM Validation', 'LLM validation (via OpenRouter) + evidencia Qdrant (limit 1500)', '~1s'],
           ['9', 'VICE Recalculate', 'Recalcula scores de todas as keywords', '~1s'],
           ['10', 'Semantic Cross-Ref', '500 keywords via TEI, matching cross-source', '~35s'],
           ['11', 'Daily Snapshot', 'Captura VICE scores finais para historico', '~1s'],
@@ -73,7 +73,7 @@ cd packages/api && npm run start:dev`}</CodeBlock>
           Dashboard &rarr; /dashboard/config &rarr; Pipelines &rarr; Full Pipeline &rarr; Executar
         </Step>
         <Step number={4} title="LLM Validation (separado)">
-          <CodeBlock>{`cd packages/crawlers && python -m pipeline.keyword_validator --limit 500`}</CodeBlock>
+          <CodeBlock>{`cd packages/api && curl -X POST http://localhost:3000/seo/pipeline/validate-keywords`}</CodeBlock>
         </Step>
       </Steps>
     </>

@@ -12,6 +12,10 @@ export default function GuideContentPage() {
         <strong>Auto mode</strong>: AI gera tudo de uma vez a partir de um briefing curto.
       </Callout>
 
+      <Callout type="tip" title="Geracao assincrona">
+        A geracao agora e assincrona — o sistema retorna um jobId e voce pode acompanhar o progresso na UI.
+      </Callout>
+
       <H2>Fluxo Co-Writer</H2>
       <Diagram title="Fluxo Co-Writer">{`
   1. Escolher template (build_guide, mechanic_guide, faq)

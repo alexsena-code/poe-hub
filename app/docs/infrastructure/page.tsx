@@ -103,9 +103,7 @@ jobs:
       <CodeBlock title=".env">{`DATABASE_URL=postgresql://poe:***@localhost:5432/poe_content
 QDRANT_URL=http://localhost:6333
 TEI_URL=http://localhost:8080/embed
-GEMINI_API_KEY=AIza...
-XAI_API_KEY=xai-...
-ANTHROPIC_API_KEY=sk-ant-...
+OPENROUTER_API_KEY=sk-or-...
 REDIS_URL=redis://localhost:6379
 GSC_CLIENT_ID=...
 GSC_CLIENT_SECRET=...
@@ -132,7 +130,7 @@ NEXT_PUBLIC_CONTENT_API_URL=https://api.pathoftrade.net/api`}</CodeBlock>
         headers={['Item', 'Custo']}
         rows={[
           ['Hetzner CX22', '~$4.50/mes'],
-          ['Gemini API', '~$10/mes'],
+          ['OpenRouter', '~$10/mes (varia por modelo)'],
           ['Total', '~$15/mes (~R$85)'],
         ]}
       />

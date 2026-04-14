@@ -40,7 +40,7 @@ export default function DocsWelcome() {
         <Card title="RAG & Contexto" description="3 camadas de dados: PostgreSQL + Qdrant chunks + summaries" href={h('engine/rag')} />
         <Card title="Qdrant Collections" description="8 collections com 70K+ chunks embedados" href={h('engine/collections')} />
         <Card title="Templates" description="Templates YAML para build guides, mechanic guides, FAQs" href={h('engine/templates')} />
-        <Card title="LLM Providers" description="Multi-provider: Gemini, Claude, Grok — configuravel por node" href={h('engine/llm')} />
+        <Card title="LLM Providers" description="OpenRouter: todos os modelos via API unica — configuravel por node" href={h('engine/llm')} />
       </CardGrid>
 
       <h2 className="text-lg font-semibold text-foreground mt-8 mb-4">poe-hub</h2>

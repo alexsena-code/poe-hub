@@ -16,7 +16,7 @@ export default function ArchitecturePage() {
           ['Banco de dados', 'PostgreSQL 16 (Prisma)', 'PostgreSQL 16 (Prisma)'],
           ['Vector DB', 'Qdrant (1024-dim)', '—'],
           ['Embedding', 'mxbai-embed-large-v1 (TEI)', '—'],
-          ['LLM', 'Gemini, Claude, Grok', 'Gemini (price parser)'],
+          ['LLM', 'OpenRouter (multi-model)', 'Gemini (price parser)'],
           ['Auth', '— (interno)', 'NextAuth.js'],
           ['Queue', 'BullMQ + Redis', '—'],
           ['Containers', 'Docker Compose', 'Docker Compose'],
