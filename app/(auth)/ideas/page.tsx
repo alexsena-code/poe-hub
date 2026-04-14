@@ -67,6 +67,8 @@ export default function IdeasPage() {
   const [generatingContent, setGeneratingContent] = useState<number | null>(null);
   const [generatedPosts, setGeneratedPosts] = useState<Record<number, any>>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [editorialBriefing, setEditorialBriefing] = useState('');
+  const [showBriefing, setShowBriefing] = useState(false);
 
   // Model selection (OpenRouter format) — default uses YAML config
   const MODEL_OPTIONS = [
@@ -118,7 +120,7 @@ export default function IdeasPage() {
       const res = await fetch(`${API}/ideation/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: opt.model }),
+        body: JSON.stringify({ model: opt.model || undefined, briefing: editorialBriefing || undefined }),
       });
       const data = await res.json();
       if (data.error) {
@@ -295,6 +297,14 @@ export default function IdeasPage() {
             {msg && <span className="text-xs text-emerald-400">{msg}</span>}
             {filterStatus !== 'generated' && (
               <>
+                <button
+                  onClick={() => setShowBriefing(!showBriefing)}
+                  className={`px-3 py-2 rounded-md text-xs transition-colors ${
+                    editorialBriefing ? 'bg-amber-900/40 text-amber-300 border border-amber-700' : 'bg-zinc-800 text-zinc-400 hover:text-foreground'
+                  }`}
+                >
+                  {editorialBriefing ? 'Briefing ✓' : '+ Briefing'}
+                </button>
                 <select
                   value={selectedModel}
                   onChange={e => setSelectedModel(Number(e.target.value))}
@@ -323,6 +333,23 @@ export default function IdeasPage() {
             )}
           </div>
         </div>
+
+        {/* Editorial briefing panel */}
+        {showBriefing && (
+          <div className="bg-surface border border-border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-foreground">Editorial Briefing</label>
+              <span className="text-[10px] text-muted-foreground">Diretrizes para a AI priorizar na geracao de ideias</span>
+            </div>
+            <textarea
+              value={editorialBriefing}
+              onChange={(e) => setEditorialBriefing(e.target.value)}
+              placeholder="Ex: Foco em conteudo de league start pra Mirage league. Priorizar guias de breach farming e builds populares no poe.ninja. Ignorar conteudo de crafting avancado por enquanto."
+              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-zinc-600 resize-none"
+              rows={3}
+            />
+          </div>
+        )}
 
         {/* Tabs row: status tabs LEFT, filter icon + Refresh RIGHT */}
         <div className="flex items-center gap-3">
