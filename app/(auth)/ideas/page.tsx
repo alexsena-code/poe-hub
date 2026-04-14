@@ -80,7 +80,7 @@ export default function IdeasPage() {
     { label: 'Gemini 2.5 Flash', model: 'google/gemini-2.5-flash' },
     { label: 'Gemini 3 Flash', model: 'google/gemini-3-flash-preview' },
     { label: 'DeepSeek V3.2', model: 'deepseek/deepseek-v3.2' },
-    { label: 'Claude Sonnet 4', model: 'anthropic/claude-sonnet-4-20250514' },
+    { label: 'Claude Sonnet 4', model: 'anthropic/claude-sonnet-4' },
     { label: 'Grok 4.1 Fast', model: 'x-ai/grok-4.1-fast' },
   ];
   const [selectedModel, setSelectedModel] = useState(0);
