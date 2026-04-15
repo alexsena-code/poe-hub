@@ -22,6 +22,12 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
   Settings,
   Wifi,
   WifiOff,
@@ -30,6 +36,7 @@ import {
   RefreshCw,
   Plus,
   Power,
+  ChevronDown,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -44,7 +51,18 @@ interface OlxCategory {
   path: string;
   label: string;
   is_active: boolean;
+  allowed_item_categories: string[];
 }
+
+const ITEM_CATEGORIES = [
+  { value: "gpu", label: "GPU" },
+  { value: "cpu-kit", label: "CPU Kit" },
+  { value: "ram", label: "RAM" },
+  { value: "psu", label: "PSU (Fonte)" },
+  { value: "ssd", label: "SSD" },
+  { value: "motherboard", label: "Placa Mãe" },
+  { value: "monitor", label: "Monitor" },
+] as const;
 
 interface Proxy {
   id: number;
@@ -100,6 +118,71 @@ const SUGGESTED_CATEGORIES = [
 ];
 
 // ---------------------------------------------------------------------------
+// Item Category Multi-Select
+// ---------------------------------------------------------------------------
+
+function ItemCategoryMultiSelect({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (val: string[]) => void;
+}) {
+  const toggle = (cat: string) => {
+    onChange(
+      value.includes(cat) ? value.filter((v) => v !== cat) : [...value, cat]
+    );
+  };
+
+  const selectedLabels = value
+    .map((v) => ITEM_CATEGORIES.find((c) => c.value === v)?.label || v)
+    .join(", ");
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="min-w-[140px] justify-between text-xs font-normal"
+        >
+          <span className="truncate max-w-[160px]">
+            {value.length === 0 ? "Todos" : selectedLabels}
+          </span>
+          <ChevronDown className="h-3 w-3 ml-1 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48 p-2" align="start">
+        <div className="space-y-1">
+          {ITEM_CATEGORIES.map((cat) => (
+            <label
+              key={cat.value}
+              className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+            >
+              <Checkbox
+                checked={value.includes(cat.value)}
+                onCheckedChange={() => toggle(cat.value)}
+              />
+              {cat.label}
+            </label>
+          ))}
+        </div>
+        {value.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full mt-2 text-xs text-muted-foreground"
+            onClick={() => onChange([])}
+          >
+            Limpar (buscar todos)
+          </Button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -113,6 +196,7 @@ export default function HardwareSettingsPage() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [newCatPath, setNewCatPath] = useState("");
   const [newCatLabel, setNewCatLabel] = useState("");
+  const [newCatAllowed, setNewCatAllowed] = useState<string[]>([]);
 
   // Proxies
   const [proxies, setProxies] = useState<Proxy[]>([]);
@@ -173,20 +257,35 @@ export default function HardwareSettingsPage() {
   // Category actions
   // -----------------------------------------------------------------------
 
-  async function addCategory(path: string, label: string) {
+  async function addCategory(path: string, label: string, allowedItemCategories?: string[]) {
     try {
       const res = await fetch(`${HARDWARE_API}/api/olx-categories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, label }),
+        body: JSON.stringify({ path, label, allowed_item_categories: allowedItemCategories || [] }),
       });
       if (!res.ok) throw new Error("Failed to add category");
       toast.success(`Categoria "${label}" adicionada`);
       setNewCatPath("");
       setNewCatLabel("");
+      setNewCatAllowed([]);
       fetchCategories();
     } catch {
       toast.error("Erro ao adicionar categoria");
+    }
+  }
+
+  async function updateCategoryAllowed(id: number, allowedItemCategories: string[]) {
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/olx-categories/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allowed_item_categories: allowedItemCategories }),
+      });
+      if (!res.ok) throw new Error("Failed to update category");
+      fetchCategories();
+    } catch {
+      toast.error("Erro ao atualizar categoria");
     }
   }
 
@@ -331,7 +430,7 @@ export default function HardwareSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Add form */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-end">
             <Input
               placeholder="/path"
               value={newCatPath}
@@ -344,10 +443,14 @@ export default function HardwareSettingsPage() {
               onChange={(e) => setNewCatLabel(e.target.value)}
               className="w-48"
             />
+            <ItemCategoryMultiSelect
+              value={newCatAllowed}
+              onChange={setNewCatAllowed}
+            />
             <Button
               size="sm"
               disabled={!newCatPath.trim() || !newCatLabel.trim()}
-              onClick={() => addCategory(newCatPath.trim(), newCatLabel.trim())}
+              onClick={() => addCategory(newCatPath.trim(), newCatLabel.trim(), newCatAllowed)}
             >
               <Plus className="h-4 w-4 mr-1" /> Add
             </Button>
@@ -393,6 +496,7 @@ export default function HardwareSettingsPage() {
                   <TableRow>
                     <TableHead>Path</TableHead>
                     <TableHead>Label</TableHead>
+                    <TableHead>Tipos de Item</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -404,6 +508,12 @@ export default function HardwareSettingsPage() {
                         {cat.path}
                       </TableCell>
                       <TableCell>{cat.label}</TableCell>
+                      <TableCell>
+                        <ItemCategoryMultiSelect
+                          value={cat.allowed_item_categories || []}
+                          onChange={(val) => updateCategoryAllowed(cat.id, val)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={cat.is_active ? "default" : "secondary"}
