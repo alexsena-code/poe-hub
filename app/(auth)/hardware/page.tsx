@@ -150,6 +150,7 @@ export default function HardwarePage() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterMinPrice, setFilterMinPrice] = useState("");
   const [filterMaxPrice, setFilterMaxPrice] = useState("");
+  const [filterTimeHours, setFilterTimeHours] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Deals pagination + view
@@ -739,6 +740,13 @@ export default function HardwarePage() {
         result = result.filter((d) => d.price <= max);
       }
     }
+    if (filterTimeHours !== "all") {
+      const hours = parseInt(filterTimeHours);
+      if (!isNaN(hours)) {
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+        result = result.filter((d) => new Date(d.found_at) >= since);
+      }
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -780,13 +788,14 @@ export default function HardwarePage() {
     filterCategory,
     filterMinPrice,
     filterMaxPrice,
+    filterTimeHours,
     searchQuery,
     sortField,
     sortDir,
   ]);
 
   // Reset deals page on filter change
-  useEffect(() => { setDealsPage(1); }, [filterName, filterSource, filterCategory, filterMinPrice, filterMaxPrice, searchQuery]);
+  useEffect(() => { setDealsPage(1); }, [filterName, filterSource, filterCategory, filterMinPrice, filterMaxPrice, filterTimeHours, searchQuery]);
 
   const totalDealsPages = Math.ceil(filteredDeals.length / DEALS_PAGE_SIZE);
   const pagedDeals = filteredDeals.slice((dealsPage - 1) * DEALS_PAGE_SIZE, dealsPage * DEALS_PAGE_SIZE);
@@ -1071,6 +1080,22 @@ export default function HardwarePage() {
                   onChange={(e) => setFilterMaxPrice(e.target.value)}
                   className="w-[100px] bg-background border-border"
                 />
+                <Select value={filterTimeHours} onValueChange={setFilterTimeHours}>
+                  <SelectTrigger className="w-[130px] bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="1">1 hora</SelectItem>
+                    <SelectItem value="3">3 horas</SelectItem>
+                    <SelectItem value="6">6 horas</SelectItem>
+                    <SelectItem value="12">12 horas</SelectItem>
+                    <SelectItem value="24">24 horas</SelectItem>
+                    <SelectItem value="48">48 horas</SelectItem>
+                    <SelectItem value="72">3 dias</SelectItem>
+                    <SelectItem value="168">7 dias</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">

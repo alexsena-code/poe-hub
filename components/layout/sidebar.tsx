@@ -30,6 +30,7 @@ import {
   BookOpenCheck,
   ChevronDown,
   Monitor,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         icon: Monitor,
         children: [
           { title: "Deals", href: "/hardware", icon: Monitor },
+          { title: "Recentes", href: "/hardware/recent", icon: Clock },
           { title: "Builder & VMs", href: "/hardware/builder", icon: Wrench },
           { title: "Analytics", href: "/hardware/analytics", icon: BarChart3 },
         ],
