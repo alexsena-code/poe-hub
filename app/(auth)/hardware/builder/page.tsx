@@ -28,6 +28,9 @@ import {
   HardDrive,
   CircuitBoard,
   Server,
+  Save,
+  FolderOpen,
+  Trash2,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -89,6 +92,24 @@ interface BuildTotals {
 }
 
 const HOST_OVERHEAD = { ram_gb: 4, threads: 2 };
+const SAVED_BUILDS_KEY = "hardware-builder-saved-builds";
+
+interface SavedBuild {
+  name: string;
+  savedAt: string;
+  gpu: string;
+  gpuQty: number;
+  cpuKit: string;
+  ram: string;
+  ramQty: number;
+  psu: string;
+  ssd: string;
+  motherboard: string;
+  vmVram: number;
+  vmRam: number;
+  vmThreads: number;
+  vmCount: number;
+}
 
 export default function PCBuilderPage() {
   const [items, setItems] = useState<ConfigItem[]>([]);
@@ -122,6 +143,70 @@ export default function PCBuilderPage() {
 
   // VM count (user-adjustable)
   const [vmCount, setVmCount] = useState(0);
+
+  // Saved builds
+  const [savedBuilds, setSavedBuilds] = useState<SavedBuild[]>([]);
+  const [buildName, setBuildName] = useState("");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SAVED_BUILDS_KEY);
+      if (stored) setSavedBuilds(JSON.parse(stored));
+    } catch {}
+  }, []);
+
+  const saveBuild = () => {
+    const name = buildName.trim();
+    if (!name) {
+      toast.error("Digite um nome para a build");
+      return;
+    }
+    const build: SavedBuild = {
+      name,
+      savedAt: new Date().toISOString(),
+      gpu: selectedGpu,
+      gpuQty,
+      cpuKit: selectedCpuKit,
+      ram: selectedRam,
+      ramQty,
+      psu: selectedPsu,
+      ssd: selectedSsd,
+      motherboard: selectedMotherboard,
+      vmVram,
+      vmRam,
+      vmThreads,
+      vmCount,
+    };
+    const updated = [...savedBuilds.filter((b) => b.name !== name), build];
+    setSavedBuilds(updated);
+    localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(updated));
+    toast.success(`Build "${name}" salva`);
+  };
+
+  const loadBuild = (build: SavedBuild) => {
+    setSelectedGpu(build.gpu);
+    setGpuQty(build.gpuQty);
+    setSelectedCpuKit(build.cpuKit);
+    setSelectedRam(build.ram);
+    setRamQty(build.ramQty);
+    setSelectedPsu(build.psu);
+    setSelectedSsd(build.ssd);
+    setSelectedMotherboard(build.motherboard);
+    setVmVram(build.vmVram);
+    setVmRam(build.vmRam);
+    setVmThreads(build.vmThreads);
+    setVmCount(build.vmCount);
+    setBuildName(build.name);
+    setActiveTab("build");
+    toast.success(`Build "${build.name}" carregada`);
+  };
+
+  const deleteBuild = (name: string) => {
+    const updated = savedBuilds.filter((b) => b.name !== name);
+    setSavedBuilds(updated);
+    localStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(updated));
+    toast.success(`Build "${name}" removida`);
+  };
 
   useEffect(() => {
     fetchData();
@@ -641,7 +726,7 @@ export default function PCBuilderPage() {
         </div>
 
         {/* Remaining after allocation */}
-        <div className="pt-3 border-t border-border/50">
+        <div className="pt-3 border-t border-border/50 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-card-foreground">
               Total VMs
@@ -650,6 +735,43 @@ export default function PCBuilderPage() {
               {vmCount}
             </span>
           </div>
+
+          {/* Cost per VM breakdown */}
+          {vmCount > 0 && activeTab === "build" && totals.usedBestTotal > 0 && (
+            <div className="space-y-1.5 pt-2 border-t border-border/30">
+              <h4 className="text-xs uppercase tracking-wider text-muted-foreground">
+                Custo por VM
+              </h4>
+              <div className="grid grid-cols-1 gap-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <TrendingDown className="h-3 w-3 text-green-500" /> Melhor usado
+                  </span>
+                  <span className="font-medium text-green-500">
+                    {formatPrice(totals.usedBestTotal / vmCount)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <DollarSign className="h-3 w-3 text-yellow-500" /> Média usado
+                  </span>
+                  <span className="font-medium text-yellow-500">
+                    {formatPrice(totals.usedAvgTotal / vmCount)}
+                  </span>
+                </div>
+                {totals.newTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <DollarSign className="h-3 w-3" /> Novo
+                    </span>
+                    <span className="font-medium">
+                      {formatPrice(totals.newTotal / vmCount)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -709,6 +831,54 @@ export default function PCBuilderPage() {
           Manual
         </button>
       </div>
+
+      {/* Save / Load builds */}
+      <Card className="bg-card border-border">
+        <CardContent className="pt-4 pb-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Input
+                placeholder="Nome da build..."
+                value={buildName}
+                onChange={(e) => setBuildName(e.target.value)}
+                className="h-8 text-sm"
+                onKeyDown={(e) => e.key === "Enter" && saveBuild()}
+              />
+              <Button size="sm" className="h-8 shrink-0" onClick={saveBuild} disabled={!buildName.trim()}>
+                <Save className="h-3.5 w-3.5 mr-1" /> Salvar
+              </Button>
+            </div>
+            {savedBuilds.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">
+                  <FolderOpen className="h-3.5 w-3.5 inline mr-1" />
+                  Builds salvas:
+                </span>
+                {savedBuilds.map((b) => (
+                  <div key={b.name} className="flex items-center gap-0.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => loadBuild(b)}
+                    >
+                      {b.name}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
+                      onClick={() => deleteBuild(b.name)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tab content */}
       {activeTab === "build" ? (
