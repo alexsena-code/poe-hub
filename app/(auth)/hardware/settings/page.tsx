@@ -37,6 +37,8 @@ import {
   Plus,
   Power,
   ChevronDown,
+  Bell,
+  Send,
 } from "lucide-react";
 
 const HARDWARE_API =
@@ -198,6 +200,11 @@ export default function HardwareSettingsPage() {
   const [newCatLabel, setNewCatLabel] = useState("");
   const [newCatAllowed, setNewCatAllowed] = useState<string[]>([]);
 
+  // Discord Webhook
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookConfigured, setWebhookConfigured] = useState(false);
+  const [webhookTesting, setWebhookTesting] = useState(false);
+
   // Proxies
   const [proxies, setProxies] = useState<Proxy[]>([]);
   const [proxiesLoading, setProxiesLoading] = useState(true);
@@ -247,11 +254,22 @@ export default function HardwareSettingsPage() {
     }
   }, []);
 
+  const fetchWebhook = useCallback(async () => {
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/discord-webhook`);
+      if (res.ok) {
+        const data = await res.json();
+        setWebhookConfigured(data.configured);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchWorkerStatus();
     fetchCategories();
     fetchProxies();
-  }, [fetchWorkerStatus, fetchCategories, fetchProxies]);
+    fetchWebhook();
+  }, [fetchWorkerStatus, fetchCategories, fetchProxies, fetchWebhook]);
 
   // -----------------------------------------------------------------------
   // Category actions
@@ -312,6 +330,41 @@ export default function HardwareSettingsPage() {
       fetchCategories();
     } catch {
       toast.error("Erro ao remover categoria");
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Discord Webhook actions
+  // -----------------------------------------------------------------------
+
+  async function saveWebhook() {
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/discord-webhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Webhook salvo");
+      setWebhookUrl("");
+      fetchWebhook();
+    } catch {
+      toast.error("Erro ao salvar webhook");
+    }
+  }
+
+  async function testWebhook() {
+    setWebhookTesting(true);
+    try {
+      const res = await fetch(`${HARDWARE_API}/api/discord-webhook/test`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Alerta de teste enviado ao Discord");
+    } catch {
+      toast.error("Erro ao enviar teste");
+    } finally {
+      setWebhookTesting(false);
     }
   }
 
@@ -553,6 +606,58 @@ export default function HardwareSettingsPage() {
               </Table>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Discord Alerts */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Bell className="h-5 w-5" /> Discord Alerts
+          </CardTitle>
+          <CardDescription>
+            Receba notificações quando um deal abaixo do preço máximo for encontrado
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={webhookConfigured ? "default" : "secondary"}
+              className={webhookConfigured ? "bg-green-600" : ""}
+            >
+              {webhookConfigured ? "Configurado" : "Não configurado"}
+            </Badge>
+            {webhookConfigured && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={webhookTesting}
+                onClick={testWebhook}
+              >
+                <Send className={`h-4 w-4 mr-1 ${webhookTesting ? "animate-pulse" : ""}`} />
+                Testar
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://discord.com/api/webhooks/..."
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              className="flex-1"
+              type="password"
+            />
+            <Button
+              size="sm"
+              disabled={!webhookUrl.trim()}
+              onClick={saveWebhook}
+            >
+              Salvar
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Crie um webhook no Discord: Configurações do Canal → Integrações → Webhooks → Novo Webhook
+          </p>
         </CardContent>
       </Card>
 
