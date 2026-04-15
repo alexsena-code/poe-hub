@@ -737,28 +737,32 @@ export default function PCBuilderPage() {
           </div>
 
           {/* Cost per VM breakdown */}
-          {vmCount > 0 && activeTab === "build" && totals.usedBestTotal > 0 && (
+          {vmCount > 0 && (totals.usedBestTotal > 0 || totals.usedAvgTotal > 0 || totals.newTotal > 0) && (
             <div className="space-y-1.5 pt-2 border-t border-border/30">
               <h4 className="text-xs uppercase tracking-wider text-muted-foreground">
                 Custo por VM
               </h4>
               <div className="grid grid-cols-1 gap-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <TrendingDown className="h-3 w-3 text-green-500" /> Melhor usado
-                  </span>
-                  <span className="font-medium text-green-500">
-                    {formatPrice(totals.usedBestTotal / vmCount)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <DollarSign className="h-3 w-3 text-yellow-500" /> Média usado
-                  </span>
-                  <span className="font-medium text-yellow-500">
-                    {formatPrice(totals.usedAvgTotal / vmCount)}
-                  </span>
-                </div>
+                {totals.usedBestTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <TrendingDown className="h-3 w-3 text-green-500" /> Melhor usado
+                    </span>
+                    <span className="font-medium text-green-500">
+                      {formatPrice(totals.usedBestTotal / vmCount)}
+                    </span>
+                  </div>
+                )}
+                {totals.usedAvgTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <DollarSign className="h-3 w-3 text-yellow-500" /> Média usado
+                    </span>
+                    <span className="font-medium text-yellow-500">
+                      {formatPrice(totals.usedAvgTotal / vmCount)}
+                    </span>
+                  </div>
+                )}
                 {totals.newTotal > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground flex items-center gap-1">
