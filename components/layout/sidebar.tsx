@@ -31,6 +31,7 @@ import {
   ChevronDown,
   Monitor,
   Clock,
+  BellRing,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         children: [
           { title: "Deals", href: "/hardware", icon: Monitor },
           { title: "Recentes", href: "/hardware/recent", icon: Clock },
+          { title: "Alertas", href: "/hardware/alerts", icon: BellRing },
           { title: "Builder & VMs", href: "/hardware/builder", icon: Wrench },
           { title: "Analytics", href: "/hardware/analytics", icon: BarChart3 },
         ],
