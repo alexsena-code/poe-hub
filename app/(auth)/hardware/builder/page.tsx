@@ -737,22 +737,12 @@ export default function PCBuilderPage() {
           </div>
 
           {/* Cost per VM breakdown */}
-          {vmCount > 0 && (totals.usedBestTotal > 0 || totals.usedAvgTotal > 0 || totals.newTotal > 0) && (
+          {vmCount > 0 && (totals.usedAvgTotal > 0 || totals.newTotal > 0) && (
             <div className="space-y-1.5 pt-2 border-t border-border/30">
               <h4 className="text-xs uppercase tracking-wider text-muted-foreground">
                 Custo por VM
               </h4>
               <div className="grid grid-cols-1 gap-1 text-sm">
-                {totals.usedBestTotal > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <TrendingDown className="h-3 w-3 text-green-500" /> Melhor usado
-                    </span>
-                    <span className="font-medium text-green-500">
-                      {formatPrice(totals.usedBestTotal / vmCount)}
-                    </span>
-                  </div>
-                )}
                 {totals.usedAvgTotal > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground flex items-center gap-1">
@@ -1217,13 +1207,12 @@ export default function PCBuilderPage() {
 
                       return components.map((comp) => {
                         const prices = getPrice(comp.name);
-                        const bestPrice = prices.best || prices.newPrice || 0;
-                        const priceLabel = prices.best > 0
-                          ? `OLX ${formatPrice(prices.best * comp.qty)}`
+                        const priceLabel = prices.avg > 0
+                          ? `OLX ${formatPrice(prices.avg * comp.qty)}`
                           : prices.newPrice > 0
                           ? `Novo ${formatPrice(prices.newPrice * comp.qty)}`
                           : "-";
-                        const priceColor = prices.best > 0 ? "text-emerald-400" : prices.newPrice > 0 ? "text-purple-400" : "text-muted-foreground";
+                        const priceColor = prices.avg > 0 ? "text-emerald-400" : prices.newPrice > 0 ? "text-purple-400" : "text-muted-foreground";
 
                         return (
                           <div key={comp.name} className="flex items-center justify-between p-2 rounded border border-border/50">
@@ -1251,23 +1240,12 @@ export default function PCBuilderPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-3 rounded-lg border border-green-500/30 bg-green-500/5">
                       <div className="flex items-center gap-2">
-                        <TrendingDown className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-card-foreground">
-                          Best Used Price
-                        </span>
-                      </div>
-                      <span className="font-semibold text-green-500">
-                        {formatPrice(totals.usedBestTotal)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <DollarSign className="h-4 w-4 text-green-500" />
                         <span className="text-sm text-card-foreground">
                           Average Used Price
                         </span>
                       </div>
-                      <span className="font-semibold text-card-foreground">
+                      <span className="font-semibold text-green-500">
                         {formatPrice(totals.usedAvgTotal)}
                       </span>
                     </div>
