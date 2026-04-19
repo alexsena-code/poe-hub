@@ -11,11 +11,28 @@ export interface Briefing {
   templateName?: string;
 }
 
+export type CritiqueSeverity = 'high' | 'medium' | 'low';
+export type CritiqueIssueType =
+  | 'factual'
+  | 'instruction'
+  | 'completeness'
+  | 'invented'
+  | 'banned_phrase';
+
+export interface CritiqueIssue {
+  id: string;
+  severity: CritiqueSeverity;
+  type: CritiqueIssueType;
+  message: string;
+  span?: string;
+}
+
 export interface GeneratedSection {
   sectionId: string;
   title: string;
   content: { 'pt-br': string; en: string };
   tokensUsed: number;
+  critiqueIssues?: CritiqueIssue[];
 }
 
 export interface SectionState {
@@ -27,6 +44,10 @@ export interface SectionState {
   lockedParts: string[];
   requiresHumanInput: boolean;
   tokensUsed: number;
+  critiqueIssues: CritiqueIssue[];
+  dismissedIssueIds: string[];
+  issuesCollapsed: boolean;
+  fixingIssueIds: string[];
 }
 
 export interface PostState {

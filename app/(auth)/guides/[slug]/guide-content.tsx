@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  ClipboardList,
   List,
   Loader2,
   Pencil,
@@ -393,17 +394,30 @@ export function GuideContent({ post }: { post: PostDetail }) {
                 </Button>
               </>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsEditing(true);
-                  setSaveMessage(null);
-                }}
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  title="Ver audit log do pipeline"
+                >
+                  <Link href={`/guides/${post.slug}/log`}>
+                    <ClipboardList className="h-4 w-4" />
+                    Audit log
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsEditing(true);
+                    setSaveMessage(null);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </Button>
+              </>
             )}
 
             <Tabs value={lang} onValueChange={(v) => setLang(v as Lang)}>

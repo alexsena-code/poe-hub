@@ -4,7 +4,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { usePostStore } from '@/lib/engine-store';
-import { writeSection, rewriteSelection } from '@/lib/content-api';
+import { writeSection, rewriteSelection, fixSection } from '@/lib/content-api';
+import IssueBanner from './IssueBanner';
 
 type Lang = 'pt-br' | 'en';
 
@@ -19,8 +20,14 @@ export default function SectionEditor() {
     sections,
     activeSectionId,
     briefing,
+    slug,
     updateSection,
     addHumanMessage,
+    setCritiqueIssues,
+    dismissIssue,
+    clearIssues,
+    setIssuesCollapsed,
+    setFixingIssues,
   } = usePostStore();
 
   const section = sections.find((s) => s.sectionId === activeSectionId);
@@ -124,6 +131,7 @@ export default function SectionEditor() {
         lockedContent: lockedParts.length > 0 ? lockedParts : undefined,
         fromScratch,
         previousSections: previousSections.length > 0 ? previousSections : undefined,
+        slug: slug || undefined,
       });
 
       if (humanInput.trim()) {
@@ -136,8 +144,36 @@ export default function SectionEditor() {
         draft: result.content || { 'pt-br': '', en: '' },
         tokensUsed: result.tokensUsed || 0,
       });
+      setCritiqueIssues(section.sectionId, result.critiqueIssues || []);
+      setIssuesCollapsed(section.sectionId, false);
     } catch {
       updateSection(section.sectionId, { status: 'pending' });
+    }
+  }
+
+  async function handleFixIssues(issueIds: string[]) {
+    if (!briefing || !section || !section.draft || issueIds.length === 0) return;
+    const targetIssues = (section.critiqueIssues || []).filter((i) => issueIds.includes(i.id));
+    if (targetIssues.length === 0) return;
+
+    setFixingIssues(section.sectionId, issueIds);
+    try {
+      const result = await fixSection({
+        briefing,
+        sectionId: section.sectionId,
+        currentDraft: section.draft,
+        issues: targetIssues,
+        lang,
+      });
+      updateSection(section.sectionId, {
+        draft: result.content,
+        tokensUsed: (section.tokensUsed || 0) + (result.tokensUsed || 0),
+      });
+      setCritiqueIssues(section.sectionId, result.critiqueIssues || []);
+    } catch {
+      // silent — user can retry
+    } finally {
+      setFixingIssues(section.sectionId, []);
     }
   }
 
@@ -370,6 +406,25 @@ export default function SectionEditor() {
             </div>
           </div>
         )}
+
+        {/* Critique issues banner */}
+        {(section.status === 'draft' ||
+          section.status === 'reviewing' ||
+          section.status === 'approved') &&
+          hasDraft &&
+          !isEditing &&
+          (section.critiqueIssues?.length ?? 0) > 0 && (
+            <IssueBanner
+              issues={section.critiqueIssues || []}
+              dismissedIds={section.dismissedIssueIds || []}
+              collapsed={section.issuesCollapsed || false}
+              fixingIds={section.fixingIssueIds || []}
+              onDismiss={(id) => dismissIssue(section.sectionId, id)}
+              onFix={(ids) => handleFixIssues(ids)}
+              onToggleCollapse={(c) => setIssuesCollapsed(section.sectionId, c)}
+              onClearAll={() => clearIssues(section.sectionId)}
+            />
+          )}
 
         {/* Draft/reviewing/approved state */}
         {(section.status === 'draft' ||

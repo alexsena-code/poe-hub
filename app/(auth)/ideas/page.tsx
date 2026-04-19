@@ -24,6 +24,8 @@ interface ContentBrief {
   status: string;
   generatedPostSlug: string | null;
   createdAt: string;
+  briefingText: string | null;
+  briefingTextModel: string | null;
 }
 
 const URGENCY_COLORS: Record<string, string> = {
@@ -245,6 +247,27 @@ export default function IdeasPage() {
 
   function exportContent(id: number, format: 'json' | 'md' | 'md-pt' | 'md-en') {
     window.open(`${API}/ideation/briefs/${id}/export?format=${format}`, '_blank');
+  }
+
+  async function deleteGeneratedPost(id: number) {
+    if (!confirm('Delete the generated post files? The brief will be reset to "accepted" so you can regenerate.')) return;
+    try {
+      const res = await fetch(`${API}/ideation/briefs/${id}/generated-post`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (data.error) {
+        setMsg(`Delete failed: ${data.error}`);
+      } else {
+        setMsg(`Deleted ${data.deletedFiles?.length ?? 0} file(s)`);
+        setGeneratedPosts(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        fetchBriefs();
+      }
+    } catch {
+      setMsg('Failed to delete generated post');
+    }
   }
 
   const filtered = briefs;
@@ -498,12 +521,17 @@ export default function IdeasPage() {
                         </div>
                       </div>
 
-                      {/* Right: rationale + actions */}
+                      {/* Right: rationale + briefing + actions */}
                       <div className="space-y-3">
                         <div>
                           <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Rationale</div>
                           <p className="text-xs text-foreground/80 leading-relaxed">{b.rationale}</p>
                         </div>
+
+                        <BriefingTextPanel brief={b} onUpdate={(updated) => {
+                          setBriefs((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+                        }} />
+
                         <div>
                           <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Model</div>
                           <span className="text-[10px] font-mono text-muted-foreground">{b.model}</span>
@@ -595,6 +623,12 @@ export default function IdeasPage() {
                               >
                                 Re-generate
                               </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); deleteGeneratedPost(b.id); }}
+                                className="px-3 py-1 bg-red-900/60 hover:bg-red-800 text-red-200 rounded text-xs transition-colors"
+                              >
+                                Delete Post
+                              </button>
                             </div>
                             {b.generatedPostSlug && (
                               <div className="text-[10px] text-muted-foreground">
@@ -629,6 +663,130 @@ export default function IdeasPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// BriefingTextPanel — shows and edits the expanded briefing for a brief
+// ────────────────────────────────────────────────────────────────────────────
+
+interface BriefingTextPanelProps {
+  brief: ContentBrief;
+  onUpdate: (updated: ContentBrief) => void;
+}
+
+function BriefingTextPanel({ brief, onUpdate }: BriefingTextPanelProps) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(brief.briefingText || '');
+  const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  useEffect(() => {
+    setText(brief.briefingText || '');
+  }, [brief.id, brief.briefingText]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`${API}/ideation/briefs/${brief.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ briefingText: text }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onUpdate(updated);
+        setEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRegenerate() {
+    setRegenerating(true);
+    try {
+      const res = await fetch(`${API}/ideation/briefs/${brief.id}/expand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onUpdate(updated);
+        setText(updated.briefingText || '');
+      }
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  const modelLabel = brief.briefingTextModel === 'human'
+    ? 'editado manualmente'
+    : brief.briefingTextModel
+      ? `gerado por ${brief.briefingTextModel}`
+      : '';
+
+  return (
+    <div className="rounded-lg border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Briefing expandido</div>
+        {modelLabel && <span className="text-[10px] text-muted-foreground italic">{modelLabel}</span>}
+        <div className="ml-auto flex gap-1">
+          {!editing && brief.briefingText && (
+            <button
+              onClick={() => setEditing(true)}
+              className="text-[10px] text-foreground hover:underline"
+            >
+              Editar
+            </button>
+          )}
+          {!editing && (
+            <button
+              onClick={handleRegenerate}
+              disabled={regenerating}
+              className="text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              {regenerating ? 'Gerando...' : (brief.briefingText ? 'Regerar' : 'Gerar')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={10}
+            className="w-full rounded border border-border bg-surface p-2 text-xs text-foreground font-mono leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-foreground/30"
+            autoFocus
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1 rounded bg-foreground text-background text-[11px] font-medium hover:bg-foreground/90 disabled:opacity-50"
+            >
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+            <button
+              onClick={() => { setEditing(false); setText(brief.briefingText || ''); }}
+              className="px-3 py-1 rounded border border-border text-muted-foreground text-[11px] hover:text-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      ) : brief.briefingText ? (
+        <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap">
+          {brief.briefingText}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">
+          Nenhum briefing expandido ainda. Clique em &quot;Gerar&quot; pra criar.
+        </p>
+      )}
     </div>
   );
 }

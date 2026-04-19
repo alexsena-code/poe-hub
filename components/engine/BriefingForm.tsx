@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid';
 import { generateOutline } from '@/lib/content-api';
 import { usePostStore } from '@/lib/engine-store';
 import type { Briefing } from '@/lib/engine-types';
+import PlanPreview from './PlanPreview';
 
 const API_URL = '/api/engine';
 
@@ -233,6 +234,12 @@ export default function BriefingForm() {
           className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
         />
       </div>
+
+      {/* Plan preview — show how the briefing will be interpreted */}
+      <PlanPreview
+        briefing={form}
+        disabled={loading || (!form.skill.trim() && !form.topic?.trim())}
+      />
 
       {/* Error */}
       {error && (

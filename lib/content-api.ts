@@ -1,4 +1,4 @@
-import type { Briefing, GeneratedSection } from './engine-types';
+import type { Briefing, CritiqueIssue, GeneratedSection } from './engine-types';
 
 const isServer = typeof window === 'undefined';
 const CONTENT_API_URL = isServer
@@ -133,6 +133,8 @@ export async function writeSection(params: {
   lockedContent?: string[];
   fromScratch?: boolean;
   previousSections?: Array<{ sectionId: string; title: string; content: { 'pt-br': string; en: string }; tokensUsed: number }>;
+  /** Post slug — sent so the engine can reuse a cached PlanOutput from output/posts/{slug}.json */
+  slug?: string;
 }) {
   const res = await fetch(`${CONTENT_API_URL}/content/write-section`, {
     method: 'POST',
@@ -140,6 +142,48 @@ export async function writeSection(params: {
     body: JSON.stringify(params),
   });
   if (!res.ok) throw new Error('Falha ao gerar seção');
+  return res.json();
+}
+
+export async function planPreview(briefing: Briefing): Promise<{
+  plan: {
+    stepBackQuery: string;
+    sections: Array<{
+      sectionId: string;
+      specificQueries: string[];
+      entityMustInclude: string[];
+      priority?: string;
+    }>;
+    generatedAt: string;
+  } | null;
+  error?: string;
+}> {
+  const res = await fetch(`${CONTENT_API_URL}/content/plan/preview`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(briefing),
+  });
+  if (!res.ok) throw new Error('Falha ao gerar preview do plano');
+  return res.json();
+}
+
+export async function fixSection(params: {
+  briefing: Briefing;
+  sectionId: string;
+  currentDraft: { 'pt-br': string; en: string };
+  issues: CritiqueIssue[];
+  lang: 'pt-br' | 'en';
+}): Promise<{
+  content: { 'pt-br': string; en: string };
+  tokensUsed: number;
+  critiqueIssues: CritiqueIssue[];
+}> {
+  const res = await fetch(`${CONTENT_API_URL}/content/section/fix`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error('Falha ao corrigir seção');
   return res.json();
 }
 

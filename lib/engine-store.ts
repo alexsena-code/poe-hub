@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Briefing, PostState, SectionState } from './engine-types';
+import type { Briefing, CritiqueIssue, PostState, SectionState } from './engine-types';
 
 interface PostStore extends PostState {
   slug: string | null;
@@ -19,6 +19,11 @@ interface PostStore extends PostState {
   setPhase: (phase: PostState['phase']) => void;
   setMeta: (meta: Record<string, unknown>) => void;
   addHumanMessage: (sectionId: string, message: string) => void;
+  setCritiqueIssues: (sectionId: string, issues: CritiqueIssue[]) => void;
+  dismissIssue: (sectionId: string, issueId: string) => void;
+  clearIssues: (sectionId: string) => void;
+  setIssuesCollapsed: (sectionId: string, collapsed: boolean) => void;
+  setFixingIssues: (sectionId: string, issueIds: string[]) => void;
   loadFromSaved: (data: any) => void;
   reset: () => void;
 }
@@ -57,6 +62,10 @@ export const usePostStore = create<PostStore>()(
             lockedParts: [],
             requiresHumanInput: s.requiresHumanInput ?? false,
             tokensUsed: 0,
+            critiqueIssues: [],
+            dismissedIssueIds: [],
+            issuesCollapsed: false,
+            fixingIssueIds: [],
           })),
           activeSectionId: sections[0]?.sectionId ?? null,
           phase: 'writing',
@@ -84,6 +93,52 @@ export const usePostStore = create<PostStore>()(
           ),
         })),
 
+      setCritiqueIssues: (sectionId, issues) =>
+        set((state) => ({
+          sections: state.sections.map((s) =>
+            s.sectionId === sectionId
+              ? { ...s, critiqueIssues: issues, dismissedIssueIds: [] }
+              : s,
+          ),
+        })),
+
+      dismissIssue: (sectionId, issueId) =>
+        set((state) => ({
+          sections: state.sections.map((s) =>
+            s.sectionId === sectionId
+              ? {
+                  ...s,
+                  dismissedIssueIds: s.dismissedIssueIds.includes(issueId)
+                    ? s.dismissedIssueIds
+                    : [...s.dismissedIssueIds, issueId],
+                }
+              : s,
+          ),
+        })),
+
+      clearIssues: (sectionId) =>
+        set((state) => ({
+          sections: state.sections.map((s) =>
+            s.sectionId === sectionId
+              ? { ...s, critiqueIssues: [], dismissedIssueIds: [], fixingIssueIds: [] }
+              : s,
+          ),
+        })),
+
+      setIssuesCollapsed: (sectionId, collapsed) =>
+        set((state) => ({
+          sections: state.sections.map((s) =>
+            s.sectionId === sectionId ? { ...s, issuesCollapsed: collapsed } : s,
+          ),
+        })),
+
+      setFixingIssues: (sectionId, issueIds) =>
+        set((state) => ({
+          sections: state.sections.map((s) =>
+            s.sectionId === sectionId ? { ...s, fixingIssueIds: issueIds } : s,
+          ),
+        })),
+
       loadFromSaved: (data: any) =>
         set({
           postId: data.postId || data.slug || '',
@@ -98,6 +153,10 @@ export const usePostStore = create<PostStore>()(
             lockedParts: s.lockedParts || [],
             requiresHumanInput: s.requiresHumanInput ?? false,
             tokensUsed: s.tokensUsed || 0,
+            critiqueIssues: s.critiqueIssues || [],
+            dismissedIssueIds: s.dismissedIssueIds || [],
+            issuesCollapsed: s.issuesCollapsed || false,
+            fixingIssueIds: [],
           })),
           activeSectionId: data.sections?.[0]?.sectionId ?? null,
           meta: data.meta || null,
