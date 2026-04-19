@@ -6,6 +6,8 @@ import remarkGfm from 'remark-gfm';
 
 const API_URL = '/api/engine';
 
+type LanguagePref = 'pt' | 'en' | 'auto';
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -19,7 +21,11 @@ interface Message {
   latencyMs?: number;
   detectedPageType?: string;
   cost?: { inputTokens: number; outputTokens: number; totalUsd: number; model: string };
+  language?: 'pt' | 'en';
+  languageSource?: 'user' | 'auto';
 }
+
+const LANGUAGE_STORAGE_KEY = 'qa-chat-language';
 
 interface Conversation {
   id: string;
@@ -80,12 +86,34 @@ export default function QAChat() {
   const [showContext, setShowContext] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredConvId, setHoveredConvId] = useState<string | null>(null);
+  const [language, setLanguage] = useState<LanguagePref>('auto');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Load language preference from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (saved === 'pt' || saved === 'en' || saved === 'auto') {
+        setLanguage(saved);
+      }
+    } catch {
+      // ignore (SSR or disabled storage)
+    }
+  }, []);
+
+  function changeLanguage(next: LanguagePref) {
+    setLanguage(next);
+    try {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+    } catch {
+      // ignore
+    }
+  }
 
   // Fetch conversations on mount
   const fetchConversations = useCallback(async () => {
@@ -156,6 +184,8 @@ export default function QAChat() {
         latencyMs: m.latencyMs as number | undefined,
         detectedPageType: m.detectedPageType as string | undefined,
         cost: m.cost as Message['cost'] | undefined,
+        language: m.language as Message['language'] | undefined,
+        languageSource: m.languageSource as Message['languageSource'] | undefined,
       }));
       setMessages(msgs);
     } catch {
@@ -257,7 +287,7 @@ export default function QAChat() {
       const answerRes = await fetch(`${API_URL}/knowledge/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, queryType: 'qa', conversationHistory }),
+        body: JSON.stringify({ question: q, queryType: 'qa', conversationHistory, language }),
       });
       const answerData = await answerRes.json();
 
@@ -270,6 +300,8 @@ export default function QAChat() {
         latencyMs: Date.now() - start,
         detectedPageType: contextData.detectedPageType,
         cost: answerData.cost,
+        language: answerData.language,
+        languageSource: answerData.languageSource,
       };
       setMessages((prev) => [...prev, assistantMsg]);
 
@@ -407,7 +439,38 @@ export default function QAChat() {
             </button>
             <span className="text-sm font-medium text-foreground">Q&A Chat</span>
           </div>
-          <span className="text-xs text-muted-foreground">RAG: 65K chunks + 213K PG rows</span>
+          <div className="flex items-center gap-4">
+            {/* Language toggle */}
+            <div
+              role="group"
+              aria-label="Response language"
+              className="inline-flex items-center rounded-md border border-border bg-background p-0.5"
+            >
+              {(['pt', 'en', 'auto'] as LanguagePref[]).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => changeLanguage(opt)}
+                  aria-pressed={language === opt}
+                  title={
+                    opt === 'pt'
+                      ? 'Sempre responder em portugues'
+                      : opt === 'en'
+                        ? 'Always answer in English'
+                        : 'Auto-detect language from question'
+                  }
+                  className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                    language === opt
+                      ? 'bg-foreground/15 text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {opt === 'pt' ? 'PT' : opt === 'en' ? 'EN' : 'Auto'}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">RAG: 65K chunks + 213K PG rows</span>
+          </div>
         </header>
 
         {/* Messages */}
@@ -484,6 +547,18 @@ export default function QAChat() {
                         {msg.detectedPageType && (
                           <span className="px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">
                             {msg.detectedPageType}
+                          </span>
+                        )}
+                        {msg.language && (
+                          <span
+                            className="px-1.5 py-0.5 rounded bg-foreground/10 text-muted-foreground font-medium uppercase"
+                            title={
+                              msg.languageSource === 'auto'
+                                ? `Auto-detected as ${msg.language.toUpperCase()}`
+                                : `Forced ${msg.language.toUpperCase()}`
+                            }
+                          >
+                            {msg.languageSource === 'auto' ? `auto - ${msg.language}` : msg.language}
                           </span>
                         )}
                         <button
