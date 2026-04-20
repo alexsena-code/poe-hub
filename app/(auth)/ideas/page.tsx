@@ -48,14 +48,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
-  build_guide: 'Build Guide',
   mechanic_guide: 'Mechanic Guide',
-  tier_list: 'Tier List',
   currency_guide: 'Currency Guide',
   quick_explainer: 'Quick Explainer',
-  comparison: 'Comparison',
   faq: 'FAQ',
-  // legacy keys (kept for backward-compat when displaying old briefs)
+  beginner_guide: 'Beginner Guide',
+  // legacy keys — kept only so old briefs still render with a readable label
+  build_guide: 'Build Guide',
+  tier_list: 'Tier List',
+  comparison: 'Comparison',
   atlas_guide: 'Atlas Guide',
   league_start: 'League Start',
   qa_page: 'Q&A',
@@ -65,8 +66,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
 // Templates the backend actually supports — keep in sync with VALID_TEMPLATES
 // in packages/api/src/modules/ideation/ideation.service.ts.
 const GENERATABLE_TEMPLATES = [
-  'quick_explainer', 'mechanic_guide', 'build_guide', 'currency_guide',
-  'comparison', 'tier_list', 'faq',
+  'quick_explainer', 'mechanic_guide', 'currency_guide', 'faq', 'beginner_guide',
 ];
 
 // Canonical data source keys — shown on every brief even when the LLM left
@@ -699,7 +699,7 @@ export default function IdeasPage() {
                               {generatingContent === b.id ? (msg?.startsWith('Generating content...') ? msg : 'Generating...') : 'Generate Content'}
                             </button>
                             <a
-                              href={`/new?topic=${encodeURIComponent(b.primaryKeyword)}&template=${encodeURIComponent(b.templateType)}&notes=${encodeURIComponent(b.rationale + '\nKeywords: ' + b.secondaryKeywords.join(', '))}`}
+                              href={`/new?briefId=${b.id}`}
                               onClick={(e) => e.stopPropagation()}
                               className="px-4 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded text-xs font-medium transition-colors"
                             >
