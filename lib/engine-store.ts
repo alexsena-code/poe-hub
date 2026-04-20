@@ -28,6 +28,8 @@ interface PostStore extends PostState {
   setPhase: (phase: PostState['phase']) => void;
   setMeta: (meta: Record<string, unknown>) => void;
   addHumanMessage: (sectionId: string, message: string) => void;
+  /** Remove a previously-submitted opinion by its index in humanMessages[]. */
+  removeHumanMessage: (sectionId: string, index: number) => void;
   setCritiqueIssues: (sectionId: string, issues: CritiqueIssue[]) => void;
   dismissIssue: (sectionId: string, issueId: string) => void;
   clearIssues: (sectionId: string) => void;
@@ -102,6 +104,18 @@ export const usePostStore = create<PostStore>()(
           sections: state.sections.map((s) =>
             s.sectionId === sectionId
               ? { ...s, humanMessages: [...s.humanMessages, message] }
+              : s,
+          ),
+        })),
+
+      removeHumanMessage: (sectionId, index) =>
+        set((state) => ({
+          sections: state.sections.map((s) =>
+            s.sectionId === sectionId
+              ? {
+                  ...s,
+                  humanMessages: s.humanMessages.filter((_, i) => i !== index),
+                }
               : s,
           ),
         })),

@@ -24,6 +24,7 @@ export default function SectionEditor() {
     globalComment,
     updateSection,
     addHumanMessage,
+    removeHumanMessage,
     setCritiqueIssues,
     dismissIssue,
     clearIssues,
@@ -536,12 +537,54 @@ export default function SectionEditor() {
 
           {section.humanMessages.length > 0 && (
             <div className="flex flex-col gap-1.5 mb-3">
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Mensagens anteriores
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  Mensagens anteriores
+                </span>
+                {section.humanMessages.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm('Excluir todas as mensagens anteriores desta seção?')) return;
+                      // Remove from the end so indices stay valid during the loop
+                      for (let i = section.humanMessages.length - 1; i >= 0; i--) {
+                        removeHumanMessage(section.sectionId, i);
+                      }
+                    }}
+                    className="text-[10px] text-muted-foreground hover:text-red-400 transition-colors"
+                  >
+                    Limpar todas
+                  </button>
+                )}
+              </div>
               {section.humanMessages.map((msg, i) => (
-                <div key={i} className="rounded-lg bg-background border border-border px-3 py-2 text-sm text-foreground/80">
-                  {msg}
+                <div
+                  key={i}
+                  className="group flex items-start gap-2 rounded-lg bg-background border border-border px-3 py-2 text-sm text-foreground/80 hover:border-border/80"
+                >
+                  <span className="flex-1 whitespace-pre-wrap">{msg}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeHumanMessage(section.sectionId, i)}
+                    className="shrink-0 text-muted-foreground/60 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all"
+                    title="Excluir esta mensagem"
+                    aria-label="Excluir mensagem"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>
