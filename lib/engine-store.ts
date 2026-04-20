@@ -20,6 +20,7 @@ interface PostStore extends PostState {
       sectionId: string;
       title: string;
       requiresHumanInput?: boolean;
+      humanInputGuidance?: string;
     }>,
   ) => void;
   updateSection: (sectionId: string, patch: Partial<SectionState>) => void;
@@ -72,6 +73,7 @@ export const usePostStore = create<PostStore>()(
             humanMessages: [],
             lockedParts: [],
             requiresHumanInput: s.requiresHumanInput ?? false,
+            humanInputGuidance: s.humanInputGuidance,
             tokensUsed: 0,
             critiqueIssues: [],
             dismissedIssueIds: [],
@@ -164,6 +166,7 @@ export const usePostStore = create<PostStore>()(
             humanMessages: s.humanMessages || [],
             lockedParts: s.lockedParts || [],
             requiresHumanInput: s.requiresHumanInput ?? false,
+            humanInputGuidance: s.humanInputGuidance || undefined,
             tokensUsed: s.tokensUsed || 0,
             critiqueIssues: s.critiqueIssues || [],
             dismissedIssueIds: s.dismissedIssueIds || [],

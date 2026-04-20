@@ -44,6 +44,8 @@ export interface SectionState {
   humanMessages: string[];
   lockedParts: string[];
   requiresHumanInput: boolean;
+  /** Human-facing prompt from the template explaining what the author should provide. */
+  humanInputGuidance?: string;
   tokensUsed: number;
   critiqueIssues: CritiqueIssue[];
   dismissedIssueIds: string[];

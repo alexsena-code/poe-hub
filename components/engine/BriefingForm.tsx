@@ -249,12 +249,18 @@ export default function BriefingForm() {
           title: string;
           requiresHumanInput?: boolean;
           requires_human_input?: boolean;
+          pendingHumanInput?: boolean;
+          humanInputGuidance?: string;
         }>
       ).map((s) => ({
         sectionId: s.sectionId || s.id || nanoid(6),
         title: s.title,
         requiresHumanInput:
-          s.requiresHumanInput ?? s.requires_human_input ?? false,
+          s.requiresHumanInput ??
+          s.requires_human_input ??
+          s.pendingHumanInput ??
+          false,
+        humanInputGuidance: s.humanInputGuidance,
       }));
 
       initSections(sections);

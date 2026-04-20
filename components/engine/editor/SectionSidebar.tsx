@@ -47,14 +47,24 @@ export default function SectionSidebar() {
                     }`}>
                       {section.title}
                     </span>
+                    {/* Needs-human badge: shows whenever the template marks
+                        this section as requiring human input AND the author
+                        hasn't submitted any opinion for it yet. Applies
+                        regardless of draft status — a placeholder draft
+                        doesn't count as input. */}
+                    {section.requiresHumanInput &&
+                      (section.humanMessages?.length ?? 0) === 0 && (
+                        <span
+                          title={section.humanInputGuidance || 'Esta seção precisa da sua opinião'}
+                          className="ml-auto shrink-0 inline-flex items-center gap-1 rounded border border-amber-500/50 bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200"
+                        >
+                          <span className="h-1 w-1 rounded-full bg-amber-400 animate-pulse" />
+                          Precisa você
+                        </span>
+                      )}
                   </div>
                   <div className="flex items-center gap-2 mt-1 ml-[18px]">
                     <span className={`text-[11px] ${config.textColor}`}>{config.label}</span>
-                    {section.requiresHumanInput && section.status === 'pending' && (
-                      <span className="text-[11px] text-amber-400 font-medium">
-                        Opiniao
-                      </span>
-                    )}
                   </div>
                 </button>
               </li>

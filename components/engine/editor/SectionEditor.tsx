@@ -269,8 +269,37 @@ export default function SectionEditor() {
   const hasDraft = section.draft !== null;
   const draftText = section.draft?.[lang] || '';
 
+  const needsHumanInput =
+    section.requiresHumanInput && (section.humanMessages?.length ?? 0) === 0;
+
   return (
     <div className="flex flex-col h-full">
+      {/* Human-input banner: rendered above the section so the author sees
+          the template's guidance the moment they open the section. Hides
+          as soon as they submit an opinion (tracked by humanMessages). */}
+      {needsHumanInput && (
+        <div className="mx-8 mt-4 rounded-lg border border-amber-500/40 bg-amber-950/30 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse" />
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-amber-200">
+                Esta seção precisa da sua opinião
+              </div>
+              {section.humanInputGuidance ? (
+                <p className="mt-1 text-xs text-amber-100/80 whitespace-pre-wrap leading-relaxed">
+                  {section.humanInputGuidance}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-amber-100/70">
+                  Use a caixa "Adicione sua opinião ou instruções..." abaixo antes de aprovar.
+                  Sem isso, o gerador retorna um placeholder vazio.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section header: title + language toggle */}
       <div className="flex items-center gap-3 px-8 py-4 border-b border-border bg-surface shrink-0">
         <h3 className="text-base font-semibold text-foreground mr-auto">
@@ -568,7 +597,17 @@ export default function SectionEditor() {
               )}
 
               {section.status === 'approved' && (
-                <span className="text-sm text-green-400 font-medium whitespace-nowrap">Secao aprovada</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-green-400 font-medium whitespace-nowrap">Seção aprovada</span>
+                  <button
+                    type="button"
+                    onClick={() => updateSection(section.sectionId, { status: 'draft' })}
+                    className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-amber-400 hover:border-amber-500/40 transition-colors"
+                    title="Voltar para rascunho para editar/regerar"
+                  >
+                    Desaprovar
+                  </button>
+                </div>
               )}
 
               {section.status === 'generating' && (
