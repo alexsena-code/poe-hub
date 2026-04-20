@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { BookOpen, Pencil, Eye, FileEdit, RefreshCw } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { BookOpen, Pencil, Eye, FileEdit, RefreshCw, AlertCircle } from "lucide-react";
 
 const API = '/api/engine';
 
@@ -12,6 +13,7 @@ interface PostSummary {
   template: string;
   status: string;
   generatedAt: string;
+  pendingHumanCount?: number;
 }
 
 function templateLabel(template: string): string {
@@ -64,6 +66,8 @@ export default function GuidesPage() {
   const [posts, setPosts] = useState<PostSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const onlyPending = searchParams.get('pending') === '1';
 
   async function fetchPosts() {
     setLoading(true);
@@ -88,6 +92,10 @@ export default function GuidesPage() {
     templateCounts[p.template] = (templateCounts[p.template] || 0) + 1;
     statusCounts[p.status] = (statusCounts[p.status] || 0) + 1;
   }
+  const pendingTotal = posts.reduce((acc, p) => acc + (p.pendingHumanCount ?? 0), 0);
+  const visiblePosts = onlyPending
+    ? posts.filter((p) => (p.pendingHumanCount ?? 0) > 0)
+    : posts;
 
   return (
     <div className="flex flex-col h-full">
@@ -105,6 +113,20 @@ export default function GuidesPage() {
           </div>
 
           <div className="flex items-center gap-4 ml-auto">
+            {pendingTotal > 0 && (
+              <Link
+                href={onlyPending ? '/guides' : '/guides?pending=1'}
+                className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                  onlyPending
+                    ? 'border-amber-500/60 bg-amber-900/40 text-amber-100'
+                    : 'border-amber-700/40 bg-amber-950/30 text-amber-300 hover:bg-amber-900/40'
+                }`}
+                title={onlyPending ? 'Mostrar todos' : 'Filtrar: aguardando seu input'}
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                {onlyPending ? `Filtrando: ${pendingTotal} pendente(s)` : `${pendingTotal} aguardam você`}
+              </Link>
+            )}
             <div>
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</div>
               <div className="text-lg font-bold text-foreground">{posts.length}</div>
@@ -148,7 +170,7 @@ export default function GuidesPage() {
           </div>
         ) : loading ? (
           <div className="py-16 text-center text-muted-foreground">Carregando...</div>
-        ) : posts.length === 0 ? (
+        ) : visiblePosts.length === 0 ? (
           <div className="py-16 text-center">
             <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/40" />
             <p className="mt-4 text-muted-foreground">
@@ -173,14 +195,27 @@ export default function GuidesPage() {
               </tr>
             </thead>
             <tbody>
-              {posts.map((post) => (
+              {visiblePosts.map((post) => (
                 <tr
                   key={post.slug}
-                  className="border-b border-border/50 hover:bg-surface transition-colors"
+                  className={`border-b border-border/50 hover:bg-surface transition-colors ${
+                    (post.pendingHumanCount ?? 0) > 0 ? 'bg-amber-950/10' : ''
+                  }`}
                 >
                   <td className="py-3 px-4">
                     <div>
-                      <div className="font-medium text-foreground">{post.title.en}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">{post.title.en}</span>
+                        {(post.pendingHumanCount ?? 0) > 0 && (
+                          <span
+                            title={`${post.pendingHumanCount} seção(ões) aguardando seu input`}
+                            className="inline-flex items-center gap-1 rounded border border-amber-700/50 bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-200"
+                          >
+                            <AlertCircle className="h-3 w-3" />
+                            {post.pendingHumanCount}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground mt-0.5">{post.title["pt-br"]}</div>
                     </div>
                   </td>

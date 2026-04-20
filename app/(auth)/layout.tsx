@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { AwaitingHumanBanner } from "@/components/engine/AwaitingHumanBanner";
 
 export default async function AuthLayout({
   children,
@@ -20,6 +21,7 @@ export default async function AuthLayout({
       <Sidebar />
       {/* On mobile, add top padding to clear the fixed hamburger bar (h-14) */}
       <main id="app-main" className="flex-1 overflow-auto p-6 px-8 pt-20 md:pt-6 lg:px-12">
+        <AwaitingHumanBanner />
         {children}
       </main>
       <Toaster />

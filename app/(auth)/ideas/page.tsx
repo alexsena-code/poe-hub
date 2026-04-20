@@ -52,11 +52,26 @@ const TEMPLATE_LABELS: Record<string, string> = {
   mechanic_guide: 'Mechanic Guide',
   tier_list: 'Tier List',
   currency_guide: 'Currency Guide',
+  quick_explainer: 'Quick Explainer',
+  comparison: 'Comparison',
+  faq: 'FAQ',
+  // legacy keys (kept for backward-compat when displaying old briefs)
   atlas_guide: 'Atlas Guide',
   league_start: 'League Start',
   qa_page: 'Q&A',
   patch_analysis: 'Patch Analysis',
 };
+
+// Templates the backend actually supports — keep in sync with VALID_TEMPLATES
+// in packages/api/src/modules/ideation/ideation.service.ts.
+const GENERATABLE_TEMPLATES = [
+  'quick_explainer', 'mechanic_guide', 'build_guide', 'currency_guide',
+  'comparison', 'tier_list', 'faq',
+];
+
+// Canonical data source keys — shown on every brief even when the LLM left
+// them out, so the user can toggle them on before generating.
+const CANONICAL_DATA_SOURCES = ['qdrant', 'ninja', 'patch', 'reddit', 'youtube', 'keywords'];
 
 export default function IdeasPage() {
   const [briefs, setBriefs] = useState<ContentBrief[]>([]);
@@ -71,6 +86,14 @@ export default function IdeasPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [editorialBriefing, setEditorialBriefing] = useState('');
   const [showBriefing, setShowBriefing] = useState(false);
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const toggleTemplate = (t: string) => {
+    setSelectedTemplates((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+    );
+  };
 
   // Model selection (OpenRouter format) — default uses YAML config
   const MODEL_OPTIONS = [
@@ -122,7 +145,11 @@ export default function IdeasPage() {
       const res = await fetch(`${API}/ideation/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: opt.model || undefined, briefing: editorialBriefing || undefined }),
+        body: JSON.stringify({
+          model: opt.model || undefined,
+          briefing: editorialBriefing || undefined,
+          templates: selectedTemplates.length > 0 ? selectedTemplates : undefined,
+        }),
       });
       const data = await res.json();
       if (data.error) {
@@ -190,6 +217,32 @@ export default function IdeasPage() {
       });
       fetchBriefs();
     } catch { /* */ }
+  }
+
+  async function toggleDataSource(id: number, key: string) {
+    const brief = briefs.find((x) => x.id === id);
+    if (!brief) return;
+    // Merge canonical keys so toggling a missing source adds it as false first
+    const base: Record<string, boolean> = {};
+    for (const k of CANONICAL_DATA_SOURCES) base[k] = false;
+    const merged: Record<string, boolean> = { ...base, ...(brief.dataSources || {}) };
+    merged[key] = !merged[key];
+
+    // Optimistic update — revert on failure
+    setBriefs((prev) => prev.map((x) => (x.id === id ? { ...x, dataSources: merged } : x)));
+    try {
+      const res = await fetch(`${API}/ideation/briefs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataSources: merged }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      setBriefs((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, dataSources: brief.dataSources } : x)),
+      );
+      setMsg('Falha ao atualizar data sources');
+    }
   }
 
   async function generateContent(id: number) {
@@ -328,6 +381,14 @@ export default function IdeasPage() {
                 >
                   {editorialBriefing ? 'Briefing ✓' : '+ Briefing'}
                 </button>
+                <button
+                  onClick={() => setShowTemplates(!showTemplates)}
+                  className={`px-3 py-2 rounded-md text-xs transition-colors ${
+                    selectedTemplates.length > 0 ? 'bg-sky-900/40 text-sky-300 border border-sky-700' : 'bg-zinc-800 text-zinc-400 hover:text-foreground'
+                  }`}
+                >
+                  {selectedTemplates.length > 0 ? `Templates (${selectedTemplates.length})` : '+ Templates'}
+                </button>
                 <select
                   value={selectedModel}
                   onChange={e => setSelectedModel(Number(e.target.value))}
@@ -371,6 +432,50 @@ export default function IdeasPage() {
               className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-zinc-600 resize-none"
               rows={3}
             />
+          </div>
+        )}
+
+        {/* Template filter panel */}
+        {showTemplates && (
+          <div className="bg-surface border border-border rounded-lg p-4 mt-2">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-medium text-foreground">Templates permitidos</label>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">
+                  {selectedTemplates.length === 0
+                    ? 'Vazio = todos os templates disponíveis'
+                    : `${selectedTemplates.length} selecionado(s)`}
+                </span>
+                {selectedTemplates.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplates([])}
+                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {GENERATABLE_TEMPLATES.map((t) => {
+                const active = selectedTemplates.includes(t);
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => toggleTemplate(t)}
+                    className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                      active
+                        ? 'bg-sky-900/40 text-sky-300 border-sky-700'
+                        : 'bg-background text-muted-foreground border-border hover:text-foreground'
+                    }`}
+                  >
+                    {TEMPLATE_LABELS[t] ?? t}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -510,13 +615,44 @@ export default function IdeasPage() {
                           </div>
                         )}
                         <div>
-                          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Data Sources</div>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Data Sources</div>
+                            {b.status !== 'generated' && (
+                              <span className="text-[10px] text-muted-foreground/60">clique para alternar</span>
+                            )}
+                          </div>
                           <div className="flex flex-wrap gap-2">
-                            {Object.entries(b.dataSources || {}).map(([key, val]) => (
-                              <span key={key} className={`text-[10px] px-1.5 py-0.5 rounded ${val ? 'bg-emerald-900/30 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                                {key.replace(/([A-Z])/g, ' $1').trim()}
-                              </span>
-                            ))}
+                            {(() => {
+                              // Show canonical keys + any extras the LLM added that we don't know about
+                              const keys = Array.from(
+                                new Set([...CANONICAL_DATA_SOURCES, ...Object.keys(b.dataSources || {})]),
+                              );
+                              const editable = b.status !== 'generated';
+                              return keys.map((key) => {
+                                const active = !!b.dataSources?.[key];
+                                const base = 'text-[10px] px-1.5 py-0.5 rounded transition-colors';
+                                const activeCls = 'bg-emerald-900/30 text-emerald-400 border border-emerald-700/40';
+                                const inactiveCls = 'bg-zinc-800 text-zinc-500 border border-transparent';
+                                if (!editable) {
+                                  return (
+                                    <span key={key} className={`${base} ${active ? activeCls : inactiveCls}`}>
+                                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); toggleDataSource(b.id, key); }}
+                                    className={`${base} ${active ? activeCls : inactiveCls} hover:brightness-125`}
+                                    title={active ? 'Desativar fonte' : 'Ativar fonte'}
+                                  >
+                                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                                  </button>
+                                );
+                              });
+                            })()}
                           </div>
                         </div>
                       </div>
