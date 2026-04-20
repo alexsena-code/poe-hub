@@ -3,12 +3,13 @@ export interface Briefing {
   ascendancy: string;
   topic?: string;
   league?: string;
-  budgetLow?: number;
-  budgetMid?: number;
-  budgetHigh?: number;
   notes?: string;
   mode?: 'auto' | 'outline_only';
   templateName?: string;
+  /** Section IDs from the template that should NOT be generated for this post. */
+  excludedSections?: string[];
+  /** Active data-source keys (youtube, reddit, patch, ...) forcing Qdrant collections. */
+  dataSources?: string[];
 }
 
 export type CritiqueSeverity = 'high' | 'medium' | 'low';

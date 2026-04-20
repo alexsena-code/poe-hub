@@ -4,9 +4,17 @@ import type { Briefing, CritiqueIssue, PostState, SectionState } from './engine-
 
 interface PostStore extends PostState {
   slug: string | null;
+  /**
+   * Editor-wide note the user attaches to the post. Passed to every
+   * writeSection call so the LLM sees consistent guidance across sections
+   * ("tom mais casual", "evitar jargão TFT", etc.) without the user having
+   * to repeat it in each section's input box.
+   */
+  globalComment: string;
   setBriefing: (briefing: Briefing) => void;
   setPostId: (id: string) => void;
   setSlug: (slug: string) => void;
+  setGlobalComment: (value: string) => void;
   initSections: (
     sections: Array<{
       sectionId: string;
@@ -28,7 +36,7 @@ interface PostStore extends PostState {
   reset: () => void;
 }
 
-const initialState: PostState & { slug: string | null } = {
+const initialState: PostState & { slug: string | null; globalComment: string } = {
   postId: '',
   slug: null,
   briefing: null,
@@ -36,6 +44,7 @@ const initialState: PostState & { slug: string | null } = {
   activeSectionId: null,
   meta: null,
   phase: 'briefing',
+  globalComment: '',
 };
 
 export const usePostStore = create<PostStore>()(
@@ -50,6 +59,8 @@ export const usePostStore = create<PostStore>()(
       setPostId: (id) => set({ postId: id }),
 
       setSlug: (slug) => set({ slug }),
+
+      setGlobalComment: (value) => set({ globalComment: value }),
 
       initSections: (sections) =>
         set({
@@ -144,6 +155,7 @@ export const usePostStore = create<PostStore>()(
           postId: data.postId || data.slug || '',
           slug: data.slug || null,
           briefing: data.briefing || null,
+          globalComment: typeof data.globalComment === 'string' ? data.globalComment : '',
           sections: (data.sections || []).map((s: any) => ({
             sectionId: s.sectionId,
             title: s.title,

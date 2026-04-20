@@ -135,6 +135,8 @@ export async function writeSection(params: {
   previousSections?: Array<{ sectionId: string; title: string; content: { 'pt-br': string; en: string }; tokensUsed: number }>;
   /** Post slug — sent so the engine can reuse a cached PlanOutput from output/posts/{slug}.json */
   slug?: string;
+  /** Editor-wide note applied to every section (separate from humanInput which is per-section). */
+  globalComment?: string;
 }) {
   const res = await fetch(`${CONTENT_API_URL}/content/write-section`, {
     method: 'POST',

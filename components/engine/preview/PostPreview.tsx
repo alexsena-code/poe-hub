@@ -15,9 +15,17 @@ export default function PostPreview({ onBack }: { onBack: () => void }) {
     (s) => s.status === 'approved' && s.draft,
   );
 
+  // Topic mode (no ascendancy) drives most current templates (mechanic_guide,
+  // currency_guide, faq, quick_explainer, beginner_guide). Only the legacy
+  // build_guide used skill+ascendancy — leaving that branch for backward
+  // compatibility.
+  const subject = briefing?.topic?.trim() || briefing?.skill?.trim() || '';
+  const isTopicMode = !briefing?.ascendancy?.trim();
   const title = briefing
-    ? `${briefing.skill} ${briefing.ascendancy} Build Guide`
-    : 'Build Guide';
+    ? isTopicMode
+      ? subject || 'Untitled'
+      : `${briefing.skill} ${briefing.ascendancy}`.trim()
+    : 'Untitled';
 
   return (
     <div className="flex flex-col h-screen">
@@ -66,32 +74,76 @@ export default function PostPreview({ onBack }: { onBack: () => void }) {
         <article className="max-w-3xl mx-auto py-12 px-8">
           <h1 className="text-3xl font-bold text-accent mb-2">{title}</h1>
 
-          {/* Meta info */}
+          {/* Meta info — matches backend GeneratedPost['meta'] shape:
+              { description: { 'pt-br', en }, keywords: string[], primaryKeyword, schemaType,
+                internalLinks: [{ slug, url, title, language }] }. The previous version
+              checked `metaDescription` which never existed, so this block was always empty. */}
           {meta && (
-            <div className="mb-8 rounded-lg bg-surface border border-border p-4">
-              <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+            <div className="mb-8 rounded-lg bg-surface border border-border p-4 space-y-2">
+              <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
                 SEO Metadata
               </h3>
-              {'metaDescription' in meta && meta.metaDescription ? (
-                <p className="text-sm text-muted-foreground mb-1">
-                  <strong className="text-foreground">Meta Description:</strong>{' '}
-                  {String(meta.metaDescription)}
+              {(() => {
+                const desc = (meta as any).description;
+                const descText = typeof desc === 'string'
+                  ? desc
+                  : desc?.[lang] || desc?.en || desc?.['pt-br'];
+                return descText ? (
+                  <p className="text-sm text-muted-foreground">
+                    <strong className="text-foreground">Meta description:</strong> {descText}
+                  </p>
+                ) : null;
+              })()}
+              {(meta as any).primaryKeyword ? (
+                <p className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">Primary keyword:</strong>{' '}
+                  {(meta as any).primaryKeyword}
                 </p>
               ) : null}
-              {'keywords' in meta && meta.keywords ? (
+              {Array.isArray((meta as any).keywords) && (meta as any).keywords.length > 0 ? (
                 <p className="text-sm text-muted-foreground">
                   <strong className="text-foreground">Keywords:</strong>{' '}
-                  {Array.isArray(meta.keywords)
-                    ? (meta.keywords as string[]).join(', ')
-                    : String(meta.keywords)}
+                  {(meta as any).keywords.join(', ')}
                 </p>
+              ) : null}
+              {Array.isArray((meta as any).internalLinks) && (meta as any).internalLinks.length > 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">Internal links:</strong>
+                  <ul className="mt-1 ml-4 list-disc">
+                    {(meta as any).internalLinks.map((l: any, i: number) => (
+                      <li key={i}>
+                        {typeof l === 'string' ? (
+                          <code>{l}</code>
+                        ) : (
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent hover:underline"
+                          >
+                            {l.title || l.slug}
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
             </div>
           )}
 
-          {/* Sections */}
+          {/* Sections — render the section title as <h2> before the markdown
+              body. Previously only the markdown was rendered, so posts that
+              don't bake their heading into the body came out as a wall of
+              text. The section's `title` comes from the template YAML with
+              variables already substituted. */}
           {approvedSections.map((section) => (
             <section key={section.sectionId} className="mb-8">
+              {section.title && (
+                <h2 className="mb-3 text-2xl font-semibold text-foreground">
+                  {section.title}
+                </h2>
+              )}
               <div className="markdown-body">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {section.draft![lang]}

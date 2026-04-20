@@ -98,14 +98,19 @@ export default function BriefingForm() {
   // without overwriting the structured briefing context.
   const [briefSource, setBriefSource] = useState<BriefSource | null>(null);
   const [briefLoading, setBriefLoading] = useState(!!briefIdParam);
+  // Sections loaded from the currently-selected template so the user can
+  // opt out of any section before generation. Keyed by section id →
+  // boolean (true = keep). We only ever add to this map, never clobber,
+  // so user choices persist across template edits.
+  const [templateSections, setTemplateSections] = useState<
+    Array<{ id: string; title: string }>
+  >([]);
+  const [keptSections, setKeptSections] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<Briefing>({
     skill: searchParams.get('topic') || '',
     ascendancy: '',
     topic: searchParams.get('topic') || '',
     league: '3.28',
-    budgetLow: 5,
-    budgetMid: 15,
-    budgetHigh: 50,
     notes: searchParams.get('notes') || '',
     mode: 'outline_only',
     templateName: searchParams.get('template') || 'mechanic_guide',
@@ -122,6 +127,47 @@ export default function BriefingForm() {
       .then((data) => setTemplates(data))
       .catch(() => {});
   }, []);
+
+  // Load the selected template's sections so the user can choose which
+  // ones to skip. Re-runs whenever templateName changes. New sections
+  // default to kept=true; sections the user already opted out of stay
+  // opted out if they appear in a different template with the same id.
+  useEffect(() => {
+    const name = form.templateName;
+    if (!name) return;
+    let cancelled = false;
+    fetch(`${API_URL}/content/templates/${encodeURIComponent(name)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const raw = Array.isArray(data?.sections) ? data.sections : [];
+        const normalized = raw
+          .map((s: any) => ({
+            id: String(s.id || s.sectionId || ''),
+            title: String(s.title || s.id || ''),
+          }))
+          .filter((s: { id: string }) => s.id);
+        setTemplateSections(normalized);
+        setKeptSections((prev) => {
+          const next = { ...prev };
+          for (const s of normalized) {
+            if (!(s.id in next)) next[s.id] = true;
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTemplateSections([]);
+      });
+    return () => { cancelled = true; };
+  }, [form.templateName]);
+
+  const toggleSection = (id: string) => {
+    setKeptSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+  const excludedSectionIds = templateSections
+    .filter((s) => !keptSections[s.id])
+    .map((s) => s.id);
 
   // Hydrate form from the full brief when arriving via /new?briefId=X.
   // We only seed the identifying fields (topic, template); the expanded
@@ -185,8 +231,12 @@ export default function BriefingForm() {
         ? {
             ...form,
             notes: buildStitchedNotes(briefSource, form.notes || ''),
+            excludedSections: excludedSectionIds.length > 0 ? excludedSectionIds : undefined,
           }
-        : form;
+        : {
+            ...form,
+            excludedSections: excludedSectionIds.length > 0 ? excludedSectionIds : undefined,
+          };
       const outline = await generateOutline(briefingForPipeline);
 
       setPostId(postId);
@@ -296,50 +346,50 @@ export default function BriefingForm() {
         />
       </div>
 
-      {/* Budget (only for build-type templates) */}
-      {!isTopicMode && <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-2">
-          Budget (Divine Orbs)
-        </label>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs text-muted-foreground mb-1">Starter</label>
-            <input
-              type="number"
-              min={0}
-              value={form.budgetLow}
-              onChange={(e) =>
-                updateField('budgetLow', Number(e.target.value))
-              }
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+      {/* Section selector — opt out of template sections for this post.
+          All sections start enabled; unchecking flows through to
+          Briefing.excludedSections and the research node filters them
+          out before write. */}
+      {templateSections.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-muted-foreground">
+              Seções do template
+            </label>
+            <span className="text-[10px] text-muted-foreground/70">
+              {excludedSectionIds.length === 0
+                ? `${templateSections.length} seções — todas ativas`
+                : `${templateSections.length - excludedSectionIds.length}/${templateSections.length} ativas`}
+            </span>
           </div>
-          <div>
-            <label className="block text-xs text-muted-foreground mb-1">Mid</label>
-            <input
-              type="number"
-              min={0}
-              value={form.budgetMid}
-              onChange={(e) =>
-                updateField('budgetMid', Number(e.target.value))
-              }
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-muted-foreground mb-1">Endgame</label>
-            <input
-              type="number"
-              min={0}
-              value={form.budgetHigh}
-              onChange={(e) =>
-                updateField('budgetHigh', Number(e.target.value))
-              }
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            />
+          <div className="rounded-lg border border-border bg-surface p-3 space-y-1.5">
+            {templateSections.map((s) => {
+              const kept = !!keptSections[s.id];
+              return (
+                <label
+                  key={s.id}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                    kept ? 'hover:bg-background/50' : 'opacity-50 hover:opacity-75'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={kept}
+                    onChange={() => toggleSection(s.id)}
+                    className="h-3.5 w-3.5 rounded border-border"
+                  />
+                  <span className="text-[11px] font-mono text-muted-foreground/70 w-32 truncate">
+                    {s.id}
+                  </span>
+                  <span className={`text-sm ${kept ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
+                    {s.title}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
-      </div>}
+      )}
 
       {/* Loaded brief summary (only when ?briefId=X) */}
       {briefLoading && (

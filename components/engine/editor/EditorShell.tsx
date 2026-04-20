@@ -28,11 +28,15 @@ export default function EditorShell({ postId }: { postId: string }) {
     briefing,
     meta,
     slug,
+    globalComment,
     setPhase,
     setMeta,
     setSlug,
+    setGlobalComment,
     reset,
   } = usePostStore();
+
+  const [showGlobalComment, setShowGlobalComment] = useState(false);
 
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
@@ -305,6 +309,57 @@ export default function EditorShell({ postId }: { postId: string }) {
 
         {/* Right: active section editor */}
         <div className="flex flex-col flex-1 min-h-0 min-w-0">
+          {/* Global comment panel — applied to every writeSection call so
+              the user's editorial direction stays consistent across
+              sections without repeating it per-section. */}
+          <div className="shrink-0 border-b border-border bg-surface/50">
+            <button
+              type="button"
+              onClick={() => setShowGlobalComment((v) => !v)}
+              className={`w-full px-4 py-2 flex items-center gap-2 text-xs transition-colors ${
+                globalComment
+                  ? 'text-amber-300 hover:bg-amber-950/20'
+                  : 'text-muted-foreground hover:bg-background/50'
+              }`}
+            >
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${globalComment ? 'bg-amber-400' : 'bg-muted-foreground/40'}`} />
+              <span className="font-medium">Comentário global</span>
+              {globalComment && (
+                <span className="text-amber-400/70 truncate max-w-[60%]">
+                  — {globalComment.slice(0, 80)}{globalComment.length > 80 ? '…' : ''}
+                </span>
+              )}
+              <span className="ml-auto text-muted-foreground/60">
+                {showGlobalComment ? 'ocultar' : globalComment ? 'editar' : 'adicionar'}
+              </span>
+            </button>
+            {showGlobalComment && (
+              <div className="px-4 pb-3">
+                <textarea
+                  value={globalComment}
+                  onChange={(e) => setGlobalComment(e.target.value)}
+                  placeholder='Ex: "tom casual, evitar jargão TFT", "priorizar exemplos com Scarab of Divinity", "não mencionar TFT trades". Vai junto em toda regeneração de seção.'
+                  rows={3}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-muted-foreground">
+                    Aplicado a todas as seções. Separado do input por-seção.
+                  </span>
+                  {globalComment && (
+                    <button
+                      type="button"
+                      onClick={() => setGlobalComment('')}
+                      className="text-[10px] text-muted-foreground hover:text-foreground"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex-1 overflow-y-auto">
             {activeSection ? (
               <SectionEditor />

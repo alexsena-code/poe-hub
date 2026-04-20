@@ -21,6 +21,7 @@ export default function SectionEditor() {
     activeSectionId,
     briefing,
     slug,
+    globalComment,
     updateSection,
     addHumanMessage,
     setCritiqueIssues,
@@ -132,6 +133,7 @@ export default function SectionEditor() {
         fromScratch,
         previousSections: previousSections.length > 0 ? previousSections : undefined,
         slug: slug || undefined,
+        globalComment: globalComment?.trim() || undefined,
       });
 
       if (humanInput.trim()) {
