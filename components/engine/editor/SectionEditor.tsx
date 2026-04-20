@@ -239,13 +239,24 @@ export default function SectionEditor() {
       const result = await rewriteSelection({
         briefing,
         sectionId: section.sectionId,
-        fullDraft: section.draft[lang],
+        // Send both languages so the backend rewrites in the active one
+        // and adapts the other — keeping PT-BR and EN in lockstep.
+        fullDraft: {
+          'pt-br': section.draft['pt-br'] || '',
+          en: section.draft.en || '',
+        },
         selectedText,
+        selectedLang: lang,
         instruction: regenInstruction.trim() || undefined,
       });
+      // Apply whichever languages came back. Backend always returns both
+      // but we guard against partial responses so a missing field doesn't
+      // wipe the other draft to empty.
+      const nextPtBr = result.content?.['pt-br'] ?? section.draft['pt-br'] ?? '';
+      const nextEn = result.content?.en ?? section.draft.en ?? '';
       if (result.content?.[lang]) {
         updateSection(section.sectionId, {
-          draft: { ...section.draft, [lang]: result.content[lang] },
+          draft: { 'pt-br': nextPtBr, en: nextEn },
           tokensUsed: (section.tokensUsed || 0) + (result.tokensUsed || 0),
         });
       }

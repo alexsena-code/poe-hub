@@ -205,8 +205,11 @@ export async function optimizeSeo(params: {
 export async function rewriteSelection(params: {
   briefing: Briefing;
   sectionId: string;
-  fullDraft: string;
+  /** Send both languages so the backend can keep them in sync after the rewrite. */
+  fullDraft: string | { 'pt-br': string; en: string };
   selectedText: string;
+  /** Which language the user highlighted. Backend rewrites in this one and translates to the other. */
+  selectedLang?: 'pt-br' | 'en';
   instruction?: string;
 }) {
   const res = await fetch(`${CONTENT_API_URL}/content/rewrite-selection`, {
