@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BookOpen, Pencil, Eye, FileEdit, RefreshCw, AlertCircle } from "lucide-react";
+import { BookOpen, Pencil, Eye, FileEdit, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
 
 const API = '/api/engine';
 
@@ -85,6 +85,19 @@ export default function GuidesPage() {
   }
 
   useEffect(() => { fetchPosts(); }, []);
+
+  async function deletePost(slug: string, title: string) {
+    if (!confirm(`Excluir o post "${title}"?\nOs arquivos JSON/MD serão removidos do disco.`)) return;
+    try {
+      const res = await fetch(`${API}/content/posts/${encodeURIComponent(slug)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPosts((prev) => prev.filter((p) => p.slug !== slug));
+    } catch (e) {
+      alert(`Falha ao excluir: ${e instanceof Error ? e.message : 'erro'}`);
+    }
+  }
 
   const templateCounts: Record<string, number> = {};
   const statusCounts: Record<string, number> = {};
@@ -256,6 +269,15 @@ export default function GuidesPage() {
                         <FileEdit className="h-3.5 w-3.5" />
                         Editar
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => deletePost(post.slug, post.title.en || post.title["pt-br"] || post.slug)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Excluir post"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Excluir
+                      </button>
                     </div>
                   </td>
                 </tr>
