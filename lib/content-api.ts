@@ -1,4 +1,4 @@
-import type { Briefing, CritiqueIssue, GeneratedSection } from './engine-types';
+import type { Briefing, CritiqueIssue, GeneratedSection, ProposedOutline } from './engine-types';
 
 const isServer = typeof window === 'undefined';
 const CONTENT_API_URL = isServer
@@ -121,6 +121,97 @@ export async function generateOutline(briefing: Briefing) {
     body: JSON.stringify(briefing),
   });
   if (!res.ok) throw new Error('Falha ao gerar outline');
+  return res.json();
+}
+
+/**
+ * Pede ao engine para propor um outline (seções editáveis) baseado no
+ * briefing + template. Resposta vem pronta para popular o OutlineEditor.
+ * Quando ENABLE_OUTLINE_PROPOSER=false no engine, retorna fallback do
+ * template skeleton — ainda editável, só não tem LLM propondo seções novas.
+ */
+export async function proposeOutline(briefing: Briefing): Promise<ProposedOutline> {
+  const res = await fetch(`${CONTENT_API_URL}/content/outline/propose`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(briefing),
+  });
+  if (!res.ok) throw new Error('Falha ao propor outline');
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Feature flags (runtime toggles backed by output/feature-flags.json)
+// ---------------------------------------------------------------------------
+
+export interface FeatureFlagEntry {
+  key: string;
+  envVar: string;
+  default: boolean;
+  label: string;
+  description: string;
+  value: boolean;
+  source: 'file' | 'env' | 'default';
+}
+
+export async function fetchFeatureFlags(): Promise<{ flags: FeatureFlagEntry[] }> {
+  const res = await fetch(`${CONTENT_API_URL}/content/feature-flags`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error('Falha ao carregar feature flags');
+  return res.json();
+}
+
+export async function updateFeatureFlags(
+  updates: Record<string, boolean>,
+): Promise<{ flags: FeatureFlagEntry[] }> {
+  const res = await fetch(`${CONTENT_API_URL}/content/feature-flags`, {
+    method: 'PUT',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error('Falha ao atualizar feature flags');
+  return res.json();
+}
+
+export async function resetFeatureFlag(key: string): Promise<{ flags: FeatureFlagEntry[] }> {
+  const res = await fetch(`${CONTENT_API_URL}/content/feature-flags/${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error('Falha ao resetar feature flag');
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Outline proposer metrics
+// ---------------------------------------------------------------------------
+
+export interface OutlineMetricsSummary {
+  total: number;
+  fallbacks: number;
+  fallbackRate: number;
+  totalTokens: number;
+  totalCostUsd: number;
+  averageLatencyMs: number | null;
+  recentFallbackReasons: Array<{ timestamp: string; reason: string; templateName?: string }>;
+  last: {
+    timestamp: string;
+    fallback: boolean;
+    llmModel: string;
+    tokensUsed: number;
+    sectionCount: number;
+    templateName?: string;
+  } | null;
+}
+
+export async function fetchOutlineMetrics(): Promise<OutlineMetricsSummary> {
+  const res = await fetch(`${CONTENT_API_URL}/content/outline/metrics`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error('Falha ao carregar métricas de outline');
   return res.json();
 }
 

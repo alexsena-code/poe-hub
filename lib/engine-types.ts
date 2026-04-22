@@ -10,6 +10,41 @@ export interface Briefing {
   excludedSections?: string[];
   /** Active data-source keys (youtube, reddit, patch, ...) forcing Qdrant collections. */
   dataSources?: string[];
+  /**
+   * User-approved outline (from OutlineEditor edits). When present, the
+   * engine iterates this list instead of the template.sections, keeping
+   * renames, reorders, additions and deletions the user made.
+   */
+  customOutline?: CustomSection[];
+}
+
+/**
+ * Single section in a user-approved outline. Matches the engine's
+ * CustomSection (packages/api/src/modules/content/types.ts).
+ */
+export interface CustomSection {
+  id: string;
+  title: string;
+  goal: string;
+  source: 'template' | 'proposed' | 'user';
+  instruction?: string;
+  query_type?: string;
+  rag_queries?: string[];
+  parallel_safe?: boolean;
+  requires_human_input?: boolean;
+  human_input_guidance?: string;
+  max_tokens?: number;
+}
+
+/** Response shape of POST /content/outline/propose. */
+export interface ProposedOutline {
+  sections: CustomSection[];
+  rationale: string;
+  generatedAt: string;
+  llmModel: string;
+  tokensUsed: number;
+  costUsd?: number;
+  fallbackUsed?: boolean;
 }
 
 export type CritiqueSeverity = 'high' | 'medium' | 'low';

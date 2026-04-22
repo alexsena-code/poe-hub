@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { nanoid } from 'nanoid';
-import { generateOutline } from '@/lib/content-api';
+import { generateOutline, proposeOutline } from '@/lib/content-api';
 import { usePostStore } from '@/lib/engine-store';
-import type { Briefing } from '@/lib/engine-types';
+import type { Briefing, CustomSection, ProposedOutline } from '@/lib/engine-types';
 import PlanPreview from './PlanPreview';
+import OutlineEditor from './OutlineEditor';
 
 const API_URL = '/api/engine';
 
@@ -118,6 +119,11 @@ export default function BriefingForm() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Step state: 'briefing' = form atual, 'outline' = OutlineEditor com proposta.
+  // Ao clicar "Gerar Outline", chamamos proposeOutline() e movemos para 'outline'.
+  const [step, setStep] = useState<'briefing' | 'outline'>('briefing');
+  const [outlineProposal, setOutlineProposal] = useState<ProposedOutline | null>(null);
+  const [pipelineBriefing, setPipelineBriefing] = useState<Briefing | null>(null);
 
   const isTopicMode = TOPIC_TEMPLATES.includes(form.templateName || '');
 
@@ -222,7 +228,6 @@ export default function BriefingForm() {
     setError(null);
 
     try {
-      const postId = nanoid(10);
       // Build the final Briefing: stitch the hydrated brief (structured
       // context from ideation) together with the user's free-form addenda
       // from the Notas textarea. The brief block goes first so the LLM
@@ -237,12 +242,45 @@ export default function BriefingForm() {
             ...form,
             excludedSections: excludedSectionIds.length > 0 ? excludedSectionIds : undefined,
           };
-      const outline = await generateOutline(briefingForPipeline);
+
+      // Step 1: pede ao engine para propor o outline. Quando a feature flag
+      // backend está off, o engine retorna o template skeleton como
+      // fallback — a UI de edição abre normalmente para rename/reorder/add.
+      const proposal = await proposeOutline(briefingForPipeline);
+
+      setPipelineBriefing(briefingForPipeline);
+      setOutlineProposal(proposal);
+      setStep('outline');
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Erro ao propor outline.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Disparado pelo OutlineEditor. Pega o outline final (já editado pelo
+  // usuário) e chama o pipeline legacy de research-only (`/content/outline`)
+  // com customOutline. Mantém a mesma sequência que o fluxo antigo:
+  // grava o post no store e navega para /editor/{postId}.
+  async function handleGenerate(sections: CustomSection[]) {
+    if (!pipelineBriefing) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const postId = nanoid(10);
+      const finalBriefing: Briefing = {
+        ...pipelineBriefing,
+        customOutline: sections,
+      };
+      const outline = await generateOutline(finalBriefing);
 
       setPostId(postId);
-      setBriefing(briefingForPipeline);
+      setBriefing(finalBriefing);
 
-      const sections = (
+      const uiSections = (
         outline.sections as Array<{
           id?: string;
           sectionId?: string;
@@ -263,16 +301,61 @@ export default function BriefingForm() {
         humanInputGuidance: s.humanInputGuidance,
       }));
 
-      initSections(sections);
+      initSections(uiSections);
       setPhase('writing');
       router.push(`/editor/${postId}`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Erro ao gerar outline.',
-      );
+      setError(err instanceof Error ? err.message : 'Erro ao gerar o post.');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleCancelOutline() {
+    setStep('briefing');
+    setOutlineProposal(null);
+    setError(null);
+  }
+
+  async function handleResetOutline() {
+    if (!pipelineBriefing) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // Re-fetch o template puro via proposeOutline — o engine retorna
+      // fallback ao skeleton quando qualquer problema acontece, e também
+      // é isso que queremos ao "resetar": outline sem edições.
+      const proposal = await proposeOutline({
+        ...pipelineBriefing,
+        // Força fallback mesmo com flag ligada enviando um hint:
+        // o proposer ainda vai rodar, mas a UI descarta alterações do user.
+      });
+      setOutlineProposal(proposal);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao resetar outline.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (step === 'outline' && outlineProposal) {
+    return (
+      <div className="flex flex-col gap-4">
+        {error && (
+          <div className="rounded-lg bg-red-900/30 border border-red-700 px-4 py-3 text-red-300 text-sm">
+            {error}
+          </div>
+        )}
+        <OutlineEditor
+          proposal={outlineProposal}
+          onConfirm={handleGenerate}
+          onCancel={handleCancelOutline}
+          onReset={handleResetOutline}
+          submitting={loading}
+          submitLabel="Gerar post"
+        />
+      </div>
+    );
   }
 
   return (
