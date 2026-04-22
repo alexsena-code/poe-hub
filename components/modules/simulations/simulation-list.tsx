@@ -38,6 +38,7 @@ interface Simulation {
   name: string;
   league: string;
   status: "draft" | "active" | "archived";
+  kind: "operational" | "forecast";
   durationWeeks: number;
   notes: string | null;
   createdAt: string;
@@ -100,6 +101,9 @@ function SimulationListInner() {
   const [leagueFilter, setLeagueFilter] = useState(
     searchParams.get("league") || "all"
   );
+  const [kindFilter, setKindFilter] = useState(
+    searchParams.get("kind") || "all"
+  );
   const { leagues } = useLeagues();
   const { formatMoney, exchangeRate } = useCurrency();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -120,6 +124,7 @@ function SimulationListInner() {
     params.set("limit", "20");
     if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
     if (leagueFilter && leagueFilter !== "all") params.set("league", leagueFilter);
+    if (kindFilter && kindFilter !== "all") params.set("kind", kindFilter);
 
     try {
       const res = await fetch(`/api/simulations?${params}`);
@@ -134,7 +139,7 @@ function SimulationListInner() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, statusFilter, leagueFilter]);
+  }, [pagination.page, statusFilter, leagueFilter, kindFilter]);
 
   useEffect(() => {
     fetchSimulations();
@@ -186,6 +191,7 @@ function SimulationListInner() {
   function resetFilters() {
     setStatusFilter("all");
     setLeagueFilter("all");
+    setKindFilter("all");
     setPagination((p) => ({ ...p, page: 1 }));
   }
 
@@ -235,6 +241,25 @@ function SimulationListInner() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Tipo</Label>
+          <Select
+            value={kindFilter}
+            onValueChange={(val) => {
+              setKindFilter(val);
+              setPagination((p) => ({ ...p, page: 1 }));
+            }}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="operational">Operacional</SelectItem>
+              <SelectItem value="forecast">Forecast</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Button variant="ghost" size="sm" onClick={resetFilters}>
           Limpar filtros
         </Button>
@@ -260,6 +285,7 @@ function SimulationListInner() {
               <TableHead>Nome</TableHead>
               <TableHead>Liga</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Tipo</TableHead>
               <TableHead className="text-center">Semanas</TableHead>
               <TableHead className="text-right">Receita</TableHead>
               <TableHead className="text-right">Lucro</TableHead>
@@ -272,7 +298,7 @@ function SimulationListInner() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={11}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Carregando...
@@ -281,7 +307,7 @@ function SimulationListInner() {
             ) : simulations.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={11}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Nenhuma simulacao encontrada
@@ -305,6 +331,11 @@ function SimulationListInner() {
                   <TableCell>
                     <Badge variant={STATUS_VARIANTS[sim.status] ?? "outline"}>
                       {STATUS_LABELS[sim.status] ?? sim.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={sim.kind === "forecast" ? "outline" : "secondary"} className="text-xs">
+                      {sim.kind === "forecast" ? "Forecast" : "Oper."}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">

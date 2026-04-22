@@ -32,6 +32,7 @@ const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatorio"),
   league: z.string().optional(),
   durationWeeks: z.number().int().min(1).max(52).optional(),
+  kind: z.enum(["operational", "forecast"]).optional(),
   notes: z.string().optional(),
 });
 
@@ -72,6 +73,7 @@ export function SimulationCreateDialog() {
       name: "",
       league: "",
       durationWeeks: 4,
+      kind: "operational",
       notes: "",
     },
   });
@@ -184,6 +186,28 @@ export function SimulationCreateDialog() {
                 {errors.durationWeeks && (
                   <p className="text-sm text-destructive">{errors.durationWeeks.message}</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  defaultValue="operational"
+                  onValueChange={(val) =>
+                    setValue("kind", val as "operational" | "forecast")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operational">
+                      Operacional — liga real em andamento
+                    </SelectItem>
+                    <SelectItem value="forecast">
+                      Forecast — para planejamento de faturamento anual
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </>
           )}

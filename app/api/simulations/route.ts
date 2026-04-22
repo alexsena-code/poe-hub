@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const league = searchParams.get("league");
   const search = searchParams.get("search");
+  const kind = searchParams.get("kind");
 
   const where: Record<string, unknown> = {};
 
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest) {
   }
   if (league) {
     where.league = league;
+  }
+  if (kind === "operational" || kind === "forecast") {
+    where.kind = kind;
   }
   if (search) {
     where.OR = [
@@ -159,6 +163,7 @@ export async function POST(request: NextRequest) {
       name: data.name,
       league: data.league,
       status: data.status,
+      kind: data.kind,
       durationWeeks: data.durationWeeks,
       notes: data.notes ?? null,
       costLinks: data.costConfigIds?.length

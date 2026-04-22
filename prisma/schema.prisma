@@ -39,6 +39,11 @@ enum SimulationStatus {
   archived
 }
 
+enum SimulationKind {
+  operational
+  forecast
+}
+
 enum TaskStatus {
   backlog
   todo
@@ -242,6 +247,7 @@ model Simulation {
   name            String
   league          String
   status          SimulationStatus @default(draft)
+  kind            SimulationKind   @default(operational)
   durationWeeks   Int              @map("duration_weeks")
   startDayOffset  Int              @default(0) @map("start_day_offset")
   notes           String?
@@ -258,12 +264,42 @@ model Simulation {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  weeks     SimulationWeek[]
-  costLinks SimulationCostLink[]
+  weeks       SimulationWeek[]
+  costLinks   SimulationCostLink[]
+  annualLinks AnnualPlanSimulation[]
 
   @@index([status])
   @@index([league])
+  @@index([kind])
   @@map("simulations")
+}
+
+model AnnualPlan {
+  id                 String   @id @default(uuid())
+  name               String
+  year               Int
+  annualCustomCosts  Json?    @map("annual_custom_costs")
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  simulationLinks AnnualPlanSimulation[]
+
+  @@index([year])
+  @@map("annual_plans")
+}
+
+model AnnualPlanSimulation {
+  annualPlanId String @map("annual_plan_id")
+  simulationId String @map("simulation_id")
+  position     Int    @default(0)
+
+  annualPlan AnnualPlan @relation(fields: [annualPlanId], references: [id], onDelete: Cascade)
+  simulation Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+
+  @@id([annualPlanId, simulationId])
+  @@index([simulationId])
+  @@map("annual_plan_simulations")
 }
 
 model SimulationWeek {

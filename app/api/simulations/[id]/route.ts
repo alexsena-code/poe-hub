@@ -160,6 +160,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.name !== undefined) updateData.name = data.name;
   if (data.league !== undefined) updateData.league = data.league;
   if (data.status !== undefined) updateData.status = data.status;
+  if (data.kind !== undefined) updateData.kind = data.kind;
   if (data.notes !== undefined) updateData.notes = data.notes ?? null;
 
   // Direct cost overrides (editable from comparison UI without re-linking a config)
