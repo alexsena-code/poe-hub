@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { nanoid } from 'nanoid';
-import { generateOutline, proposeOutline, fetchSkimCollections } from '@/lib/content-api';
+import { generateOutline, proposeOutline, fetchSkimCollections, analyzePob } from '@/lib/content-api';
 import { usePostStore } from '@/lib/engine-store';
-import type { Briefing, CustomSection, ProposedOutline } from '@/lib/engine-types';
+import type { Briefing, CustomSection, ProposedOutline, PobSummary } from '@/lib/engine-types';
 import PlanPreview from './PlanPreview';
 import OutlineEditor from './OutlineEditor';
 import SkimCollectionsSelector from './SkimCollectionsSelector';
+import PobSummaryCard from './PobSummaryCard';
 
 const API_URL = '/api/engine';
 
@@ -129,6 +130,11 @@ export default function BriefingForm() {
   const [skimDefaultsByTemplate, setSkimDefaultsByTemplate] = useState<
     Record<string, string[]>
   >({});
+  // PoB analysis state — card shows decoded class/ascendancy/loadouts
+  // immediately after clicking "Analisar", before the user generates.
+  const [pobSummary, setPobSummary] = useState<PobSummary | null>(null);
+  const [pobAnalyzing, setPobAnalyzing] = useState(false);
+  const [pobError, setPobError] = useState<string | null>(null);
   // Step state: 'briefing' = form atual, 'outline' = OutlineEditor com proposta.
   // Ao clicar "Gerar Outline", chamamos proposeOutline() e movemos para 'outline'.
   const [step, setStep] = useState<'briefing' | 'outline'>('briefing');
@@ -572,20 +578,64 @@ export default function BriefingForm() {
       {/* PoB import — decoded server-side, virá injetado em briefing.notes
           como "## BUILD SNAPSHOT" (e "## BUILD VARIANTS" se o arquivo
           tiver múltiplos loadouts). */}
-      <div>
+      <div className="space-y-2">
         <label className="block text-sm font-medium text-muted-foreground mb-1">
           PoB URL <span className="text-xs text-muted-foreground/70">(opcional — pobb.in / pastebin / código cru base64)</span>
         </label>
-        <input
-          type="url"
-          placeholder="https://pobb.in/..."
-          value={form.pobUrl ?? ''}
-          onChange={(e) => updateField('pobUrl', e.target.value)}
-          className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-        <p className="mt-1 text-[11px] text-muted-foreground/80">
+        <div className="flex gap-2">
+          <input
+            type="url"
+            placeholder="https://pobb.in/..."
+            value={form.pobUrl ?? ''}
+            onChange={(e) => {
+              updateField('pobUrl', e.target.value);
+              // Limpa análise anterior se o autor muda a URL.
+              if (pobSummary) setPobSummary(null);
+              if (pobError) setPobError(null);
+            }}
+            className="flex-1 rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <button
+            type="button"
+            onClick={async () => {
+              const url = (form.pobUrl ?? '').trim();
+              if (!url) {
+                setPobError('Cole a URL ou o código do PoB primeiro.');
+                return;
+              }
+              setPobAnalyzing(true);
+              setPobError(null);
+              try {
+                const summary = await analyzePob(url);
+                setPobSummary(summary);
+              } catch (e) {
+                setPobError(e instanceof Error ? e.message : 'Erro ao analisar');
+                setPobSummary(null);
+              } finally {
+                setPobAnalyzing(false);
+              }
+            }}
+            disabled={pobAnalyzing || !(form.pobUrl ?? '').trim()}
+            className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-medium text-accent hover:bg-accent/20 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+          >
+            {pobAnalyzing ? 'Analisando…' : 'Analisar PoB'}
+          </button>
+        </div>
+        <p className="text-[11px] text-muted-foreground/80">
           Todos os items, passives, auras e loadouts alternativos do PoB entram no contexto do writer.
+          Clique em <strong>Analisar PoB</strong> pra ver o que foi decodificado antes de gerar.
         </p>
+        {pobError && (
+          <div className="rounded-lg border border-red-700/50 bg-red-950/20 px-3 py-2 text-xs text-red-300">
+            {pobError}
+          </div>
+        )}
+        {pobSummary && (
+          <PobSummaryCard
+            summary={pobSummary}
+            onDismiss={() => setPobSummary(null)}
+          />
+        )}
       </div>
 
       {/* Notes */}

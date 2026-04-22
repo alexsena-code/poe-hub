@@ -6,6 +6,7 @@ import type {
   SkimCollectionsCatalog,
   PostTrace,
   PostTraceSummary,
+  PobSummary,
 } from './engine-types';
 
 const isServer = typeof window === 'undefined';
@@ -183,6 +184,32 @@ export async function deleteTrace(slug: string): Promise<{ slug: string; deleted
     { method: 'DELETE', headers: authHeaders() },
   );
   if (!res.ok) throw new Error('Falha ao deletar trace');
+  return res.json();
+}
+
+/**
+ * Decodifica um PoB (URL pobb.in, pastebin, ou código cru base64+zlib)
+ * e retorna o snapshot resumido (identity, stats, main skill, supports,
+ * auxiliaries, tree, gear, alternate loadouts). Usado pelo botão
+ * "Analisar PoB" no briefing form — dá feedback visual antes do
+ * autor gerar o outline.
+ */
+export async function analyzePob(code: string): Promise<PobSummary> {
+  const res = await fetch(`${CONTENT_API_URL}/pob/summary`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) {
+    let msg = 'Falha ao analisar PoB';
+    try {
+      const body = await res.json();
+      if (body?.message) msg = `${msg}: ${body.message}`;
+    } catch {
+      /* ignore — fall through to default */
+    }
+    throw new Error(msg);
+  }
   return res.json();
 }
 

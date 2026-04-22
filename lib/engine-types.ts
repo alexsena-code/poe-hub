@@ -115,6 +115,80 @@ export interface PostTrace {
   events: TraceEvent[];
 }
 
+// ---------------------------------------------------------------------------
+// PoB decoder summary (mirror of packages/api PobSummary)
+// ---------------------------------------------------------------------------
+
+export interface PobSummaryGearItem {
+  slot: string;
+  name: string;
+  isUnique: boolean;
+  canonical: boolean;
+  id?: string;
+  explicits?: string[];
+  implicits?: string[];
+  enchant?: string;
+  influences?: string[];
+  itemLevel?: number;
+  corrupted?: true;
+  mirrored?: true;
+  fractured?: true;
+  split?: true;
+}
+
+export interface PobAlternateLoadout {
+  id: string;
+  title: string;
+  gear?: PobSummaryGearItem[];
+  tree?: {
+    nodesTotal: number;
+    keystones: string[];
+    notablesAllocated: string[];
+    masteries: Array<{ name: string; choice: string }>;
+    jewels: string[];
+  };
+  mainSkill?: string | null;
+  supports?: string[];
+  auras?: string[];
+  heralds?: string[];
+  curses?: string[];
+  banners?: string[];
+  triggers?: string[];
+  movement?: string[];
+}
+
+export interface PobSummary {
+  class: string;
+  ascendancy: string;
+  level: number;
+  notes?: string;
+  stats: {
+    totalDps?: string;
+    ehp?: string;
+    life?: string;
+    energyShield?: string;
+    resists?: string;
+    movementSpeed?: string;
+  };
+  mainSkill: string | null;
+  supports: string[];
+  auras?: string[];
+  heralds?: string[];
+  curses?: string[];
+  banners?: string[];
+  triggers?: string[];
+  movement?: string[];
+  tree: {
+    nodesTotal: number;
+    keystones: string[];
+    notablesAllocated: string[];
+    masteries: Array<{ name: string; choice: string }>;
+    jewels: string[];
+  };
+  gear: PobSummaryGearItem[];
+  alternateLoadouts?: PobAlternateLoadout[];
+}
+
 export interface PostTraceSummary {
   slug: string;
   mode: TraceMode;
