@@ -569,6 +569,25 @@ export default function BriefingForm() {
         </div>
       )}
 
+      {/* PoB import — decoded server-side, virá injetado em briefing.notes
+          como "## BUILD SNAPSHOT" (e "## BUILD VARIANTS" se o arquivo
+          tiver múltiplos loadouts). */}
+      <div>
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
+          PoB URL <span className="text-xs text-muted-foreground/70">(opcional — pobb.in / pastebin / código cru base64)</span>
+        </label>
+        <input
+          type="url"
+          placeholder="https://pobb.in/..."
+          value={form.pobUrl ?? ''}
+          onChange={(e) => updateField('pobUrl', e.target.value)}
+          className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground/80">
+          Todos os items, passives, auras e loadouts alternativos do PoB entram no contexto do writer.
+        </p>
+      </div>
+
       {/* Notes */}
       <div>
         <label className="block text-sm font-medium text-muted-foreground mb-1">

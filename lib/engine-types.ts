@@ -11,6 +11,13 @@ export interface Briefing {
   /** Active data-source keys (youtube, reddit, patch, ...) forcing Qdrant collections. */
   dataSources?: string[];
   /**
+   * Path of Building import URL (pobb.in / pastebin / raw base64 code).
+   * Decoded server-side at generate time — the decoded snapshot is
+   * injected into briefing.notes as `## BUILD SNAPSHOT (PoB import)`
+   * which the writer treats as authoritative build data.
+   */
+  pobUrl?: string;
+  /**
    * User-approved outline (from OutlineEditor edits). When present, the
    * engine iterates this list instead of the template.sections, keeping
    * renames, reorders, additions and deletions the user made.
