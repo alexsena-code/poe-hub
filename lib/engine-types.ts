@@ -35,6 +35,91 @@ export interface SkimCollectionsCatalog {
   defaultsByTemplate: Record<string, string[]>;
 }
 
+// ---------------------------------------------------------------------------
+// Post generation trace (mirrors packages/api/.../trace/trace-types.ts)
+// ---------------------------------------------------------------------------
+
+export type TraceMode = 'autonomous' | 'co_writer' | 'outline_only' | 'fix' | 'rewrite_selection';
+
+export interface TraceLlmCall {
+  model: string;
+  systemPrompt: string;
+  userMessage: string;
+  response: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  latencyMs: number;
+  llmUsageLogId?: number | null;
+}
+
+export interface TraceRetrieval {
+  query: string | string[];
+  queryType: string;
+  collections: string[];
+  chunkCount: number;
+  topChunks: Array<{
+    score: number;
+    collection: string;
+    pageTitle: string;
+    section?: string;
+    preview: string;
+  }>;
+  exactDataPresent: boolean;
+  summaryPresent: boolean;
+  durationMs: number;
+}
+
+export interface TraceEvent {
+  seq: number;
+  timestamp: string;
+  node: string;
+  kind: string;
+  sectionId?: string;
+  message: string;
+  details?: Record<string, any>;
+  durationMs?: number;
+  tokensUsed?: number;
+  costUsd?: number;
+  llm?: TraceLlmCall;
+  retrieval?: TraceRetrieval;
+}
+
+export interface PostTrace {
+  slug: string;
+  mode: TraceMode;
+  createdAt: string;
+  updatedAt: string;
+  totals: {
+    tokensUsed: number;
+    costUsd: number;
+    durationMs: number;
+    eventCount: number;
+    llmCallCount: number;
+  };
+  inputs: {
+    briefing: Briefing;
+    templateName?: string;
+    templateSnapshot?: Record<string, any>;
+    customOutline?: CustomSection[];
+    skimCollections?: string[];
+    featureFlags?: Record<string, boolean>;
+  };
+  events: TraceEvent[];
+}
+
+export interface PostTraceSummary {
+  slug: string;
+  mode: TraceMode;
+  createdAt: string;
+  updatedAt: string;
+  totals: PostTrace['totals'];
+  templateName?: string;
+  skill?: string;
+  ascendancy?: string;
+  topic?: string;
+}
+
 /**
  * Single section in a user-approved outline. Matches the engine's
  * CustomSection (packages/api/src/modules/content/types.ts).

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { BookOpen, Pencil, Eye, FileEdit, RefreshCw, AlertCircle, Trash2 } from "lucide-react";
+import { BookOpen, Pencil, Eye, FileEdit, RefreshCw, AlertCircle, Trash2, Activity } from "lucide-react";
 
 const API = '/api/engine';
 
@@ -268,6 +268,14 @@ export default function GuidesPage() {
                       >
                         <FileEdit className="h-3.5 w-3.5" />
                         Editar
+                      </Link>
+                      <Link
+                        href={`/guides/${post.slug}/trace`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-foreground/10 transition-colors"
+                        title="Ver trace de geração (prompts, chunks, decisões)"
+                      >
+                        <Activity className="h-3.5 w-3.5" />
+                        Trace
                       </Link>
                       <button
                         type="button"

@@ -4,6 +4,8 @@ import type {
   GeneratedSection,
   ProposedOutline,
   SkimCollectionsCatalog,
+  PostTrace,
+  PostTraceSummary,
 } from './engine-types';
 
 const isServer = typeof window === 'undefined';
@@ -151,6 +153,39 @@ export async function proposeOutline(briefing: Briefing): Promise<ProposedOutlin
  * com descrição e defaults por template. Consumido pelo
  * SkimCollectionsSelector pra renderizar checkboxes e pré-selecionar.
  */
+// ---------------------------------------------------------------------------
+// Post generation trace (Phase 1)
+// ---------------------------------------------------------------------------
+
+export async function fetchTraces(): Promise<PostTraceSummary[]> {
+  const res = await fetch(`${CONTENT_API_URL}/content/traces`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error('Falha ao listar traces');
+  return res.json();
+}
+
+export async function fetchTrace(slug: string): Promise<PostTrace | null> {
+  const res = await fetch(
+    `${CONTENT_API_URL}/content/traces/${encodeURIComponent(slug)}`,
+    { headers: authHeaders(), cache: 'no-store' },
+  );
+  if (!res.ok) throw new Error('Falha ao carregar trace');
+  const data = await res.json();
+  if (data?.error) return null;
+  return data as PostTrace;
+}
+
+export async function deleteTrace(slug: string): Promise<{ slug: string; deleted: boolean }> {
+  const res = await fetch(
+    `${CONTENT_API_URL}/content/traces/${encodeURIComponent(slug)}`,
+    { method: 'DELETE', headers: authHeaders() },
+  );
+  if (!res.ok) throw new Error('Falha ao deletar trace');
+  return res.json();
+}
+
 export async function fetchSkimCollections(): Promise<SkimCollectionsCatalog> {
   const res = await fetch(`${CONTENT_API_URL}/content/skim-collections`, {
     headers: authHeaders(),
