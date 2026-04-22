@@ -9,6 +9,7 @@ import {
   type RawWeek,
   type RawDay,
   type CostConfigData,
+  type CustomCostEntry,
 } from "@/lib/simulation-calculator";
 
 type Params = { params: Promise<{ id: string }> };
@@ -41,8 +42,17 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 
   // Get cost config for calculations (use first linked config)
-  const costConfig: CostConfigData | null =
-    simulation.costLinks.length > 0 ? simulation.costLinks[0].costConfig : null;
+  const linkedConfig = simulation.costLinks[0]?.costConfig ?? null;
+  const costConfig: CostConfigData | null = linkedConfig
+    ? {
+        proxyCostPerBotMonthly: linkedConfig.proxyCostPerBotMonthly,
+        levelingCostPerBot: linkedConfig.levelingCostPerBot,
+        stashPackCostPerBot: linkedConfig.stashPackCostPerBot,
+        expluginsKeyCostDaily: linkedConfig.expluginsKeyCostDaily,
+        dpbKeyCostDaily: linkedConfig.dpbKeyCostDaily,
+        customCosts: (linkedConfig.customCosts as CustomCostEntry[] | null) ?? null,
+      }
+    : null;
 
   // Calculate per-week results
   const weeksWithCalc = simulation.weeks.map((week) => {
@@ -152,6 +162,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.status !== undefined) updateData.status = data.status;
   if (data.notes !== undefined) updateData.notes = data.notes ?? null;
 
+  // Direct cost overrides (editable from comparison UI without re-linking a config)
+  if (data.proxyCostPerBotMonthly !== undefined) updateData.proxyCostPerBotMonthly = data.proxyCostPerBotMonthly;
+  if (data.levelingCostPerBot !== undefined) updateData.levelingCostPerBot = data.levelingCostPerBot;
+  if (data.stashPackCostPerBot !== undefined) updateData.stashPackCostPerBot = data.stashPackCostPerBot;
+  if (data.expluginsKeyCostDaily !== undefined) updateData.expluginsKeyCostDaily = data.expluginsKeyCostDaily;
+  if (data.dpbKeyCostDaily !== undefined) updateData.dpbKeyCostDaily = data.dpbKeyCostDaily;
+  if (data.customCosts !== undefined) updateData.customCosts = data.customCosts;
+
   // Handle cost config: support both costConfigId (singular) and costConfigIds (array)
   const configId = (body as Record<string, unknown>).costConfigId as string | undefined;
   const costConfigIds = data.costConfigIds ?? (configId ? [configId] : undefined);
@@ -188,6 +206,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       updateData.stashPackCostPerBot = Number(primaryConfig.stashPackCostPerBot);
       updateData.expluginsKeyCostDaily = Number(primaryConfig.expluginsKeyCostDaily);
       updateData.dpbKeyCostDaily = Number(primaryConfig.dpbKeyCostDaily);
+      updateData.customCosts = primaryConfig.customCosts ?? [];
     }
   }
 

@@ -1,6 +1,20 @@
 import { z } from "zod/v4";
 
 // ============================================================
+// Custom costs (extensible, user-defined)
+// ============================================================
+
+export const customCostSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1, "Nome do custo é obrigatório"),
+  amount: z.number().min(0, "Valor mínimo 0"),
+  cadence: z.enum(["daily", "monthly", "one_time"]),
+  perBot: z.boolean(),
+});
+
+export type CustomCost = z.infer<typeof customCostSchema>;
+
+// ============================================================
 // Simulation
 // ============================================================
 
@@ -19,6 +33,13 @@ export const updateSimulationSchema = z.object({
   status: z.enum(["draft", "active", "archived"]).optional(),
   notes: z.string().nullable().optional(),
   costConfigIds: z.array(z.string().uuid()).optional(),
+  // Cost overrides (editable directly on the simulation snapshot)
+  proxyCostPerBotMonthly: z.number().min(0).nullable().optional(),
+  levelingCostPerBot: z.number().min(0).nullable().optional(),
+  stashPackCostPerBot: z.number().min(0).nullable().optional(),
+  expluginsKeyCostDaily: z.number().min(0).nullable().optional(),
+  dpbKeyCostDaily: z.number().min(0).nullable().optional(),
+  customCosts: z.array(customCostSchema).nullable().optional(),
 });
 
 // ============================================================
@@ -60,6 +81,7 @@ export const createCostConfigSchema = z.object({
   stashPackCostPerBot: z.number().min(0).optional().default(0),
   expluginsKeyCostDaily: z.number().min(0),
   dpbKeyCostDaily: z.number().min(0).optional().default(0),
+  customCosts: z.array(customCostSchema).optional().default([]),
   notes: z.string().nullable().optional(),
 });
 

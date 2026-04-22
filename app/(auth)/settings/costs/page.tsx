@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod/v4";
 import { toast } from "sonner";
@@ -33,10 +33,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Plus, Pencil, Trash2, Star, Info } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Star, Info, X } from "lucide-react";
 import { useCurrency } from "@/hooks/use-currency";
 
 // --- Types ---
+
+interface CustomCost {
+  id: string;
+  name: string;
+  amount: number;
+  cadence: "daily" | "monthly" | "one_time";
+  perBot: boolean;
+}
 
 interface CostConfig {
   id: string;
@@ -47,12 +55,21 @@ interface CostConfig {
   stashPackCostPerBot: number;
   expluginsKeyCostDaily: number;
   dpbKeyCostDaily: number;
+  customCosts: CustomCost[] | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 // --- Schema ---
+
+const customCostFormSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, "Nome obrigatório"),
+  amount: z.number().min(0, "Valor mínimo 0"),
+  cadence: z.enum(["daily", "monthly", "one_time"]),
+  perBot: z.boolean(),
+});
 
 const costConfigSchema = z.object({
   name: z.string().min(1, "Nome obrigatorio"),
@@ -62,14 +79,11 @@ const costConfigSchema = z.object({
   stashPackCostPerBot: z.number().min(0, "Valor minimo 0"),
   expluginsKeyCostDaily: z.number().min(0, "Valor minimo 0"),
   dpbKeyCostDaily: z.number().min(0, "Valor minimo 0"),
+  customCosts: z.array(customCostFormSchema).optional(),
   notes: z.string().optional(),
 });
 
 type CostConfigForm = z.infer<typeof costConfigSchema>;
-
-// --- Helpers ---
-
-// fmtCurrency removed — use formatMoney from useCurrency hook instead
 
 // --- Cost field names that hold monetary values ---
 const COST_FIELDS = [
@@ -152,6 +166,9 @@ export default function CostConfigsPage() {
     dpbKeyCostDaily: "usd",
   });
 
+  // Per-custom-cost currency (keyed by the custom cost id)
+  const [customCurrencies, setCustomCurrencies] = useState<Record<string, "usd" | "brl">>({});
+
   function toggleFieldCurrency(field: CostFieldName) {
     setFieldCurrencies((prev) => ({
       ...prev,
@@ -163,7 +180,7 @@ export default function CostConfigsPage() {
     setFieldCurrencies({
       proxyCostPerBotMonthly: "usd",
       levelingCostPerBot: "usd",
-    stashPackCostPerBot: "usd",
+      stashPackCostPerBot: "usd",
       expluginsKeyCostDaily: "usd",
       dpbKeyCostDaily: "usd",
     });
@@ -173,7 +190,7 @@ export default function CostConfigsPage() {
     register,
     handleSubmit,
     reset,
-    setValue,
+    control,
     formState: { errors },
   } = useForm<CostConfigForm>({
     resolver: zodResolver(costConfigSchema),
@@ -185,8 +202,14 @@ export default function CostConfigsPage() {
       stashPackCostPerBot: 0,
       expluginsKeyCostDaily: 0,
       dpbKeyCostDaily: 0,
+      customCosts: [],
       notes: "",
     },
+  });
+
+  const { fields: customFields, append: appendCustom, remove: removeCustom } = useFieldArray({
+    control,
+    name: "customCosts",
   });
 
   const fetchConfigs = useCallback(async () => {
@@ -209,6 +232,7 @@ export default function CostConfigsPage() {
   function openCreate() {
     setEditingConfig(null);
     resetFieldCurrencies();
+    setCustomCurrencies({});
     reset({
       name: "",
       isDefault: false,
@@ -217,6 +241,7 @@ export default function CostConfigsPage() {
       stashPackCostPerBot: 0,
       expluginsKeyCostDaily: 0,
       dpbKeyCostDaily: 0,
+      customCosts: [],
       notes: "",
     });
     setDialogOpen(true);
@@ -225,6 +250,8 @@ export default function CostConfigsPage() {
   function openEdit(config: CostConfig) {
     setEditingConfig(config);
     resetFieldCurrencies();
+    const customs = config.customCosts ?? [];
+    setCustomCurrencies(Object.fromEntries(customs.map((c) => [c.id, "usd" as const])));
     reset({
       name: config.name,
       isDefault: config.isDefault,
@@ -233,9 +260,35 @@ export default function CostConfigsPage() {
       stashPackCostPerBot: Number(config.stashPackCostPerBot),
       expluginsKeyCostDaily: Number(config.expluginsKeyCostDaily),
       dpbKeyCostDaily: Number(config.dpbKeyCostDaily),
+      customCosts: customs.map((c) => ({
+        id: c.id,
+        name: c.name,
+        amount: Number(c.amount),
+        cadence: c.cadence,
+        perBot: c.perBot,
+      })),
       notes: config.notes ?? "",
     });
     setDialogOpen(true);
+  }
+
+  function addCustomCost() {
+    const newId = crypto.randomUUID();
+    appendCustom({
+      id: newId,
+      name: "",
+      amount: 0,
+      cadence: "monthly",
+      perBot: false,
+    });
+    setCustomCurrencies((prev) => ({ ...prev, [newId]: "usd" }));
+  }
+
+  function toggleCustomCurrency(id: string) {
+    setCustomCurrencies((prev) => ({
+      ...prev,
+      [id]: (prev[id] ?? "usd") === "usd" ? "brl" : "usd",
+    }));
   }
 
   async function onSubmit(data: CostConfigForm) {
@@ -248,6 +301,14 @@ export default function CostConfigsPage() {
           payload[field] = Number(((payload[field] as number) / exchangeRate).toFixed(4));
         }
       }
+      payload.customCosts = (data.customCosts ?? []).map((cc) => {
+        const curr = customCurrencies[cc.id] ?? "usd";
+        const amount =
+          curr === "brl" && exchangeRate > 0
+            ? Number((cc.amount / exchangeRate).toFixed(4))
+            : cc.amount;
+        return { ...cc, amount };
+      });
 
       const url = editingConfig
         ? `/api/cost-configs/${editingConfig.id}`
@@ -296,6 +357,10 @@ export default function CostConfigsPage() {
     }
   }
 
+  function cadenceLabel(c: CustomCost["cadence"]) {
+    return c === "daily" ? "Diário" : c === "monthly" ? "Mensal" : "Único";
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -331,6 +396,7 @@ export default function CostConfigsPage() {
               <TableHead className="text-right">Stash Pack/Bot (unico)</TableHead>
               <TableHead className="text-right">Explugins Key (diario)</TableHead>
               <TableHead className="text-right">DPB Key (diario)</TableHead>
+              <TableHead className="text-right">Customs</TableHead>
               <TableHead className="text-right">Acoes</TableHead>
             </TableRow>
           </TableHeader>
@@ -338,7 +404,7 @@ export default function CostConfigsPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Carregando...
@@ -347,7 +413,7 @@ export default function CostConfigsPage() {
             ) : configs.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center py-8 text-muted-foreground"
                 >
                   Nenhuma configuracao encontrada. Crie a primeira.
@@ -383,6 +449,31 @@ export default function CostConfigsPage() {
                     {formatMoney(Number(config.dpbKeyCostDaily), "usd")}
                   </TableCell>
                   <TableCell className="text-right">
+                    {config.customCosts && config.customCosts.length > 0 ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="font-mono cursor-help">
+                              {config.customCosts.length}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <ul className="text-xs space-y-0.5">
+                              {config.customCosts.map((c) => (
+                                <li key={c.id}>
+                                  {c.name}: {formatMoney(Number(c.amount), "usd")} / {cadenceLabel(c.cadence)}
+                                  {c.perBot ? " · por bot" : " · global"}
+                                </li>
+                              ))}
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
@@ -413,16 +504,16 @@ export default function CostConfigsPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingConfig ? "Editar Configuracao" : "Nova Configuracao"}
             </DialogTitle>
             <DialogDescription>
-              Define os custos operacionais diarios para simulacoes.
+              Define os custos operacionais usados em simulacoes e projecoes.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-1.5">
               <Label htmlFor="config-name">Nome</Label>
               <Input
@@ -489,6 +580,106 @@ export default function CostConfigsPage() {
                 onToggleCurrency={() => toggleFieldCurrency("dpbKeyCostDaily")}
               />
             </div>
+
+            {/* Custos adicionais */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Custos adicionais</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      VPS, eletricidade, licenças extras — qualquer custo além dos padrões acima.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addCustomCost}>
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Adicionar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {customFields.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">
+                    Nenhum custo adicional configurado.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {customFields.map((field, index) => {
+                      const ccId = field.id;
+                      const curr = customCurrencies[field.id] ?? "usd";
+                      return (
+                        <div
+                          key={field.id}
+                          className="grid grid-cols-[2fr_1.2fr_1.2fr_auto_auto] gap-2 items-start p-2 rounded-md border bg-muted/30"
+                        >
+                          <div>
+                            <Input
+                              placeholder="Nome (ex: VPS)"
+                              {...register(`customCosts.${index}.name`)}
+                            />
+                            {errors.customCosts?.[index]?.name && (
+                              <p className="text-xs text-destructive mt-0.5">
+                                {errors.customCosts[index]?.name?.message}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex">
+                            <button
+                              type="button"
+                              onClick={() => toggleCustomCurrency(ccId)}
+                              className="flex items-center justify-center px-2 rounded-l-md border border-r-0 border-input bg-muted text-sm font-mono font-medium hover:bg-muted/80 transition-colors min-w-[2.5rem]"
+                              title="Alternar moeda"
+                            >
+                              {curr === "usd" ? "$" : "R$"}
+                            </button>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="rounded-l-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+                              {...register(`customCosts.${index}.amount`, {
+                                valueAsNumber: true,
+                              })}
+                            />
+                          </div>
+                          <select
+                            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                            {...register(`customCosts.${index}.cadence`)}
+                          >
+                            <option value="daily">Diário</option>
+                            <option value="monthly">Mensal</option>
+                            <option value="one_time">Único</option>
+                          </select>
+                          <label className="flex items-center gap-1.5 text-xs whitespace-nowrap pt-2">
+                            <input
+                              type="checkbox"
+                              className="rounded border-border"
+                              {...register(`customCosts.${index}.perBot`)}
+                            />
+                            Por bot
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-destructive"
+                            onClick={() => removeCustom(index)}
+                            title="Remover"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          <input
+                            type="hidden"
+                            {...register(`customCosts.${index}.id`)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="space-y-1.5">
               <Label htmlFor="config-notes">Notas (opcional)</Label>

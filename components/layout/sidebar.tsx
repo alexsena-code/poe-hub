@@ -68,6 +68,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Vendas", href: "/sales", icon: DollarSign },
           { title: "Precos", href: "/prices", icon: TrendingUp },
           { title: "Simulacoes", href: "/simulations", icon: Calculator },
+          { title: "Faturamento Anual", href: "/simulations/annual", icon: Calculator },
         ],
       },
       {

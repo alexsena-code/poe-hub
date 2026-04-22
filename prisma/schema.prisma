@@ -253,6 +253,7 @@ model Simulation {
   stashPackCostPerBot     Decimal? @map("sim_stash_pack_cost_per_bot") @db.Decimal(10, 2)
   expluginsKeyCostDaily   Decimal? @map("sim_explugins_key_cost_daily") @db.Decimal(10, 4)
   dpbKeyCostDaily         Decimal? @map("sim_dpb_key_cost_daily") @db.Decimal(10, 4)
+  customCosts             Json?    @map("sim_custom_costs")
 
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
@@ -310,6 +311,7 @@ model GlobalCostConfig {
   stashPackCostPerBot       Decimal @default(0) @map("stash_pack_cost_per_bot") @db.Decimal(10, 2)
   expluginsKeyCostDaily     Decimal @map("explugins_key_cost_daily") @db.Decimal(10, 4)
   dpbKeyCostDaily           Decimal @map("dpb_key_cost_daily") @db.Decimal(10, 4)
+  customCosts               Json?   @map("custom_costs")
   notes                     String?
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")

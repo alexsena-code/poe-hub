@@ -64,6 +64,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.stashPackCostPerBot !== undefined) updateData.stashPackCostPerBot = data.stashPackCostPerBot;
   if (data.expluginsKeyCostDaily !== undefined) updateData.expluginsKeyCostDaily = data.expluginsKeyCostDaily;
   if (data.dpbKeyCostDaily !== undefined) updateData.dpbKeyCostDaily = data.dpbKeyCostDaily;
+  if (data.customCosts !== undefined) updateData.customCosts = data.customCosts;
   if (data.notes !== undefined) updateData.notes = data.notes ?? null;
 
   // Handle isDefault toggle

@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       stashPackCostPerBot: data.stashPackCostPerBot ?? 0,
       expluginsKeyCostDaily: data.expluginsKeyCostDaily,
       dpbKeyCostDaily: data.dpbKeyCostDaily,
+      customCosts: data.customCosts ?? [],
       notes: data.notes ?? null,
     },
   });

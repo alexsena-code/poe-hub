@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Save, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
+import { EditableNum } from "@/components/ui/editable-num";
+import { toast } from "sonner";
 import {
   ChartConfig,
   ChartContainer,
@@ -35,6 +37,14 @@ import type { SimulationWeek, SimulationDay } from "./week-editor";
 
 // --- Types ---
 
+interface CustomCost {
+  id: string;
+  name: string;
+  amount: number;
+  cadence: "daily" | "monthly" | "one_time";
+  perBot: boolean;
+}
+
 interface Simulation {
   id: string;
   name: string;
@@ -48,6 +58,7 @@ interface Simulation {
   stashPackCostPerBot: number | null;
   expluginsKeyCostDaily: number | null;
   dpbKeyCostDaily: number | null;
+  customCosts: CustomCost[] | null;
   weeks: SimulationWeek[];
 }
 
@@ -93,6 +104,36 @@ function resolveField(
   return weekVal !== null && weekVal !== undefined ? Number(weekVal) : null;
 }
 
+function customPerBotDaily(customs: CustomCost[] | null | undefined): number {
+  let sum = 0;
+  for (const cc of customs ?? []) {
+    if (!cc.perBot || cc.cadence === "one_time") continue;
+    sum += cc.cadence === "monthly" ? cc.amount / 30 : cc.amount;
+  }
+  return sum;
+}
+
+function customGlobalDaily(customs: CustomCost[] | null | undefined): number {
+  let sum = 0;
+  for (const cc of customs ?? []) {
+    if (cc.perBot || cc.cadence === "one_time") continue;
+    sum += cc.cadence === "monthly" ? cc.amount / 30 : cc.amount;
+  }
+  return sum;
+}
+
+function customOneTime(
+  customs: CustomCost[] | null | undefined,
+  maxBots: number
+): number {
+  let sum = 0;
+  for (const cc of customs ?? []) {
+    if (cc.cadence !== "one_time") continue;
+    sum += cc.perBot ? cc.amount * maxBots : cc.amount;
+  }
+  return sum;
+}
+
 function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals {
   let totalRevenueUsd = 0;
   let totalRevenueBrl = 0;
@@ -108,7 +149,9 @@ function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals {
   const expluginsDaily = hasCost ? Number(sim.expluginsKeyCostDaily) : 0;
   const dpbDaily = hasCost ? Number(sim.dpbKeyCostDaily) : 0;
   const proxyDaily = hasCost ? Number(sim.proxyCostPerBotMonthly) / 30 : 0;
-  const costPerBotDaily = expluginsDaily + dpbDaily + proxyDaily;
+  const customPerBot = customPerBotDaily(sim.customCosts);
+  const customGlobal = customGlobalDaily(sim.customCosts);
+  const costPerBotDaily = expluginsDaily + dpbDaily + proxyDaily + customPerBot;
 
   for (const week of sim.weeks) {
     for (const day of week.days) {
@@ -127,27 +170,30 @@ function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals {
         if (priceBrl !== null) totalRevenueBrl += divines * priceBrl;
       }
 
+      const activeBots = resolveField(day, "activeBots", week) ?? 0;
       if (hasCost) {
-        const activeBots = resolveField(day, "activeBots", week) ?? 0;
         totalOperationalCost += activeBots * costPerBotDaily;
       }
+      // Global daily customs run every day that's not offset-locked
+      totalOperationalCost += customGlobal;
     }
   }
 
   const effectiveRevenueUsd =
     totalRevenueUsd > 0 ? totalRevenueUsd : totalRevenueBrl / exchangeRate;
 
+  const maxBots = Math.max(
+    ...sim.weeks.map((w) => Number(w.defaultActiveBots)),
+    0
+  );
   let oneTimeCost = 0;
   if (hasCost) {
-    const maxBots = Math.max(
-      ...sim.weeks.map((w) => Number(w.defaultActiveBots)),
-      0
-    );
     oneTimeCost =
       maxBots *
       (Number(sim.levelingCostPerBot ?? 0) +
         Number(sim.stashPackCostPerBot ?? 0));
   }
+  oneTimeCost += customOneTime(sim.customCosts, maxBots);
 
   const totalCost = totalOperationalCost + oneTimeCost;
   const profit = effectiveRevenueUsd - totalCost;
@@ -174,7 +220,9 @@ function calcWeekTotals(sim: Simulation, exchangeRate: number): WeekTotals[] {
   const expluginsDaily = hasCost ? Number(sim.expluginsKeyCostDaily) : 0;
   const dpbDaily = hasCost ? Number(sim.dpbKeyCostDaily) : 0;
   const proxyDaily = hasCost ? Number(sim.proxyCostPerBotMonthly) / 30 : 0;
-  const costPerBotDaily = expluginsDaily + dpbDaily + proxyDaily;
+  const customPerBot = customPerBotDaily(sim.customCosts);
+  const customGlobal = customGlobalDaily(sim.customCosts);
+  const costPerBotDaily = expluginsDaily + dpbDaily + proxyDaily + customPerBot;
 
   return [...sim.weeks]
     .sort((a, b) => a.weekNumber - b.weekNumber)
@@ -199,10 +247,11 @@ function calcWeekTotals(sim: Simulation, exchangeRate: number): WeekTotals[] {
           if (priceBrl !== null) weekRevBrl += divines * priceBrl;
         }
 
+        const activeBots = resolveField(day, "activeBots", week) ?? 0;
         if (hasCost) {
-          const activeBots = resolveField(day, "activeBots", week) ?? 0;
           weekCost += activeBots * costPerBotDaily;
         }
+        weekCost += customGlobal;
       }
 
       const effectiveRev =
@@ -257,59 +306,6 @@ function Delta({ a, b, formatFn, positiveIsGood = true }: DeltaProps) {
   );
 }
 
-// --- Inline edit cell ---
-
-function EditableNum({
-  value,
-  onChange,
-  type = "decimal",
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  type?: "int" | "decimal";
-}) {
-  const [editing, setEditing] = useState(false);
-  const [editVal, setEditVal] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function start() {
-    setEditVal(String(value));
-    setEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }
-
-  function commit() {
-    setEditing(false);
-    const parsed = type === "int" ? parseInt(editVal) : parseFloat(editVal);
-    if (!isNaN(parsed) && parsed !== value) onChange(parsed);
-  }
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        className="h-6 w-16 text-center font-mono text-sm bg-background border border-input rounded-sm outline-none focus:ring-1 focus:ring-ring"
-        value={editVal}
-        onChange={(e) => setEditVal(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") setEditing(false);
-        }}
-      />
-    );
-  }
-
-  return (
-    <span
-      className="cursor-pointer font-mono text-sm hover:text-primary transition-colors underline decoration-dotted underline-offset-4"
-      onClick={start}
-    >
-      {type === "int" ? value : value.toFixed(2)}
-    </span>
-  );
-}
-
 // --- Main component ---
 
 interface SimulationComparisonProps {
@@ -342,9 +338,81 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
     setDirty((prev) => new Set(prev).add(ids[simIndex]));
   }
 
+  function updateSimCost(
+    simIndex: number,
+    field:
+      | "proxyCostPerBotMonthly"
+      | "levelingCostPerBot"
+      | "stashPackCostPerBot"
+      | "expluginsKeyCostDaily"
+      | "dpbKeyCostDaily",
+    value: number
+  ) {
+    setSimulations((prev) => {
+      const updated = [...prev];
+      updated[simIndex] = { ...updated[simIndex], [field]: value };
+      return updated;
+    });
+    setDirty((prev) => new Set(prev).add(ids[simIndex]));
+  }
+
+  function updateCustomCost(
+    simIndex: number,
+    costId: string,
+    patch: Partial<CustomCost>
+  ) {
+    setSimulations((prev) => {
+      const updated = [...prev];
+      const sim = updated[simIndex];
+      const list = (sim.customCosts ?? []).map((c) =>
+        c.id === costId ? { ...c, ...patch } : c
+      );
+      updated[simIndex] = { ...sim, customCosts: list };
+      return updated;
+    });
+    setDirty((prev) => new Set(prev).add(ids[simIndex]));
+  }
+
+  function addCustomCost(simIndex: number) {
+    setSimulations((prev) => {
+      const updated = [...prev];
+      const sim = updated[simIndex];
+      const newItem: CustomCost = {
+        id:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `cc-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: "Novo custo",
+        amount: 0,
+        cadence: "monthly",
+        perBot: false,
+      };
+      updated[simIndex] = {
+        ...sim,
+        customCosts: [...(sim.customCosts ?? []), newItem],
+      };
+      return updated;
+    });
+    setDirty((prev) => new Set(prev).add(ids[simIndex]));
+  }
+
+  function removeCustomCost(simIndex: number, costId: string) {
+    setSimulations((prev) => {
+      const updated = [...prev];
+      const sim = updated[simIndex];
+      updated[simIndex] = {
+        ...sim,
+        customCosts: (sim.customCosts ?? []).filter((c) => c.id !== costId),
+      };
+      return updated;
+    });
+    setDirty((prev) => new Set(prev).add(ids[simIndex]));
+  }
+
   async function saveSimulation(simIndex: number) {
     const sim = simulations[simIndex];
     try {
+      // Save per-week defaults
       for (const week of sim.weeks) {
         await fetch(
           `/api/simulations/${sim.id}/weeks/${week.weekNumber}`,
@@ -361,13 +429,29 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
           }
         );
       }
+
+      // Save cost overrides (including custom costs) on the simulation itself
+      await fetch(`/api/simulations/${sim.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proxyCostPerBotMonthly: sim.proxyCostPerBotMonthly,
+          levelingCostPerBot: sim.levelingCostPerBot,
+          stashPackCostPerBot: sim.stashPackCostPerBot,
+          expluginsKeyCostDaily: sim.expluginsKeyCostDaily,
+          dpbKeyCostDaily: sim.dpbKeyCostDaily,
+          customCosts: sim.customCosts ?? [],
+        }),
+      });
+
       setDirty((prev) => {
         const next = new Set(prev);
         next.delete(sim.id);
         return next;
       });
+      toast.success(`Alterações salvas: ${sim.name}`);
     } catch {
-      // data already updated locally
+      toast.error("Falha ao salvar. Mudanças continuam em memória.");
     }
   }
 
@@ -576,15 +660,18 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
               simulations.forEach((sim, si) => {
                 const offset = sim.startDayOffset ?? 0;
                 const hasCost = sim.proxyCostPerBotMonthly != null && sim.expluginsKeyCostDaily != null && sim.dpbKeyCostDaily != null;
-                const costPerBotDaily = hasCost
-                  ? Number(sim.expluginsKeyCostDaily) + Number(sim.dpbKeyCostDaily) + Number(sim.proxyCostPerBotMonthly) / 30
-                  : 0;
+                const customPerBot = customPerBotDaily(sim.customCosts);
+                const customGlobal = customGlobalDaily(sim.customCosts);
+                const costPerBotDaily_ = hasCost
+                  ? Number(sim.expluginsKeyCostDaily) + Number(sim.dpbKeyCostDaily) + Number(sim.proxyCostPerBotMonthly) / 30 + customPerBot
+                  : customPerBot;
 
                 // Start with one-time costs as negative (investment)
                 const maxBots = Math.max(...sim.weeks.map((w) => Number(w.defaultActiveBots)), 0);
-                const oneTime = hasCost
-                  ? maxBots * (Number(sim.levelingCostPerBot ?? 0) + Number(sim.stashPackCostPerBot ?? 0))
-                  : 0;
+                const oneTime =
+                  (hasCost
+                    ? maxBots * (Number(sim.levelingCostPerBot ?? 0) + Number(sim.stashPackCostPerBot ?? 0))
+                    : 0) + customOneTime(sim.customCosts, maxBots);
                 let cumProfit = -oneTime;
                 for (let di = 0; di <= d; di++) {
                   if (di < offset) continue;
@@ -607,7 +694,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
                     if (priceUsd) dayRev = divines * Number(priceUsd);
                     else if (priceBrl) dayRev = (divines * Number(priceBrl)) / exchangeRate;
                   }
-                  const dayCost = hasCost ? bots * costPerBotDaily : 0;
+                  const dayCost = (hasCost ? bots * costPerBotDaily_ : bots * customPerBot) + customGlobal;
                   cumProfit += dayRev - dayCost;
                 }
 
@@ -701,6 +788,182 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
               </div>
             );
           })()}
+        </CardContent>
+      </Card>
+
+      {/* Section B: Editable costs per simulation */}
+      <Card>
+        <CardContent className="pt-5 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="font-semibold">Custos (editáveis)</p>
+              <p className="text-xs text-muted-foreground">
+                Edite diretamente os custos desta simulação. Valores em USD. Clique em Salvar para persistir.
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-48">Custo</TableHead>
+                  {simulations.map((sim, si) => (
+                    <TableHead key={sim.id} className="text-right border-l border-border/50">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-foreground">{simNames[si]}</span>
+                        {dirty.has(sim.id) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            title="Salvar"
+                            onClick={() => saveSimulation(si)}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(
+                  [
+                    { key: "proxyCostPerBotMonthly", label: "Proxy/bot (mensal)", decimals: 2 },
+                    { key: "levelingCostPerBot", label: "Leveling/bot (único)", decimals: 2 },
+                    { key: "stashPackCostPerBot", label: "Stash pack/bot (único)", decimals: 2 },
+                    { key: "expluginsKeyCostDaily", label: "Explugins key (diário)", decimals: 4 },
+                    { key: "dpbKeyCostDaily", label: "DPB key (diário)", decimals: 4 },
+                  ] as const
+                ).map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell className="text-sm text-muted-foreground">{row.label}</TableCell>
+                    {simulations.map((sim, si) => (
+                      <TableCell key={sim.id} className="text-right border-l border-border/50">
+                        <EditableNum
+                          value={Number(sim[row.key] ?? 0)}
+                          decimals={row.decimals}
+                          onChange={(v) => updateSimCost(si, row.key, v)}
+                        />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+
+                {/* Custom costs rows */}
+                <TableRow>
+                  <TableCell colSpan={1 + simulations.length} className="pt-5 pb-1 text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                    Custos adicionais
+                  </TableCell>
+                </TableRow>
+                {(() => {
+                  const maxCustoms = Math.max(
+                    ...simulations.map((s) => (s.customCosts ?? []).length),
+                    0
+                  );
+                  if (maxCustoms === 0) {
+                    return (
+                      <TableRow>
+                        <TableCell
+                          colSpan={1 + simulations.length}
+                          className="text-center text-xs text-muted-foreground py-2"
+                        >
+                          Nenhum custo adicional — use o botão + abaixo de cada simulação para adicionar.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  return Array.from({ length: maxCustoms }, (_, idx) => (
+                    <TableRow key={`custom-row-${idx}`}>
+                      <TableCell className="text-xs text-muted-foreground align-top pt-3">#{idx + 1}</TableCell>
+                      {simulations.map((sim, si) => {
+                        const cc = (sim.customCosts ?? [])[idx];
+                        if (!cc) {
+                          return (
+                            <TableCell key={sim.id} className="text-right border-l border-border/50 text-muted-foreground text-xs">
+                              —
+                            </TableCell>
+                          );
+                        }
+                        return (
+                          <TableCell key={sim.id} className="border-l border-border/50 align-top py-2">
+                            <div className="grid grid-cols-[1fr_auto] gap-1 items-center">
+                              <input
+                                className="h-7 px-1.5 text-xs bg-background border border-input rounded-sm"
+                                value={cc.name}
+                                onChange={(e) =>
+                                  updateCustomCost(si, cc.id, { name: e.target.value })
+                                }
+                                placeholder="Nome"
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                title="Remover"
+                                onClick={() => removeCustomCost(si, cc.id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                              <div className="flex items-center gap-1 col-span-2 justify-end">
+                                <EditableNum
+                                  value={cc.amount}
+                                  decimals={2}
+                                  onChange={(v) => updateCustomCost(si, cc.id, { amount: v })}
+                                />
+                                <select
+                                  className="h-6 text-xs bg-background border border-input rounded-sm px-1"
+                                  value={cc.cadence}
+                                  onChange={(e) =>
+                                    updateCustomCost(si, cc.id, {
+                                      cadence: e.target.value as CustomCost["cadence"],
+                                    })
+                                  }
+                                >
+                                  <option value="daily">Diário</option>
+                                  <option value="monthly">Mensal</option>
+                                  <option value="one_time">Único</option>
+                                </select>
+                                <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                  <input
+                                    type="checkbox"
+                                    checked={cc.perBot}
+                                    onChange={(e) =>
+                                      updateCustomCost(si, cc.id, { perBot: e.target.checked })
+                                    }
+                                  />
+                                  /bot
+                                </label>
+                              </div>
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ));
+                })()}
+
+                {/* Add-row buttons */}
+                <TableRow>
+                  <TableCell />
+                  {simulations.map((sim, si) => (
+                    <TableCell key={sim.id} className="text-right border-l border-border/50">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => addCustomCost(si)}
+                      >
+                        <Plus className="mr-1 h-3 w-3" />
+                        Adicionar
+                      </Button>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -954,10 +1217,12 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
 
                                   // Daily cost per bot
                                   const hasCost = sim.proxyCostPerBotMonthly != null && sim.expluginsKeyCostDaily != null && sim.dpbKeyCostDaily != null;
+                                  const cpb = customPerBotDaily(sim.customCosts);
+                                  const cg = customGlobalDaily(sim.customCosts);
                                   const costPerBotDaily = hasCost
-                                    ? Number(sim.expluginsKeyCostDaily) + Number(sim.dpbKeyCostDaily) + Number(sim.proxyCostPerBotMonthly) / 30
-                                    : 0;
-                                  const dayCost = bots * costPerBotDaily;
+                                    ? Number(sim.expluginsKeyCostDaily) + Number(sim.dpbKeyCostDaily) + Number(sim.proxyCostPerBotMonthly) / 30 + cpb
+                                    : cpb;
+                                  const dayCost = bots * costPerBotDaily + cg;
                                   const profit = revenue - dayCost;
 
                                   const muted = isLocked ? " opacity-40" : "";

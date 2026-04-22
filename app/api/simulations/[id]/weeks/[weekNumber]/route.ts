@@ -8,6 +8,7 @@ import {
   type RawWeek,
   type RawDay,
   type CostConfigData,
+  type CustomCostEntry,
 } from "@/lib/simulation-calculator";
 
 type Params = { params: Promise<{ id: string; weekNumber: string }> };
@@ -46,10 +47,17 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Week not found" }, { status: 404 });
   }
 
-  const costConfig: CostConfigData | null =
-    week.simulation.costLinks.length > 0
-      ? week.simulation.costLinks[0].costConfig
-      : null;
+  const linkedConfig = week.simulation.costLinks[0]?.costConfig ?? null;
+  const costConfig: CostConfigData | null = linkedConfig
+    ? {
+        proxyCostPerBotMonthly: linkedConfig.proxyCostPerBotMonthly,
+        levelingCostPerBot: linkedConfig.levelingCostPerBot,
+        stashPackCostPerBot: linkedConfig.stashPackCostPerBot,
+        expluginsKeyCostDaily: linkedConfig.expluginsKeyCostDaily,
+        dpbKeyCostDaily: linkedConfig.dpbKeyCostDaily,
+        customCosts: (linkedConfig.customCosts as CustomCostEntry[] | null) ?? null,
+      }
+    : null;
 
   const rawWeek: RawWeek = {
     weekNumber: week.weekNumber,

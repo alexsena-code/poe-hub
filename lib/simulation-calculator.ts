@@ -27,12 +27,22 @@ export interface RawWeek {
   defaultDivinePriceBrl: number | { toNumber(): number } | null;
 }
 
+export interface CustomCostEntry {
+  id: string;
+  name: string;
+  amount: number;
+  cadence: "daily" | "monthly" | "one_time";
+  perBot: boolean;
+}
+
 /** Cost config data */
 export interface CostConfigData {
   proxyCostPerBotMonthly: number | { toNumber(): number };
   levelingCostPerBot: number | { toNumber(): number };
+  stashPackCostPerBot?: number | { toNumber(): number };
   expluginsKeyCostDaily: number | { toNumber(): number };
   dpbKeyCostDaily: number | { toNumber(): number };
+  customCosts?: CustomCostEntry[] | null;
 }
 
 /** Day with all values resolved (no nulls for core fields) */
@@ -157,11 +167,24 @@ export function calculateWeek(
     const expluginsPerBotDaily = toNumRequired(costConfig.expluginsKeyCostDaily);
     const dpbPerBotDaily = toNumRequired(costConfig.dpbKeyCostDaily);
     const proxyPerBotDaily = toNumRequired(costConfig.proxyCostPerBotMonthly) / 30;
-    const costPerBotDaily = expluginsPerBotDaily + dpbPerBotDaily + proxyPerBotDaily;
 
-    costUsd = resolvedDays.reduce((sum, rd) => {
-      return sum + rd.activeBots * costPerBotDaily;
-    }, 0);
+    // Custom cost contributions to per-bot-daily and global-daily
+    let customPerBotDaily = 0;
+    let customGlobalDaily = 0;
+    for (const cc of costConfig.customCosts ?? []) {
+      if (cc.cadence === "one_time") continue;
+      const dailyAmount = cc.cadence === "monthly" ? cc.amount / 30 : cc.amount;
+      if (cc.perBot) customPerBotDaily += dailyAmount;
+      else customGlobalDaily += dailyAmount;
+    }
+
+    const costPerBotDaily =
+      expluginsPerBotDaily + dpbPerBotDaily + proxyPerBotDaily + customPerBotDaily;
+
+    costUsd = resolvedDays.reduce(
+      (sum, rd) => sum + rd.activeBots * costPerBotDaily + customGlobalDaily,
+      0
+    );
   }
 
   const profitUsd = revenueUsd !== null ? revenueUsd - costUsd : null;
@@ -210,7 +233,21 @@ export function calculateSimulation(
             (max, wc) => Math.max(max, wc.maxActiveBots),
             0
           );
-          return maxBotsEver * toNumRequired(costConfig.levelingCostPerBot);
+          const leveling = toNumRequired(costConfig.levelingCostPerBot);
+          const stash =
+            costConfig.stashPackCostPerBot !== undefined
+              ? toNumRequired(costConfig.stashPackCostPerBot)
+              : 0;
+          let customOneTimePerBot = 0;
+          let customOneTimeGlobal = 0;
+          for (const cc of costConfig.customCosts ?? []) {
+            if (cc.cadence !== "one_time") continue;
+            if (cc.perBot) customOneTimePerBot += cc.amount;
+            else customOneTimeGlobal += cc.amount;
+          }
+          return (
+            maxBotsEver * (leveling + stash + customOneTimePerBot) + customOneTimeGlobal
+          );
         })()
       : 0;
 
