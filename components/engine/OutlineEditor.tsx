@@ -1,7 +1,45 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CustomSection, ProposedOutline } from '@/lib/engine-types';
+
+/**
+ * Textarea que cresce com o conteúdo — sem scroll interno, sem altura
+ * fixa. Usada nos goals das seções pra que perguntas numeradas ou
+ * listas longas fiquem 100% visíveis.
+ */
+function AutoGrowTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+  minRows = 3,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  className?: string;
+  minRows?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={minRows}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+}
 
 interface OutlineEditorProps {
   proposal: ProposedOutline;
@@ -223,30 +261,31 @@ export default function OutlineEditor({
               className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
             />
 
-            <textarea
-              rows={2}
+            <AutoGrowTextarea
               value={s.goal}
-              onChange={(e) => updateField(idx, 'goal', e.target.value)}
+              onChange={(next) => updateField(idx, 'goal', next)}
               placeholder="Goal: em uma frase, o que essa seção precisa entregar ao leitor."
-              className="w-full rounded border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none leading-relaxed"
+              minRows={3}
+              className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none leading-relaxed overflow-hidden"
             />
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <button
           type="button"
           onClick={addSection}
           disabled={sections.length >= MAX_SECTIONS}
-          className="rounded border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:bg-background/60 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border bg-surface px-4 py-2 font-medium text-foreground/80 transition-colors hover:border-accent/60 hover:bg-background/70 hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          + Adicionar seção
+          <span className="text-lg leading-none">+</span>
+          <span>Adicionar seção</span>
         </button>
         <button
           type="button"
           onClick={onReset}
-          className="rounded border border-border bg-surface px-3 py-1.5 text-muted-foreground hover:bg-background/60"
+          className="rounded-lg border border-border bg-surface px-4 py-2 text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
         >
           Resetar ao template
         </button>
@@ -258,22 +297,36 @@ export default function OutlineEditor({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 pt-2">
+      <div className="sticky bottom-0 -mx-4 mt-4 flex items-center justify-between gap-3 border-t border-border bg-background/90 px-4 py-3 backdrop-blur">
         <button
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="rounded border border-border bg-surface px-4 py-2 text-sm text-muted-foreground hover:bg-background/60 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-40"
         >
-          Voltar ao briefing
+          <span aria-hidden>←</span>
+          <span>Voltar ao briefing</span>
         </button>
         <button
           type="button"
           onClick={handleConfirm}
           disabled={submitting}
-          className="rounded bg-accent px-6 py-2 text-sm font-semibold text-background hover:bg-accent-hover disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-accent px-7 py-2.5 text-sm font-semibold text-background shadow-lg shadow-accent/20 ring-1 ring-accent/40 transition-all hover:bg-accent-hover hover:shadow-accent/40 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? 'Gerando...' : submitLabel}
+          {submitting ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span>Gerando post…</span>
+            </>
+          ) : (
+            <>
+              <span>{submitLabel}</span>
+              <span aria-hidden>→</span>
+            </>
+          )}
         </button>
       </div>
     </div>
