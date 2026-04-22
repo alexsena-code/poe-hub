@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { nanoid } from 'nanoid';
-import { generateOutline, proposeOutline } from '@/lib/content-api';
+import { generateOutline, proposeOutline, fetchSkimCollections } from '@/lib/content-api';
 import { usePostStore } from '@/lib/engine-store';
 import type { Briefing, CustomSection, ProposedOutline } from '@/lib/engine-types';
 import PlanPreview from './PlanPreview';
 import OutlineEditor from './OutlineEditor';
+import SkimCollectionsSelector from './SkimCollectionsSelector';
 
 const API_URL = '/api/engine';
 
@@ -119,6 +120,15 @@ export default function BriefingForm() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Collections do Qdrant a consultar no skim do outline proposer.
+  // Pré-populamos com os defaults do template; o SkimCollectionsSelector
+  // deixa o autor ampliar ou reduzir. Vazio = usa o default do template
+  // no backend. Um valor diferente do default viaja como
+  // briefing.skimCollections ao gerar o outline.
+  const [skimCollections, setSkimCollections] = useState<string[]>([]);
+  const [skimDefaultsByTemplate, setSkimDefaultsByTemplate] = useState<
+    Record<string, string[]>
+  >({});
   // Step state: 'briefing' = form atual, 'outline' = OutlineEditor com proposta.
   // Ao clicar "Gerar Outline", chamamos proposeOutline() e movemos para 'outline'.
   const [step, setStep] = useState<'briefing' | 'outline'>('briefing');
@@ -133,6 +143,42 @@ export default function BriefingForm() {
       .then((data) => setTemplates(data))
       .catch(() => {});
   }, []);
+
+  // Fetch o catálogo de skim collections uma vez (é pequeno e mudam raro).
+  // Também reseta a seleção pro default do template assim que o mapa
+  // chega.
+  useEffect(() => {
+    let cancelled = false;
+    fetchSkimCollections()
+      .then((data) => {
+        if (cancelled) return;
+        setSkimDefaultsByTemplate(data.defaultsByTemplate);
+        const name = form.templateName;
+        if (name && data.defaultsByTemplate[name]) {
+          setSkimCollections(data.defaultsByTemplate[name]);
+        }
+      })
+      .catch(() => {
+        // Backend offline / sem endpoint? Mantemos vazio e o backend
+        // cai no default por template (no-op prática pro autor).
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reseta skimCollections ao default quando templateName muda — exceto
+  // se o autor já customizou neste render pro mesmo template (sem jeito
+  // trivial de detectar; keep simple, reset sempre).
+  useEffect(() => {
+    const name = form.templateName;
+    if (!name) return;
+    const defaults = skimDefaultsByTemplate[name];
+    if (defaults && defaults.length > 0) {
+      setSkimCollections(defaults);
+    }
+  }, [form.templateName, skimDefaultsByTemplate]);
 
   // Load the selected template's sections so the user can choose which
   // ones to skip. Re-runs whenever templateName changes. New sections
@@ -232,15 +278,25 @@ export default function BriefingForm() {
       // context from ideation) together with the user's free-form addenda
       // from the Notas textarea. The brief block goes first so the LLM
       // treats the user's notes as higher-priority guidance.
+      // Só enviamos skimCollections quando o autor desviou do default do
+      // template — backend trata "ausente/vazio" como "use default".
+      const templateDefaults = skimDefaultsByTemplate[form.templateName || ''] || [];
+      const skimDiffersFromDefault =
+        skimCollections.length !== templateDefaults.length ||
+        !skimCollections.every((k) => templateDefaults.includes(k));
+      const skimOverride = skimDiffersFromDefault ? skimCollections : undefined;
+
       const briefingForPipeline: Briefing = briefSource
         ? {
             ...form,
             notes: buildStitchedNotes(briefSource, form.notes || ''),
             excludedSections: excludedSectionIds.length > 0 ? excludedSectionIds : undefined,
+            skimCollections: skimOverride,
           }
         : {
             ...form,
             excludedSections: excludedSectionIds.length > 0 ? excludedSectionIds : undefined,
+            skimCollections: skimOverride,
           };
 
       // Step 1: pede ao engine para propor o outline. Quando a feature flag
@@ -530,6 +586,17 @@ export default function BriefingForm() {
           className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
         />
       </div>
+
+      {/* Skim collections — quais fontes do Qdrant alimentam o outline proposer */}
+      <SkimCollectionsSelector
+        templateName={form.templateName}
+        selected={skimCollections}
+        onChange={setSkimCollections}
+        onResetToDefault={() => {
+          const defaults = skimDefaultsByTemplate[form.templateName || ''];
+          if (defaults) setSkimCollections(defaults);
+        }}
+      />
 
       {/* Plan preview — show how the briefing will be interpreted */}
       <PlanPreview

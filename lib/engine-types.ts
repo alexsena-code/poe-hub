@@ -16,6 +16,23 @@ export interface Briefing {
    * renames, reorders, additions and deletions the user made.
    */
   customOutline?: CustomSection[];
+  /**
+   * Qdrant collections a consultar no skim do OutlineProposer.
+   * Vazio/ausente = default por template; com valor, sobrescreve.
+   */
+  skimCollections?: string[];
+}
+
+export interface SkimCollection {
+  key: string;
+  label: string;
+  description: string;
+  defaultFor: string[];
+}
+
+export interface SkimCollectionsCatalog {
+  collections: SkimCollection[];
+  defaultsByTemplate: Record<string, string[]>;
 }
 
 /**

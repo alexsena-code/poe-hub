@@ -1,4 +1,10 @@
-import type { Briefing, CritiqueIssue, GeneratedSection, ProposedOutline } from './engine-types';
+import type {
+  Briefing,
+  CritiqueIssue,
+  GeneratedSection,
+  ProposedOutline,
+  SkimCollectionsCatalog,
+} from './engine-types';
 
 const isServer = typeof window === 'undefined';
 const CONTENT_API_URL = isServer
@@ -137,6 +143,20 @@ export async function proposeOutline(briefing: Briefing): Promise<ProposedOutlin
     body: JSON.stringify(briefing),
   });
   if (!res.ok) throw new Error('Falha ao propor outline');
+  return res.json();
+}
+
+/**
+ * Catálogo de Qdrant collections que o OutlineProposer pode consultar,
+ * com descrição e defaults por template. Consumido pelo
+ * SkimCollectionsSelector pra renderizar checkboxes e pré-selecionar.
+ */
+export async function fetchSkimCollections(): Promise<SkimCollectionsCatalog> {
+  const res = await fetch(`${CONTENT_API_URL}/content/skim-collections`, {
+    headers: authHeaders(),
+    cache: 'force-cache', // catálogo muda raramente; cache agressivo é OK
+  });
+  if (!res.ok) throw new Error('Falha ao carregar catálogo de collections');
   return res.json();
 }
 
