@@ -105,6 +105,76 @@ formatting:
         Style guide e templates sao editaveis em Dashboard &rarr; Config &rarr; tabs &quot;Style Guide&quot; e &quot;Templates&quot;.
         Alteracoes aplicam imediatamente em novas geracoes.
       </Callout>
+
+      <H2>Placeholders (renderizados pelo site em runtime)</H2>
+      <P>
+        O LLM cita entidades atraves de placeholders que o site resolve server-side ao renderizar
+        o post. Evita numeros hardcoded que envelhecem mal e garante tooltips/icones consistentes
+        com o resto da UI.
+      </P>
+      <P>
+        Gramatica: <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">{'{{kind:value}}'}</code> ou <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">{'{{kind:value|modifier}}'}</code>.
+        Valores sao greedy ate <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">|</code> ou <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">{'}}'}</code>,
+        entao nomes multi-palavra (ex: &quot;Mirror of Kalandra&quot;) funcionam sem escape.
+      </P>
+      <Table
+        headers={['Kind', 'Uso', 'Exemplo']}
+        rows={[
+          ['price', 'Preco live de poe.ninja formatado pela liga atual', '{{price:Headhunter|divine}}'],
+          ['link', 'Link interno pra guia/produto/build no pathoftrade.net', '{{link:Mageblood}}'],
+          ['item', 'Card inline com icone + tooltip (unique / currency / scarab / gem)', '{{item:Divine Orb}}'],
+          ['passive', 'Tooltip in-game de node da arvore passiva (notable/keystone/ascendancy/mastery)', '{{passive:Lethality}}'],
+          ['pobitem', 'Item de um snapshot PoB (rolls reais, nao o base template)', '{{pobitem:<cuid>}}'],
+          ['cta', 'Banner de marketplace block-level (currency / single product)', '{{cta:currency}}'],
+        ]}
+      />
+
+      <H2>Placeholder CTA — uso e sintaxe</H2>
+      <P>
+        Banner de marketplace reutilizavel. Block-level (deve ocupar um paragrafo sozinho — uso
+        embutido em prosa e silenciosamente descartado). Copy cita automaticamente a liga temp
+        ativa (&quot;Buy orbs in Mirage with fast delivery...&quot;).
+      </P>
+      <CodeBlock title="Sintaxe {{cta:...}}">{`{{cta:currency}}                       # 3 orbs default pro gameVersion do post
+{{cta:product|divine-orb}}             # single-product card com icone + preco
+{{cta:currency|poe2}}                  # force PoE 2 currency banner
+{{cta:product|mirror-of-kalandra|poe2}}  # PoE 2 single-product (modifier multipart)`}</CodeBlock>
+      <P>
+        Tokens aceitos pra gameVersion override: <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">poe1</code> / <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">poe-1</code> / <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">path-of-exile-1</code> e as variantes com <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">2</code>. Case-insensitive, ordem dos modifiers livre.
+      </P>
+
+      <H2>Resolucao de gameVersion (hibrida)</H2>
+      <Table
+        headers={['Origem', 'Quando vence']}
+        rows={[
+          ['Modifier do placeholder', 'Sempre que presente ({{cta:currency|poe2}}) — override explicito'],
+          ['ResolveContext.gameVersion', 'Herda do post (Sanity post.gameVersion propagado no /blog/[slug])'],
+          ['Default', 'path-of-exile-1 quando nao ha modifier nem contexto'],
+        ]}
+      />
+      <Callout type="info" title="LLM nao precisa marcar gameVersion">
+        Em 95% dos casos o LLM apenas escreve <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">{'{{cta:currency}}'}</code> e o banner herda automaticamente
+        o jogo do post. Override com <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">|poe2</code> so e necessario em posts que misturam jogos
+        (pecas de comparacao — raras).
+      </Callout>
+
+      <H2>Regras de uso (do style_guide.yaml)</H2>
+      <Table
+        headers={['Regra', 'Motivo']}
+        rows={[
+          ['No maximo 1 CTA por secao principal', 'Mais que isso parece SEO spam e distrai do conteudo'],
+          ['Nunca dois CTAs seguidos', 'Quebra o ritmo de leitura'],
+          ['Bom contexto: fim de "Cost & League Pacing"', 'Reader natural point of decision'],
+          ['Bom contexto: entre budget tier e endgame tier', 'Transicao que encaixa oferta de currency'],
+          ['Ruim: cada secao', 'Overexposure'],
+          ['Ruim: no meio de prosa', 'Block-level — nao funciona embutido'],
+        ]}
+      />
+
+      <Callout type="tip" title="Testar localmente">
+        A pagina <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">/preview/cta</code> no site renderiza um post mock com todas as variantes (standalone,
+        inline-dropado, product, override poe2) pra validar mudancas no layout sem publicar.
+      </Callout>
     </>
   );
 }

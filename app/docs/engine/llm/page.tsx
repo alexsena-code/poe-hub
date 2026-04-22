@@ -36,13 +36,18 @@ export default function LlmPage() {
       <Table
         headers={['Node', 'Modelo', 'Descricao']}
         rows={[
-          ['default', 'google/gemini-2.5-flash-lite', 'Fallback para tudo'],
-          ['qa', 'google/gemini-2.5-flash-lite', 'Respostas Q&A'],
-          ['write', 'google/gemini-2.5-flash-lite', 'Geracao de secoes'],
-          ['optimize', 'google/gemini-2.5-flash-lite', 'SEO optimization'],
-          ['ideation', 'x-ai/grok-4.1-fast', 'Geracao de ideias'],
-          ['validation', 'google/gemini-2.5-flash-lite', 'Validacao de keywords'],
-          ['summary', 'google/gemini-2.5-flash-lite', 'Summaries poe_meta'],
+          ['classify', 'google/gemini-2.5-flash-lite', 'Escolha de template'],
+          ['plan', 'openai/gpt-4.1-mini', 'Step-back + queries RAG'],
+          ['brief_expand', 'openai/gpt-4.1-mini', 'Expansao de brief PT-BR'],
+          ['research (summarizer)', 'google/gemini-2.5-flash-lite', 'Sumarizacao de chunks'],
+          ['gap_check', 'google/gemini-2.5-flash-lite', 'Detector de gaps'],
+          ['write', 'google/gemini-2.5-flash (ou claude-sonnet-4)', 'Geracao de secoes (configuravel)'],
+          ['critique (2-pass)', 'google/gemini-2.5-flash-lite', 'Validacao + re-check'],
+          ['fix', 'anthropic/claude-sonnet-4', 'Autofix de issues HIGH'],
+          ['translate', 'openai/gpt-4.1-mini', 'EN -> PT-BR'],
+          ['qa', 'google/gemini-2.5-flash', 'Respostas Q&A chat'],
+          ['optimize', 'google/gemini-2.5-flash-lite', 'SEO metadata'],
+          ['ideation', 'google/gemini-2.5-flash-lite', 'Geracao de ideias'],
         ]}
       />
 
@@ -111,6 +116,47 @@ GET /jobs/abc-123
       <Callout type="info" title="Dashboard de custos">
         Dashboard &rarr; /dashboard/llm mostra custos por modelo, por node, por dia.
         Tambem acessivel via GET /seo/pipeline/costs?days=30.
+      </Callout>
+
+      <H2>Tool Calling — estado atual</H2>
+      <P>
+        <strong>O engine NAO usa tool calling / function calling.</strong> Todas as chamadas LLM sao
+        single-shot prompt+completion. A interface <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">LlmRequest</code> aceita
+        apenas <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">systemPrompt</code>, <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">userMessage</code>, <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">maxTokens</code> e <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">jsonMode</code> —
+        sem <code className="px-1 py-0.5 rounded bg-surface text-[13px] font-mono border border-border">tools[]</code>, sem dispatch loop, sem multi-turn.
+      </P>
+      <P>
+        Como os dados chegam ao modelo hoje:
+      </P>
+      <Table
+        headers={['Mecanica', 'Como funciona']}
+        rows={[
+          ['Pre-resolved RAG', 'research + gap_check assemblam todo o contexto server-side (PG + Qdrant + summaries) ANTES do write. O LLM ve o prompt fully-stuffed.'],
+          ['Pipeline como state machine', 'Cada node = 1 LLM call. Output alimenta o proximo node. Ordem fixa: research -> analyze -> gap_check -> write -> critique -> fix -> translate -> optimize.'],
+          ['Context size', 'Target ~1200 tokens por secao. Cabe facil num single shot — por isso tool calling nao e bloqueante hoje.'],
+        ]}
+      />
+
+      <H2>Oportunidades de otimizacao</H2>
+      <P>
+        Em ordem de ROI — recomendo comecar pelo #1 (menor esforco, maior economia):
+      </P>
+      <Table
+        headers={['#', 'Oportunidade', 'Ganho estimado', 'Esforco']}
+        rows={[
+          ['1', 'Prompt caching (cache_control Anthropic via OpenRouter)', '30-50% reducao no custo total de post — system prompt ~3-5k tokens repetido em 8-10 calls por post', '~30 linhas em LlmService.callOpenRouter()'],
+          ['2', 'Tool calling (agentic Q&A, dynamic fetch)', 'Habilita capabilities novas (PoB chatbot, citacao de precos live, verificacao dinamica)', 'Refactor medio — novo callWithTools() + registry'],
+          ['3', 'Streaming', 'UX no editor — write node leva 30-90s, streaming mostra prose aparecendo', '~50 linhas EventSource'],
+          ['4', 'Batch API (50% off)', 'Economia em ideation e research nao-urgente', 'Nova lane assincrona separada'],
+          ['5', 'Fallback chain de modelos', 'Resiliencia a 429/5xx — gemini-flash -> gemini-pro -> claude-haiku', '~40 linhas'],
+          ['6', 'Streaming tool use (Anthropic)', 'Combina (2) e (3)', 'So faz sentido depois de (2)'],
+        ]}
+      />
+      <Callout type="info" title="Recomendacao">
+        Prompt caching primeiro. Nosso system prompt (style_guide.yaml + template instructions)
+        tem ~3-5k tokens e e reenviado em todo node. Cache bate e paga 80-90% menos no input
+        cost. Se rodar Sonnet no write (padrao opcional), economia chega a 30-50% no custo
+        total por post. Mudanca pequena, sem risco arquitetural.
       </Callout>
 
       <H2>poe-hub LLM</H2>
