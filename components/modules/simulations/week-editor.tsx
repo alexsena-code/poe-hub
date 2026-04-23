@@ -46,6 +46,7 @@ export interface SimulationWeek {
   defaultHoursPerDay: number;
   defaultDivinePriceUsd: number | null;
   defaultDivinePriceBrl: number | null;
+  buildCostDivines: number | null;
   days: SimulationDay[];
 }
 
@@ -499,6 +500,12 @@ export function WeekEditor({
               ? { defaultDivinePriceBrl: val } as Partial<SimulationWeek>
               : { defaultDivinePriceUsd: val } as Partial<SimulationWeek>
           )}
+        />
+        <DefaultField
+          label="Build (divines)"
+          value={localWeek.buildCostDivines != null ? Number(localWeek.buildCostDivines) : null}
+          tooltip="Quantidade de divines para montar um personagem que entra em operação nesta semana. Convertido em USD pelo preço da divine desta semana. Cobrado apenas para bots novos (aumento em relação à semana anterior)."
+          onSave={(val) => saveWeekDefaults({ buildCostDivines: val } as Partial<SimulationWeek>)}
         />
       </div>
 

@@ -33,6 +33,7 @@ const createSchema = z.object({
   league: z.string().optional(),
   durationWeeks: z.number().int().min(1).max(52).optional(),
   kind: z.enum(["operational", "forecast"]).optional(),
+  costConfigId: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -44,21 +45,38 @@ interface SimOption {
   league: string;
 }
 
+interface CostConfigOption {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
 export function SimulationCreateDialog() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [baseSimId, setBaseSimId] = useState<string>("");
   const [simOptions, setSimOptions] = useState<SimOption[]>([]);
+  const [costConfigOptions, setCostConfigOptions] = useState<CostConfigOption[]>([]);
   const router = useRouter();
   const { leagues, loading: leaguesLoading } = useLeagues();
 
-  // Fetch existing simulations for "Baseado em"
+  // Fetch existing simulations for "Baseado em" and cost configs for setup picker
   useEffect(() => {
     if (!open) return;
     fetch("/api/simulations?limit=50")
       .then((r) => r.json())
       .then((d) => setSimOptions((d.data ?? []).map((s: SimOption) => ({ id: s.id, name: s.name, league: s.league }))))
       .catch(() => {});
+    fetch("/api/cost-configs")
+      .then((r) => r.json())
+      .then((d) => {
+        const items: CostConfigOption[] = Array.isArray(d) ? d : d.data ?? [];
+        setCostConfigOptions(items);
+        const def = items.find((c) => c.isDefault) ?? items[0];
+        if (def) setValue("costConfigId", def.id);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const {
@@ -100,10 +118,15 @@ export function SimulationCreateDialog() {
         setBaseSimId("");
         router.push(`/simulations/compare?ids=${baseSimId},${dup.id}`);
       } else {
+        const { costConfigId, ...rest } = data;
+        const payload = {
+          ...rest,
+          costConfigIds: costConfigId ? [costConfigId] : undefined,
+        };
         const res = await fetch("/api/simulations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -206,6 +229,37 @@ export function SimulationCreateDialog() {
                     <SelectItem value="forecast">
                       Forecast — para planejamento de faturamento anual
                     </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Setup de custos</Label>
+                  <a
+                    href="/settings/costs"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+                  >
+                    Gerenciar
+                  </a>
+                </div>
+                <Select
+                  onValueChange={(val) =>
+                    setValue("costConfigId", val === "none" ? undefined : val)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar setup (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem custos</SelectItem>
+                    {costConfigOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {c.isDefault ? "(padrão)" : ""}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -45,6 +45,18 @@ interface CustomCost {
   perBot: boolean;
 }
 
+interface CostConfigOption {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  proxyCostPerBotMonthly: number;
+  levelingCostPerBot: number;
+  stashPackCostPerBot: number;
+  expluginsKeyCostDaily: number;
+  dpbKeyCostDaily: number;
+  customCosts: CustomCost[] | null;
+}
+
 interface Simulation {
   id: string;
   name: string;
@@ -53,6 +65,7 @@ interface Simulation {
   durationWeeks: number;
   startDayOffset: number;
   costConfigName: string | null;
+  costLinks?: { costConfigId: string; costConfig: { id: string; name: string } }[];
   proxyCostPerBotMonthly: number | null;
   levelingCostPerBot: number | null;
   stashPackCostPerBot: number | null;
@@ -195,6 +208,23 @@ function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals {
   }
   oneTimeCost += customOneTime(sim.customCosts, maxBots);
 
+  // Build cost: newBotsW × buildDivinesW × priceW (USD, falls back to BRL÷exch)
+  const sortedWeeks = [...sim.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  let prevBotsBuild = 0;
+  for (const w of sortedWeeks) {
+    const currentBots = Number(w.defaultActiveBots);
+    const newBots = Math.max(0, currentBots - prevBotsBuild);
+    prevBotsBuild = currentBots;
+    const divines = w.buildCostDivines != null ? Number(w.buildCostDivines) : 0;
+    if (newBots === 0 || divines === 0) continue;
+    const priceUsd = w.defaultDivinePriceUsd != null ? Number(w.defaultDivinePriceUsd) : null;
+    const priceBrl = w.defaultDivinePriceBrl != null ? Number(w.defaultDivinePriceBrl) : null;
+    let unitUsd = 0;
+    if (priceUsd != null) unitUsd = priceUsd;
+    else if (priceBrl != null && exchangeRate > 0) unitUsd = priceBrl / exchangeRate;
+    oneTimeCost += newBots * divines * unitUsd;
+  }
+
   const totalCost = totalOperationalCost + oneTimeCost;
   const profit = effectiveRevenueUsd - totalCost;
   const roi = totalCost > 0 ? (profit / totalCost) * 100 : 0;
@@ -319,6 +349,56 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [showChart, setShowChart] = useState(false);
+  const [costConfigs, setCostConfigs] = useState<CostConfigOption[]>([]);
+
+  useEffect(() => {
+    fetch("/api/cost-configs")
+      .then((r) => r.json())
+      .then((data) => {
+        const items = Array.isArray(data) ? data : data.data ?? [];
+        setCostConfigs(items);
+      })
+      .catch(() => setCostConfigs([]));
+  }, []);
+
+  async function applyCostConfig(simIndex: number, configId: string) {
+    const sim = simulations[simIndex];
+    const cfg = costConfigs.find((c) => c.id === configId);
+    if (!cfg) return;
+    try {
+      const res = await fetch(`/api/simulations/${sim.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ costConfigIds: [configId] }),
+      });
+      if (!res.ok) throw new Error();
+      // Update local state with snapshot values from the new config
+      setSimulations((prev) => {
+        const updated = [...prev];
+        updated[simIndex] = {
+          ...updated[simIndex],
+          costConfigName: cfg.name,
+          proxyCostPerBotMonthly: Number(cfg.proxyCostPerBotMonthly),
+          levelingCostPerBot: Number(cfg.levelingCostPerBot),
+          stashPackCostPerBot: Number(cfg.stashPackCostPerBot),
+          expluginsKeyCostDaily: Number(cfg.expluginsKeyCostDaily),
+          dpbKeyCostDaily: Number(cfg.dpbKeyCostDaily),
+          customCosts: cfg.customCosts ?? [],
+          costLinks: [{ costConfigId: cfg.id, costConfig: { id: cfg.id, name: cfg.name } }],
+        };
+        return updated;
+      });
+      // Remove dirty flag — the new config was already persisted
+      setDirty((prev) => {
+        const next = new Set(prev);
+        next.delete(sim.id);
+        return next;
+      });
+      toast.success(`Config "${cfg.name}" aplicada a ${sim.name}`);
+    } catch {
+      toast.error("Erro ao aplicar config");
+    }
+  }
 
   function updateWeekDefault(
     simIndex: number,
@@ -798,10 +878,46 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
             <div>
               <p className="font-semibold">Custos (editáveis)</p>
               <p className="text-xs text-muted-foreground">
-                Edite diretamente os custos desta simulação. Valores em USD. Clique em Salvar para persistir.
+                Edite diretamente os custos desta simulação, ou troque o setup de custos para snapshotar novos valores. Valores em USD.
               </p>
             </div>
+            <Link
+              href="/settings/costs"
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
+            >
+              Gerenciar setups
+            </Link>
           </div>
+
+          {/* Cost config selector per simulation */}
+          <div
+            className="grid gap-2 mb-3 px-1"
+            style={{ gridTemplateColumns: `12rem repeat(${simulations.length}, 1fr)` }}
+          >
+            <div className="text-xs text-muted-foreground font-medium self-center">Setup de custos</div>
+            {simulations.map((sim, si) => {
+              const linkedId = sim.costLinks?.[0]?.costConfigId ?? "";
+              return (
+                <select
+                  key={sim.id}
+                  className="h-8 text-xs rounded-md border border-input bg-background px-2"
+                  value={linkedId}
+                  onChange={(e) => applyCostConfig(si, e.target.value)}
+                >
+                  <option value="" disabled>
+                    Selecionar setup…
+                  </option>
+                  {costConfigs.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.isDefault ? " (padrão)" : ""}
+                    </option>
+                  ))}
+                </select>
+              );
+            })}
+          </div>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>

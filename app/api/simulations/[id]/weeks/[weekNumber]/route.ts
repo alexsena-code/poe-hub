@@ -138,6 +138,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.defaultHoursPerDay !== undefined) updateData.defaultHoursPerDay = data.defaultHoursPerDay;
   if (data.defaultDivinePriceUsd !== undefined) updateData.defaultDivinePriceUsd = data.defaultDivinePriceUsd ?? null;
   if (data.defaultDivinePriceBrl !== undefined) updateData.defaultDivinePriceBrl = data.defaultDivinePriceBrl ?? null;
+  if (data.buildCostDivines !== undefined) updateData.buildCostDivines = data.buildCostDivines ?? null;
 
   const updated = await prisma.simulationWeek.update({
     where: { id: week.id },

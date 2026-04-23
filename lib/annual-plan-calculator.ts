@@ -21,6 +21,7 @@ export interface SimulationSnapshot {
     defaultHoursPerDay: number | { toNumber(): number };
     defaultDivinePriceUsd: number | { toNumber(): number } | null;
     defaultDivinePriceBrl: number | { toNumber(): number } | null;
+    buildCostDivines: number | { toNumber(): number } | null;
     days: {
       dayNumber: number;
       activeBots: number | null;
@@ -118,6 +119,24 @@ export function calcSimulationLeagueTotals(
   for (const cc of sim.customCosts ?? []) {
     if (cc.cadence !== "one_time") continue;
     oneTimeCost += cc.perBot ? cc.amount * maxBots : cc.amount;
+  }
+
+  // Build cost per league: new bots × weekly buildDivines × weekly USD price
+  const sortedWeeks = [...sim.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  let prevBotsBuild = 0;
+  for (const w of sortedWeeks) {
+    const currentBots = w.defaultActiveBots;
+    const newBots = Math.max(0, currentBots - prevBotsBuild);
+    prevBotsBuild = currentBots;
+    const divines = toNum(w.buildCostDivines);
+    if (newBots === 0 || divines === 0) continue;
+    const priceUsd = toNum(w.defaultDivinePriceUsd);
+    const priceBrl = toNum(w.defaultDivinePriceBrl);
+    let unitUsd = 0;
+    if (priceUsd > 0) unitUsd = priceUsd;
+    else if (priceBrl > 0 && exchangeRate > 0) unitUsd = priceBrl / exchangeRate;
+    if (unitUsd === 0) continue;
+    oneTimeCost += newBots * divines * unitUsd;
   }
 
   const totalCost = operationalCost + oneTimeCost;

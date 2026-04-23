@@ -312,6 +312,7 @@ model SimulationWeek {
   defaultHoursPerDay     Decimal @map("default_hours_per_day") @db.Decimal(5, 2) @default(24)
   defaultDivinePriceUsd  Decimal? @map("default_divine_price_usd") @db.Decimal(18, 8)
   defaultDivinePriceBrl  Decimal? @map("default_divine_price_brl") @db.Decimal(18, 8)
+  buildCostDivines       Decimal? @map("build_cost_divines") @db.Decimal(18, 4)
 
   simulation Simulation      @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   days       SimulationDay[]

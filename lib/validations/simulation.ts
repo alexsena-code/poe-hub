@@ -57,6 +57,7 @@ export const updateWeekSchema = z.object({
   defaultHoursPerDay: z.number().min(0).max(24).optional(),
   defaultDivinePriceUsd: z.number().min(0).nullable().optional(),
   defaultDivinePriceBrl: z.number().min(0).nullable().optional(),
+  buildCostDivines: z.number().min(0).nullable().optional(),
 });
 
 // ============================================================

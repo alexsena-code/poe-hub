@@ -25,6 +25,7 @@ export interface RawWeek {
   defaultHoursPerDay: number | { toNumber(): number };
   defaultDivinePriceUsd: number | { toNumber(): number } | null;
   defaultDivinePriceBrl: number | { toNumber(): number } | null;
+  buildCostDivines?: number | { toNumber(): number } | null;
 }
 
 export interface CustomCostEntry {
@@ -201,12 +202,46 @@ export function calculateWeek(
 }
 
 /**
+ * Computes the build cost (in USD) charged once per bot when it comes online.
+ *
+ * - Week 1: all `defaultActiveBots` are considered "new" (initial build).
+ * - Week N > 1: only `max(0, bots[N] - bots[N-1])` pay the week-N build cost.
+ * - Amount in USD = newBots * week.buildCostDivines * priceUsd(week).
+ *   If USD price is missing, falls back to BRL/exchangeRate if provided; otherwise 0.
+ */
+export function calculateBuildCostUsd(
+  weeks: RawWeek[],
+  exchangeRate?: number
+): number {
+  const sorted = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  let total = 0;
+  let prevBots = 0;
+  for (const w of sorted) {
+    const currentBots = w.defaultActiveBots;
+    const newBots = Math.max(0, currentBots - prevBots);
+    prevBots = currentBots;
+    const divines = toNum(w.buildCostDivines) ?? 0;
+    if (newBots === 0 || divines === 0) continue;
+    const priceUsd = toNum(w.defaultDivinePriceUsd);
+    const priceBrl = toNum(w.defaultDivinePriceBrl);
+    let unitUsd = 0;
+    if (priceUsd != null) unitUsd = priceUsd;
+    else if (priceBrl != null && exchangeRate && exchangeRate > 0)
+      unitUsd = priceBrl / exchangeRate;
+    if (unitUsd === 0) continue;
+    total += newBots * divines * unitUsd;
+  }
+  return total;
+}
+
+/**
  * Calculates totals for the full simulation across all weeks.
  * Leveling cost is a one-time charge: maxBotsAcrossAllWeeks * levelingCostPerBot.
  */
 export function calculateSimulation(
   weeks: { week: RawWeek; days: RawDay[] }[],
-  costConfig?: CostConfigData | null
+  costConfig?: CostConfigData | null,
+  exchangeRate?: number
 ): SimulationCalculation {
   const weekCalcs = weeks.map(({ week, days }) =>
     calculateWeek(week, days, costConfig)
@@ -251,7 +286,12 @@ export function calculateSimulation(
         })()
       : 0;
 
-  const totalCostUsd = operationalCostUsd + levelingCostUsd;
+  const buildCostUsd = calculateBuildCostUsd(
+    weeks.map((w) => w.week),
+    exchangeRate
+  );
+
+  const totalCostUsd = operationalCostUsd + levelingCostUsd + buildCostUsd;
 
   const totalProfitUsd =
     totalRevenueUsd !== null ? totalRevenueUsd - totalCostUsd : null;
