@@ -4,6 +4,9 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# Copy prisma schema before `npm ci` because the postinstall script runs
+# `prisma generate`, which needs the schema file to be present.
+COPY prisma ./prisma
 RUN npm ci
 
 # Build
