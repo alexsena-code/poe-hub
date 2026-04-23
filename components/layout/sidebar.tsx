@@ -21,7 +21,6 @@ import {
   MessageSquare,
   Search,
   BarChart3,
-  Cpu,
   FileText,
   Lightbulb,
   Wrench,
@@ -32,6 +31,7 @@ import {
   Monitor,
   Clock,
   BellRing,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -109,10 +109,16 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "People", href: "/people", icon: Users },
         ],
       },
-      { title: "Analytics", href: "/analytics", icon: BarChart3 },
-      { title: "LLM Logs", href: "/llm-logs", icon: Cpu },
       { title: "Engine Config", href: "/engine-config", icon: Wrench },
       { title: "Docs", href: "/docs", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      // Session 21 Track B: fused /logs + /llm-logs + /analytics + /monitor
+      // into a single tabbed observability dashboard.
+      { title: "Observability", href: "/admin/observability", icon: Activity },
     ],
   },
   {
