@@ -1,388 +1,348 @@
-# CLAUDE.md — PoE HUB
+# CLAUDE.md — PoE Hub
 
-## Sobre o Projeto
+## Project overview
 
-Plataforma web de gestão operacional para operação de bots de farming em Path of Exile. Substituindo uma planilha existente por uma aplicação completa.
+Operational control panel for the Path of Trade solo operator. Consumes
+the `path-of-trade-content` engine's HTTP API (content generation, SEO
+research, ideation) and runs its own PoE-adjacent data pipelines
+(Discord price scraping, hardware deals monitoring, bot management,
+sales tracking, simulation planning).
 
-**Leia o PRD.md antes de qualquer implementação.** Ele contém todas as entidades, funcionalidades, e prioridades.
+**What it does.** Replaces a multi-tab spreadsheet operation with a
+single authenticated web app. Modules in production today:
 
-## Stack
+- `/dashboard` — KPIs (live prices, active bots, MTD revenue)
+- `/bots` — bot instance management (config, proxies, schedules)
+- `/sales` — revenue tracking per bot + per buyer
+- `/prices` — divine/chaos/USD/BRL price history from Discord scraping
+- `/simulations` — scenario modeling (optimistic/expected/pessimistic)
+- `/tasks` — kanban board
+- `/settings/*` — proxy, leagues, users, global costs
+- `/engine-config` — YAML editor for the engine (templates, prompts,
+  style guide) — the hub is the UI for the engine's YAML configs
+- `/hardware` — PCBuildWizard BR deals feed + OLX monitoring
+- `/seo` — research / analysis / opportunities — consumes engine SEO API
+- `/logs`, `/llm-logs`, `/analytics`, `/monitor` — observability
 
-- **Frontend + API:** Next.js 14+ (App Router), TypeScript
-- **Styling:** Tailwind CSS + shadcn/ui
-- **ORM:** Prisma
-- **Banco:** PostgreSQL 16
-- **Auth:** NextAuth.js (credentials provider)
-- **Infra:** Docker Compose (app + postgres)
-- **Script externo:** Discord price scraper (TypeScript, roda via cron)
+**Why.** Operator is solo, vibe-coding with Claude Code. Ops surface
+needs to be LEGIBLE enough for operator + future Claude sessions to
+navigate without drowning. Current pain (April 2026): 48 routes
+scattered across 6 admin entry points, 25+ sidebar items without
+hierarchy, 5 god components over 1000L each. Track B of engine session
+21 kicks off the IA rework (see `docs/progress/session-01.md`).
 
-## Estrutura do Repositório
+**Operator.** Solo (`icaroberger00@gmail.com`) — same operator as
+`path-of-trade-content`. No other users.
 
+Read `PRD.md` for product requirements and entity definitions. Read
+`docs/PROGRESS.md` for current status and session continuity.
+
+## Current status
+
+Production stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 +
+NextAuth credentials + Tailwind v4 + shadcn/ui + Vitest + Playwright.
+Deployed via Docker Compose. Dark mode default (operation is largely
+nocturnal).
+
+Tests: ~373 Vitest unit/integration + 32 Playwright E2E.
+
+Session 01 (2026-04-23) is the IA rework Track B — see
+`docs/PROGRESS.md` for details.
+
+## Code style
+
+Rules below apply to all app code. Enforce them in new code; fix nearby
+violations when you touch a file; flag big violations as refactor tasks
+rather than silently rewriting unrelated areas.
+
+- **Functions**: 4-20 lines. Split if longer.
+- **Files**: target 500 lines, ±10% margin (effective 450-550). Over 550
+  is a must-split; 450-550 is a judgement call — split only when SRP is
+  also being violated. Counting is raw `wc -l` (code + comments +
+  whitespace all count — comments carry intent, don't subsidize them).
+- **One thing per function, one responsibility per module (SRP)**.
+- **Names**: specific and unique. Avoid `data`, `handler`, `Manager`.
+  Prefer names that return <5 grep hits in the codebase.
+- **Types**: explicit. No `any` in TypeScript. Prefer `unknown` + narrow
+  over `any`. Component props always typed; hooks always annotated.
+- **No code duplication**. Extract shared logic into a function/module.
+  Hotspots: modules under `components/modules/*` (historical drift from
+  early feature-by-feature implementation) and the `app/(auth)/*` pages
+  that became god components.
+- **Early returns over nested ifs**. Max 2 levels of indentation per
+  function.
+- **Exception messages must include the offending value and expected
+  shape**. `throw new Error(\`bad price cents: ${n} (expected >= 0)\`)`
+  — not `throw new Error("bad input")`.
+
+## Comments
+
+- Keep your own comments. Don't strip them on refactor — they carry
+  intent and provenance from prior sessions.
+- Write WHY, not WHAT. Skip `// increment counter` above `i++`.
+- JSDoc on exported functions that aren't self-explanatory: intent +
+  one usage example.
+- Reference issue numbers / commit SHAs when a line exists because of a
+  specific bug or upstream constraint (e.g. "Discord exporter emits
+  `\n` inside code blocks — see legacy-phases.md Fase 4").
+
+## Tests
+
+- Test runner is Vitest. Run with `npx vitest run` (one-shot) or
+  `npx vitest` (watch mode). Playwright E2E via `npx playwright test`.
+- Every new function gets a test. Bug fixes get a regression test.
+- Mock external services (engine API, exchange rate APIs, Discord) with
+  named fake classes or `vi.mock()` — not inline stubs.
+- **Never mock Prisma for integration tests** — use the real test DB
+  (`potc_test`, isolated from dev). Migrations run before the suite.
+- Tests must be F.I.R.S.T: fast, independent, repeatable,
+  self-validating, timely.
+- Factories live in `tests/factories/` — reuse them, don't inline test
+  data that's shaped like a real entity.
+
+## Dependencies
+
+- Inject dependencies through parameters (hooks, function args) — not
+  global imports or module singletons. The Prisma client singleton in
+  `lib/prisma.ts` is the one intentional exception; everything else
+  passes through.
+- Wrap third-party libs behind a thin interface owned by this project.
+  Example pattern: `lib/engine-client.ts` wraps the engine's HTTP API
+  so route handlers don't fetch it directly — if the engine contract
+  changes, only this file updates.
+- Server Components fetch data directly (no hook layer); Client
+  Components consume via props or SWR. Don't wrap `fetch` in a custom
+  hook for single-use reads — keep it inline and server-side.
+
+## Structure
+
+- Follow Next.js App Router convention: `app/<route>/page.tsx` for
+  routes, `app/<route>/layout.tsx` for scoped layouts, `app/api/<path>/
+  route.ts` for Route Handlers.
+- **Server Components by default**. `'use client'` only when the
+  component needs hooks, event handlers, browser APIs, or third-party
+  client-only libs (recharts, dnd-kit).
+- Co-locate module-specific components in `components/modules/<module>/`.
+  Generic primitives live under `components/ui/` (shadcn). Shared
+  cross-module components under `components/layout/` or
+  `components/shared/`.
+- Predictable paths: if you grep for a domain name, the match should
+  land under `components/modules/<domain>/`, `app/(auth)/<domain>/`, or
+  `app/api/<domain>/`. No other location.
+- Prefer small focused modules over god files. If an app page exceeds
+  500L, split into sub-routes or extract feature components.
+
+## Formatting
+
+- Use prettier for TS/TSX/JSON/YAML. Don't discuss style beyond that.
+- Line length: 100. Tailwind classes that blow past 100 are fine if
+  breaking them hurts readability — prettier wraps them automatically.
+
+## Logging
+
+- Use `console.error` / `console.warn` for operator-visible errors in
+  Route Handlers. Structured JSON is overkill for single-operator
+  tooling — prefer readable strings with context (`[bots] failed to
+  start instance ${id}: ${err.message}`).
+- No `console.log` in production paths — route through `console.debug`
+  (filtered out in prod by default) or remove before commit.
+- Frontend debugging: prefer React DevTools + Network tab over
+  `console.log` scattering.
+
+## Tech stack
+
+- **Framework**: Next.js 16 (App Router) — `app/`
+- **Styling**: Tailwind CSS v4 + shadcn/ui — `components/ui/`
+- **ORM**: Prisma 6 — `prisma/schema.prisma`
+- **Database**: PostgreSQL 16 (operator entities, prices, sales,
+  simulations, bot configs, tasks)
+- **Auth**: NextAuth.js (credentials provider, JWT strategy) —
+  `lib/auth.ts`
+- **Encryption**: AES-256-GCM for sensitive fields — `lib/crypto.ts`
+- **Forms**: react-hook-form + zod — validation schemas co-located
+  with forms
+- **Charts**: recharts — `'use client'` islands only
+- **Drag-and-drop**: @hello-pangea/dnd (kanban, reorderable lists)
+- **Toast**: sonner
+- **Engine client**: `lib/engine-client.ts` — typed wrapper for the
+  `path-of-trade-content` HTTP API
+- **Tests**: Vitest + React Testing Library (unit/component/integration)
+  + Playwright (E2E)
+- **Container**: Docker Compose — `docker-compose.yml`
+- **Scraper**: standalone CLI — `scripts/discord-price-scraper/`
+
+## Key commands
+
+```bash
+# Dev server
+npm run dev
+
+# Prisma
+npx prisma migrate dev              # create/apply migration
+npx prisma generate                 # regenerate client
+npx prisma studio                   # visual DB browser
+npx prisma db seed                  # seed dev data
+
+# Tests
+npx vitest run                      # unit + integration (one-shot)
+npx vitest                          # watch mode
+npx playwright test                 # E2E
+
+# Docker
+docker compose up -d                # full stack (app + db)
+docker compose up -d db             # DB only (for local dev)
+
+# Scraper (manual)
+npx tsx scripts/discord-price-scraper/index.ts
+
+# Custom agents (Claude Code)
+# /agents                           list available
+# /agents create                    create new interactively
 ```
-poe-hub/
-├── .claude/
-│   └── agents/             # Custom subagents (ver seção abaixo)
-│       ├── db-architect.md
-│       ├── frontend-dev.md
-│       ├── api-dev.md
-│       ├── scraper-dev.md
-│       ├── qa-reviewer.md
-│       └── test-engineer.md
-├── docker-compose.yml
-├── .env.example
-├── app/                    # Next.js App Router
-│   ├── (auth)/            # Rotas autenticadas (layout com sidebar)
-│   │   ├── dashboard/
-│   │   ├── bots/
-│   │   ├── sales/
-│   │   ├── prices/
-│   │   ├── simulations/
-│   │   ├── tasks/
-│   │   └── settings/
-│   ├── login/
-│   ├── api/               # Route Handlers
-│   │   ├── auth/
-│   │   ├── bots/
-│   │   ├── sales/
-│   │   ├── prices/
-│   │   ├── simulations/
-│   │   └── tasks/
-│   ├── layout.tsx
-│   └── page.tsx           # Redirect to /dashboard
-├── components/
-│   ├── ui/                # shadcn/ui components
-│   ├── layout/            # Sidebar, Header, etc.
-│   └── modules/           # Componentes específicos por módulo
-│       ├── bots/
-│       ├── sales/
-│       ├── prices/
-│       ├── simulations/
-│       └── tasks/
-├── lib/
-│   ├── prisma.ts          # Prisma client singleton
-│   ├── auth.ts            # NextAuth config
-│   ├── crypto.ts          # Encrypt/decrypt para campos sensíveis
-│   └── utils.ts
-├── prisma/
-│   ├── schema.prisma
-│   ├── migrations/
-│   └── seed.ts
-├── scripts/
-│   └── discord-price-scraper/
-│       ├── index.ts
-│       ├── parser.ts
-│       └── README.md
-├── types/
-│   └── index.ts           # Tipos compartilhados
-├── tests/
-│   ├── factories/         # Factories para gerar dados de teste
-│   │   ├── bot.factory.ts
-│   │   ├── sale.factory.ts
-│   │   └── simulation.factory.ts
-│   ├── helpers/
-│   │   ├── setup.ts       # Setup global (test DB, cleanup)
-│   │   └── auth.ts        # Helper para simular sessão autenticada
-│   └── vitest.setup.ts    # Vitest global setup
-├── vitest.config.ts
-├── .env.test              # DATABASE_URL para potc_test
-├── PRD.md
-└── CLAUDE.md
-```
 
-## Regras de Desenvolvimento
+## Stack-specific rules
 
-### Gerais
-- TypeScript strict mode — sem `any` exceto quando absolutamente necessário
-- Toda interação com banco via Prisma — nunca raw SQL exceto para queries analíticas complexas
-- Server Components por padrão, Client Components apenas quando necessário (interatividade)
-- Toda rota de API deve validar auth via `getServerSession()`
-- Campos sensíveis (senhas) devem usar as funções de `lib/crypto.ts` para encrypt/decrypt
+These extend (never override) the generic code-style rules above.
 
-### Banco de Dados
-- Migrations sempre via `prisma migrate dev`
-- Indexes para: foreign keys, campos de busca frequente, `discord_message_id` (unique)
-- Enums no Prisma para status, currencies, roles
-- Timestamps (`created_at`, `updated_at`) em todas as tabelas
+### General
+- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`.
+- Never hardcode secrets — use `.env` only.
+- Database changes go through Prisma migrations
+  (`npx prisma migrate dev`).
 
-### UI/UX
-- Layout: Sidebar fixa à esquerda com navegação principal
-- Usar componentes shadcn/ui: Table, Card, Dialog, Form, Select, Input, Badge, Chart
-- Tabelas com paginação server-side para datasets grandes (preços)
-- Formulários com react-hook-form + zod para validação
-- Toast notifications para feedback de ações (sonner)
-- Dark mode como padrão (operação noturna é comum)
+### Next.js App Router
+- Server Components by default; `'use client'` only when needed.
+  Historical state (session 01 audit): 147 `'use client'` pages, zero
+  Server Components. Any new page starts as a Server Component unless
+  there's a concrete reason.
+- Data fetching in Server Components: call Prisma or the engine client
+  directly — no fetch layer in between.
+- Mutations via Server Actions where possible; Route Handlers (`app/
+  api/.../route.ts`) for anything cross-origin or used by scripts/bots.
+- All Route Handlers must validate auth via `getServerSession()` before
+  any DB operation.
+- Route Handler responses are typed — never return raw Prisma objects
+  that leak encrypted/sensitive fields.
+- Pagination via query params: `?page=1&limit=20`.
 
-### API Routes
-- Padrão RESTful
-- Responses sempre tipadas
-- Error handling consistente com status codes corretos
-- Paginação via query params: `?page=1&limit=20`
+### Forms
+- react-hook-form + zod. Schema co-located with the form component.
+- shadcn `Form` primitives for layout consistency.
+- Toast on submit success/failure via sonner.
 
-## Ordem de Implementação
+### UI
+- shadcn/ui primitives first: Table, Card, Dialog, Form, Select,
+  Input, Badge, Tabs, Accordion, Chart. Don't install competing libs.
+- Tailwind only — no inline styles, no CSS modules.
+- Responsive: desktop-first (operator is on a desktop 99% of the time),
+  but must be usable on mobile for ops on the go.
+- Dark mode is default + only theme for now. Zinc palette via shadcn
+  CSS variables.
 
-Seguir as fases do PRD.md. Dentro de cada fase:
+### Database
+- Schema in `prisma/schema.prisma`. Migrations in `prisma/migrations/`.
+- UUIDs for all primary keys (`@id @default(uuid())`).
+- `createdAt` + `updatedAt` on every table (`@updatedAt`).
+- Prisma enums for status fields, currencies, roles.
+- snake_case for DB columns via `@map`, camelCase in Prisma models.
+- Encrypted fields (bot passwords, proxy credentials) use
+  `lib/crypto.ts` — never stored in plain text, never logged.
 
-1. **Schema primeiro:** Criar/atualizar o Prisma schema e rodar migration
-2. **API segundo:** Criar os route handlers com validação
-3. **Testes de API:** Integration tests para todos os endpoints (happy path + errors + edge cases)
-4. **UI terceiro:** Criar as páginas e componentes
-5. **Testes de UI:** Component tests para elementos interativos
-6. **Review:** Rodar qa-reviewer para auditoria final
+### Engine integration
+- All calls to the engine's HTTP API go through `lib/engine-client.ts`.
+  Never `fetch()` the engine inline from a route/page.
+- Briefing/content types shared with the engine are currently
+  **divergent** — there's a planned reconciliation (shared-types
+  package or OpenAPI-generated client). Until then, the engine-client
+  wrapper owns type adapters.
 
-> **Uma feature NÃO está completa sem testes passando.** Usar o agent `test-engineer` após cada implementação.
+### Tests
+- Unit tests for pure logic (simulation calculations, crypto, parsers,
+  zod schemas): co-located or in `__tests__/`.
+- Integration tests for Route Handlers: real `potc_test` DB, full CRUD
+  cycle, auth 401, validation 400.
+- Component tests for interactive UI: form validation, user events,
+  conditional rendering.
+- Playwright E2E for critical flows only (log in → dashboard → create
+  sale → verify in DB). Don't recreate unit tests at E2E level.
+- Coverage targets: 100% for calculations/crypto, 90%+ for Route
+  Handlers and parser, 70%+ for components.
 
-## Quando Perguntar ao Usuário
+## Environment variables
 
-- Se a lógica de negócio não estiver clara no PRD (especialmente fórmulas de simulação)
-- Se houver trade-off de UX significativo (ex: wizard vs formulário longo)
-- Se precisar de dados de exemplo (formato de mensagens do Discord, etc.)
-- Nunca assuma credenciais ou secrets — peça ao usuário para configurar via .env
-
-## Variáveis de Ambiente Necessárias
+See `.env.example` for the full list. Key variables:
 
 ```env
 # Database
 DATABASE_URL=postgresql://poth:poth@localhost:5432/poth
 
 # NextAuth
-NEXTAUTH_SECRET=<gerar com openssl rand -base64 32>
+NEXTAUTH_SECRET=<openssl rand -base64 32>
 NEXTAUTH_URL=http://localhost:3000
 
-# Encryption key para campos sensíveis
-ENCRYPTION_KEY=<gerar com openssl rand -hex 32>
+# Encryption (AES-256-GCM for sensitive fields)
+ENCRYPTION_KEY=<openssl rand -hex 32>
 
-# Discord (para o scraper)
-DISCORD_TOKEN=<token do discord>
+# Engine API (sibling repo)
+ENGINE_API_URL=http://localhost:3001
+ENGINE_API_KEY=                     # matches engine's API_KEY env
+
+# Discord scraper
+DISCORD_TOKEN=
 
 # Admin seed
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=<definir>
+ADMIN_PASSWORD=
 ```
 
-## Comandos Úteis
+## Progress tracking (CRITICAL)
 
-```bash
-# Dev
-npm run dev
+Progress is stored as one file per session under `docs/progress/`.
+`docs/PROGRESS.md` is a short **index** — status, metrics, and links to
+the per-session files. Do not grow it beyond ~150 lines.
 
-# Prisma
-npx prisma migrate dev
-npx prisma generate
-npx prisma studio
-npx prisma db seed
+Each session file (`docs/progress/session-NN.md`) contains:
+- Theme of the session (one sentence).
+- Changelog per completed chunk (what landed, file paths, validation
+  command run).
+- What's left (specific, not vague).
+- Design decisions, deviations from PRD, known issues.
 
-# Docker
-docker compose up -d        # Subir tudo
-docker compose up -d db     # Só o banco (dev local)
+Session numbering is **independent** from the engine. If referencing
+engine work, call it "engine session NN".
 
-# Scraper
-npx tsx scripts/discord-price-scraper/index.ts
+Legacy history (Fases 1-N, flat format) lives in
+`docs/progress/legacy-phases.md` — preserved for reference, not active.
+New work starts in numbered sessions.
 
-# Agents (dentro do Claude Code)
-# /agents              → listar todos os agents disponíveis
-# /agents create       → criar novo agent interativamente
-# claude --agent db-architect   → iniciar sessão como agent específico
-```
+When starting a new Claude Code session:
+1. Read `docs/PROGRESS.md` (index).
+2. Read the latest or active `docs/progress/session-NN.md` for details.
+3. Read `PRD.md` for the relevant product section.
+4. Verify the last completed task still works (`npm run dev` + smoke).
+5. Create or append to `docs/progress/session-NN.md` as you work;
+   update the index when status/metrics change.
 
-## Custom Agents (`.claude/agents/`)
+**Before any non-trivial `git commit`** (feature landing, refactor
+chunk, bug fix of substance — not `docs:` or typo-only commits):
+- Append a short entry to the active `docs/progress/session-NN.md`
+  describing what landed, file paths touched, and the validation
+  command run (tests, build, smoke).
+- Stage the progress file in the same commit as the code change, so
+  the history stays coherent.
 
-O projeto usa custom subagents do Claude Code para delegar tarefas especializadas. Crie os agents abaixo via `/agents` ou manualmente em `.claude/agents/`.
+## Custom agents
 
-### db-architect
+Custom subagents live in `.claude/agents/` (Markdown files, one per
+agent). Invoke via `/agents` in Claude Code. Preserved agents:
 
-```markdown
----
-name: db-architect
-description: Database architect specialized in Prisma schemas, PostgreSQL optimization, migrations, indexes, and data modeling for the Path of Trade Hub project.
-tools: Read, Write, Edit, Bash, Glob, Grep
-model: sonnet
----
+- **db-architect** — Prisma schema evolution, migrations, indexes.
+- **frontend-dev** — Next.js pages/components, shadcn/ui, forms.
+- **api-dev** — Route Handlers, zod validation, auth enforcement.
+- **scraper-dev** — Discord price scraper (legacy but occasionally
+  updated when Discord exporter format changes).
+- **qa-reviewer** — read-only code audit before merging.
+- **test-engineer** — Vitest + RTL test authoring after each feature.
 
-You are a senior database architect. Your expertise is PostgreSQL and Prisma ORM.
-
-**Context:** Read PRD.md for all entity definitions. Read prisma/schema.prisma for current state.
-
-**Responsibilities:**
-- Design and evolve the Prisma schema following PRD.md entities exactly
-- Create and review migrations (`npx prisma migrate dev`)
-- Add proper indexes for foreign keys, unique constraints, and frequently queried fields
-- Implement the seed script (prisma/seed.ts) with initial data
-- Optimize queries — suggest composite indexes when needed
-- Ensure encrypted fields (bot passwords, proxy credentials) use the correct types (String, not plain text)
-
-**Rules:**
-- Always use UUID for PKs (`@id @default(uuid())`)
-- Timestamps on every table (`createdAt`, `updatedAt` with `@updatedAt`)
-- Use Prisma enums for status fields, currencies, roles
-- snake_case for DB columns via `@map`, camelCase in Prisma models
-- Never write raw SQL unless for analytical queries that Prisma can't express
-```
-
-### frontend-dev
-
-```markdown
----
-name: frontend-dev
-description: Frontend developer specialized in Next.js App Router, React Server Components, Tailwind CSS, and shadcn/ui. Builds the UI for all Path of Trade Hub modules.
-tools: Read, Write, Edit, Bash, Glob, Grep
-model: sonnet
----
-
-You are a senior frontend developer specialized in Next.js 14+ with App Router.
-
-**Context:** Read PRD.md for UI requirements. Read CLAUDE.md for conventions.
-
-**Responsibilities:**
-- Build pages and components following the structure in CLAUDE.md
-- Use Server Components by default, Client Components only for interactivity
-- Implement all UI using Tailwind CSS + shadcn/ui components
-- Forms with react-hook-form + zod validation
-- Dark mode as default theme
-- Implement Kanban board (tasks module) with drag-and-drop (use @hello-pangea/dnd or similar)
-- Simulation week/day editor with inline editing, inheritance visual indicators (gray/italic for inherited, bold for overrides)
-- Toast notifications via sonner
-- Server-side pagination for large datasets
-
-**Rules:**
-- Never use `"use client"` unless the component needs hooks, event handlers, or browser APIs
-- Always co-locate components in `components/modules/<module-name>/`
-- Use shadcn/ui primitives: Table, Card, Dialog, Form, Select, Input, Badge, Tabs, Accordion
-- Responsive: desktop-first, but usable on mobile
-- No inline styles — Tailwind only
-```
-
-### api-dev
-
-```markdown
----
-name: api-dev
-description: Backend API developer for Next.js Route Handlers. Builds RESTful endpoints with authentication, validation, and proper error handling for Path of Trade Hub.
-tools: Read, Write, Edit, Bash, Glob, Grep
-model: sonnet
----
-
-You are a senior backend developer building REST APIs with Next.js Route Handlers.
-
-**Context:** Read PRD.md for all entities and business logic. Read CLAUDE.md for conventions.
-
-**Responsibilities:**
-- Create Route Handlers in `app/api/` following RESTful patterns
-- Validate all inputs with zod schemas
-- Authenticate every route via `getServerSession()`
-- Implement encryption/decryption for sensitive fields using `lib/crypto.ts` (AES-256-GCM)
-- Pagination via query params (`?page=1&limit=20`)
-- Proper HTTP status codes and typed error responses
-- Implement the simulation calculation engine (revenue, cost, profit per day/week/total)
-
-**Rules:**
-- Always validate auth before any DB operation
-- Return typed responses — never raw Prisma objects with sensitive fields exposed
-- Use Prisma transactions for operations that touch multiple tables
-- Encrypt bot passwords and proxy credentials before storing, decrypt only when explicitly requested
-- Calculation logic for simulations must respect the week→day inheritance model (day.field ?? week.default_field)
-```
-
-### scraper-dev
-
-```markdown
----
-name: scraper-dev
-description: Developer specialized in the Discord price scraping CLI script. Handles DiscordChatExporter integration, message parsing, regex extraction, and database insertion for price history.
-tools: Read, Write, Edit, Bash, Glob, Grep
-model: sonnet
----
-
-You are a developer building the Discord price scraping pipeline.
-
-**Context:** Read PRD.md section 3.2 for full requirements. The script lives in `scripts/discord-price-scraper/`.
-
-**Responsibilities:**
-- Integrate with DiscordChatExporter CLI (JSON export mode) or parse manually exported JSON files
-- Build robust regex/heuristic parser to extract prices from Discord messages
-- Identify and classify authors (CNL revendedor vs outros)
-- Insert into PostgreSQL via Prisma, deduplicating by discord_message_id
-- Handle multiple currencies (divine, chaos, USD, BRL)
-- Make the script idempotent and safe to run via cron repeatedly
-
-**Rules:**
-- Script must be runnable standalone: `npx tsx scripts/discord-price-scraper/index.ts`
-- Use the same Prisma client and schema as the main app
-- Log clearly: how many messages processed, how many new entries, how many skipped (duplicates)
-- Never crash on malformed messages — log and skip
-- Support both CLI export (automated) and manual JSON file drop (fallback)
-```
-
-### qa-reviewer
-
-```markdown
----
-name: qa-reviewer
-description: QA reviewer that audits code for bugs, security issues, missing validations, and adherence to PRD specifications. Reviews before merging any feature.
-tools: Read, Glob, Grep, Bash
-model: sonnet
----
-
-You are a senior QA engineer reviewing the Path of Trade Hub codebase.
-
-**Context:** Read PRD.md for specifications. Read CLAUDE.md for coding standards.
-
-**Responsibilities:**
-- Review code for bugs, security vulnerabilities, and logic errors
-- Verify that implementations match PRD.md specifications exactly
-- Check that sensitive fields are properly encrypted (never stored in plain text)
-- Ensure all API routes validate auth and inputs
-- Run `npx prisma validate` and `npx tsc --noEmit` to catch type errors
-- Verify that simulation calculations follow the documented formulas
-- Check for missing error handling, edge cases, and N+1 queries
-
-**Rules:**
-- Read-only — never edit files, only report findings
-- Be specific: file path, line reference, what's wrong, how to fix
-- Prioritize: security issues > data integrity > logic bugs > style issues
-- Always verify encrypted fields are not being logged or exposed in API responses
-```
-
-### test-engineer
-
-```markdown
----
-name: test-engineer
-description: Test engineer that writes unit, integration, and component tests for every feature. Invoked after each feature implementation to ensure full coverage before moving to the next phase.
-tools: Read, Write, Edit, Bash, Glob, Grep
-model: sonnet
----
-
-You are a senior test engineer for the Path of Trade Hub project.
-
-**Context:** Read PRD.md section 7 (Estratégia de Testes) for testing requirements and coverage targets. Read CLAUDE.md for conventions.
-
-**Stack:** Vitest, React Testing Library, Prisma (test DB), Playwright (E2E only in Fase 8).
-
-**Responsibilities:**
-- Write tests immediately after each feature is implemented — a feature is NOT done until tests pass
-- Unit tests for pure logic: simulation calculations, crypto encrypt/decrypt, Discord message parser, zod schemas, total calculations
-- Integration tests for API Routes: full CRUD cycle, auth enforcement, input validation, error responses, edge cases
-- Component tests for client-side: form validation, user interactions, state management, conditional rendering
-- Create and maintain test factories in `tests/factories/` for generating consistent test data
-- Ensure test DB is isolated (`potc_test`) and migrations run before test suite
-
-**Workflow per feature:**
-1. Read the implementation code
-2. Read the corresponding PRD section for expected behavior
-3. Write unit tests for any pure functions/calculations
-4. Write integration tests for API routes (happy path + error cases + edge cases)
-5. Write component tests for interactive UI elements
-6. Run `npx vitest run` and ensure all tests pass
-7. Report coverage summary
-
-**Rules:**
-- Test files: `*.test.ts` / `*.test.tsx` co-located with source or in `__tests__/`
-- Naming: `describe('ModuleName')` → `it('should do X when Y')`
-- Never mock Prisma for integration tests — use a real test database
-- Mock external services (Discord API, exchange rate APIs) with vi.mock
-- Simulation calculation tests must cover: normal case, zero bots, null prices, full override, partial override, week inheritance
-- Crypto tests must verify: encrypt→decrypt roundtrip, different inputs produce different ciphertexts, tampered ciphertext fails
-- API tests must verify: 401 without auth, 400 with invalid input, 404 for missing resources, 200/201 for success
-- Coverage targets: 100% for calculations and crypto, 90%+ for API routes and parser, 70%+ for components
-```
-
+Agent definitions are in-repo at `.claude/agents/*.md` — edit there
+when responsibilities drift. Don't inline them in this file.
