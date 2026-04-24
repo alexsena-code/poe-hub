@@ -342,6 +342,70 @@ sessão).
 Validação: `npx next build` passa limpo, as 7 rotas de /admin/config
 listadas no build output, zero warnings.
 
+### S01.d — B3b: Split engine-config.tsx (1944L) — DONE
+
+God file principal do session 21 decomposto via agent background
+paralelo ao style research. Pattern seguido: mesmo do `keybert-tab.tsx`
+já existente — cada tab é um client component carregado via
+`dynamic(import('./tabs/<name>-tab'), { loading: … })`.
+
+**9 tab components extraídos** em `app/(auth)/admin/config/engine/tabs/`:
+
+| Arquivo | Linhas | Endpoint PUT |
+|---|---:|---|
+| `weights-tab.tsx` | 81 | /api/engine/config/weights |
+| `routing-tab.tsx` | 153 | /api/engine/config/routing |
+| `llm-tab.tsx` | 148 | /api/engine/config/llm |
+| `budget-tab.tsx` | 71 | /api/engine/config/budget |
+| `style-tab.tsx` | 212 | /api/engine/config/style |
+| `ideation-tab.tsx` | 101 | /api/engine/config/ideation |
+| `competitors-tab.tsx` | 151 | /api/engine/config/competitors |
+| `playground-tab.tsx` | 261 | (playground fetch only) |
+| `pipelines-tab.tsx` | 700 | /api/engine/pipelines/* |
+
+**`engine/page.tsx`: 1944L → 182L** — thin orchestrator com state
+(config, loading, saving, toast, activeTab), `useEffect` fetch
+`/api/engine/config/all`, `saveSection` helper, `showToast` helper,
+loading/error early returns, tab switcher + dynamic rendering.
+
+**Ressalvas**:
+- `pipelines-tab.tsx` ficou em 700L (acima da margem 550L). Justificado
+  pelo agent: ~180L são o array `PIPELINES` config e o restante são
+  4 sub-components acoplados ao único runner (`PipelineCostsCard`,
+  `PipelineStatusBadge`, `PipelineResultSummary`, `PipelinesPanel`).
+  Split extra não mapearia pra SRP independentes. Flagged pra revisar
+  se crescer.
+- `SaveBtn` duplicado em 5 tabs (weights/routing/llm/budget/style) —
+  preferido sobre shared helper dado que page.tsx já tá dentro do
+  budget.
+
+**Validação**: `npx next build` → exit 0, zero warnings, `/admin/config/
+engine` route builda OK. Zero behavior deviations (fetch URLs, JSON
+body shapes, toast messages, form defaults, save endpoints
+byte-equivalent).
+
+### S01.e — Style preview (`/admin/design-preview`) — DONE (temp)
+
+Preview temporária pra o operador avaliar 6 das 8 propostas do style
+audit (agent background rodou em paralelo com B3b). Tudo scoped — o
+theme global não muda até decisão do operador.
+
+- `components/ui/page-header.tsx` (novo, 35L): proposal A — componente
+  real com `title`, `description?`, `actions?` slot. Se aprovada, vira
+  o único lugar pra tweakar tipografia de pages (40+ call sites atuais).
+- `components/ui/empty-state.tsx` (novo, 45L): proposal D — `icon`,
+  `title`, `description?`, `action?` slot. Dashed border rounded card.
+- `app/(auth)/admin/design-preview/page.tsx` (novo, 410L): preview page
+  com 7 sections — Typography scale (H), Palette swap (C, com toggle
+  zinc/slate/neutral em tempo real), Semantic colors (B), PageHeader
+  (A), SEO accent emerald (F), EmptyState (D), + mini mockup integrado
+  combinando Phase 1+2 aplicadas a uma fake `/seo/research`. CSS vars
+  scoped via `style` prop em wrappers, zero mudança global.
+- `components/layout/sidebar.tsx` (+1 entry): "Design Preview" no
+  Admin group, marcada como temp.
+- **Delete quando decisões de style landarem** (removal planejado em
+  S01.f ou session 02).
+
 ## O que resta na session 01
 
 **Bloqueio**: aguardando decisão do operador sobre os 3 design
