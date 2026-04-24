@@ -86,7 +86,7 @@ export function LlmLogsDailyChart({ daily }: { daily: DailyStat[] }) {
           />
           <Area
             yAxisId="cost"
-            type="monotone"
+            type="linear"
             dataKey="cost"
             stroke="#10b981"
             fill="url(#colorCost)"

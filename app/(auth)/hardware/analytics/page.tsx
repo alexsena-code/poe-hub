@@ -528,7 +528,7 @@ export default function HardwareAnalyticsPage() {
                 <Tooltip formatter={(v: unknown) => fmt(Number(v))} contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 {selectedProducts.map((name, i) => (
-                  <Line key={name} type="monotone" dataKey={name} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                  <Line key={name} type="linear" dataKey={name} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls />
                 ))}
               </LineChart>
             </ResponsiveContainer>
@@ -613,7 +613,7 @@ export default function HardwareAnalyticsPage() {
                     <XAxis dataKey="range" stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} tickLine={false} />
                     <YAxis stroke="#666" tick={{ fill: "#aaa", fontSize: 11 }} allowDecimals={false} tickLine={false} />
                     <Tooltip contentStyle={{ background: "#1a1a1a", border: "1px solid #333", color: "#eee", borderRadius: 8 }} />
-                    <Line type="monotone" dataKey="count" name="Deals" stroke="#22d3ee" strokeWidth={2} dot={{ r: 4, fill: "#22d3ee" }} activeDot={{ r: 6 }} />
+                    <Line type="linear" dataKey="count" name="Deals" stroke="#22d3ee" strokeWidth={2} dot={{ r: 4, fill: "#22d3ee" }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

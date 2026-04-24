@@ -26,15 +26,19 @@ describe("BotStatusBadge", () => {
     expect(screen.getByText("Manutenção")).toBeDefined();
   });
 
-  it("applies green class for active", () => {
+  it("applies success theme color for active", () => {
     const { container } = render(<BotStatusBadge status="active" />);
     const badge = container.firstChild as HTMLElement;
-    expect(badge.className).toContain("bg-green-900");
+    // Session 01 S01.f: moved from bg-green-900 (hardcoded tailwind) to
+    // bg-success (theme-driven via --color-success in globals.css).
+    expect(badge.className).toContain("bg-success");
+    expect(badge.getAttribute("data-status")).toBe("active");
   });
 
-  it("applies red class for banned", () => {
+  it("applies destructive theme color for banned", () => {
     const { container } = render(<BotStatusBadge status="banned" />);
     const badge = container.firstChild as HTMLElement;
-    expect(badge.className).toContain("bg-red-900");
+    expect(badge.className).toContain("bg-destructive");
+    expect(badge.getAttribute("data-status")).toBe("banned");
   });
 });

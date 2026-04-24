@@ -406,6 +406,65 @@ theme global não muda até decisão do operador.
 - **Delete quando decisões de style landarem** (removal planejado em
   S01.f ou session 02).
 
+### S01.f — Style Phase 1 aplicada — DONE
+
+Operador decidiu após testar `/admin/design-preview`: neutral (não
+slate), charts sem suavização. Phase 1 propostas B+C+H executadas +
+charts fix. Preview page mantida temporariamente com banner "Phase 1
+aplicada" + section nova comparando smooth vs linear.
+
+**`app/globals.css`** (@theme block rewrite):
+- Base swapped **zinc → neutral**: `#09090b` → `#0a0a0a`, `#27272a`
+  → `#262626`, `#a1a1aa` → `#a3a3a3`. Pure gray hue 0, sem tint
+  azulado.
+- Adicionadas **semantic colors** (proposal B): `--color-success
+  #16a34a`, `--color-warning #f59e0b`, `--color-info #3b82f6`, todos
+  com `-foreground` pair. `--color-destructive` mantido (#7f1d1d).
+- Adicionado **SEO accent** (proposal F): `--color-seo #10b981`
+  (emerald) + `--color-seo-foreground`. Ainda não aplicado a `/seo/*`
+  rotas — fase futura (Phase 2).
+- Adicionada **typography scale** (proposal H): 6 vars
+  (`--font-size-h1` 30px, `h2` 24px, `h3` 20px, `h4` 18px, `body`
+  14px, `caption` 12px). Consume via `text-[var(--font-size-h1)]` ou
+  futuro utility layer.
+
+**`components.json`**: `baseColor: zinc → neutral`. Futuro
+`npx shadcn@latest add <component>` gera com a nova base.
+
+**Charts: smooth → linear** (decisão específica do operador):
+- `components/admin/observability/llm-logs-chart.tsx:89`: `type="monotone"`
+  → `type="linear"`.
+- `app/(auth)/hardware/analytics/page.tsx:531,616`: 2 Line com
+  `type="monotone"` → `type="linear"`.
+- Racional: retas refletem dados reais sem interpolação de splines
+  (monotone cria sensação falsa de tendência entre medições). Dark
+  ops aesthetic.
+
+**`bot-status-badge.tsx` + test**:
+- Troca hardcoded `bg-green-900`/`bg-red-900`/`bg-yellow-900`/`bg-zinc-700`
+  → theme tokens `bg-success/20 text-success`, `bg-destructive/20`,
+  `bg-warning/20`, `bg-muted`. Agora reage a palette swap.
+- Adicionado `data-status` attribute pro test/CSS debug.
+- Test file: trocado `expect(className).toContain('bg-green-900')`
+  → `toContain('bg-success')` + check `data-status="active"`.
+- Validação: `npx vitest run bot-status-badge` → 6/6 passed.
+
+**`/admin/design-preview`** (update pra refletir o estado atual):
+- Top banner: "Phase 1 aplicada" (green, success color).
+- Section nova: "Charts: smooth (monotone) → linear [aplicado]" —
+  ResponsiveContainer + LineChart side-by-side mostrando o mesmo
+  dataset renderizado com cada type.
+- Palette swap toggle mantido (zinc/slate/neutral) como referência
+  histórica — zinc só existe no scoped preview agora.
+
+**Pendente (Phase 2 propostas A+F)** — fora do escopo desta rodada:
+- A: PageHeader backfill em 40+ pages (componente já existe em
+  `components/ui/page-header.tsx`, aguardando decisão de execução).
+- F: aplicar `--color-seo` nos headers de `/seo/*` (var já declarada
+  no @theme, falta sweep de uso).
+
+Validação: `npx next build` → exit 0, zero warnings.
+
 ## O que resta na session 01
 
 **Bloqueio**: aguardando decisão do operador sobre os 3 design

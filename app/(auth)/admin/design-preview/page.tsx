@@ -12,6 +12,15 @@ import {
   Plus,
   FileX,
 } from "lucide-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -23,6 +32,18 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+// Mock dataset — spiky intentionally so the smooth vs linear contrast
+// is visible. Real charts use the same shape from /api/engine endpoints.
+const CHART_SAMPLE = [
+  { day: "Mon", value: 12 },
+  { day: "Tue", value: 38 },
+  { day: "Wed", value: 15 },
+  { day: "Thu", value: 47 },
+  { day: "Fri", value: 22 },
+  { day: "Sat", value: 41 },
+  { day: "Sun", value: 18 },
+];
 
 // ─── Theme variants ────────────────────────────────────────────────
 // HSL triples applied as CSS vars on a wrapper div so Tailwind utilities
@@ -97,8 +118,23 @@ export default function DesignPreviewPage() {
     <div className="space-y-8">
       <PageHeader
         title="Design Preview"
-        description="Propostas de style da session 01. Preview scoped — theme global nao mudou. Delete esta rota depois que aprovarmos (ou nao) as mudancas."
+        description="Propostas de style da session 01. Phase 1 (neutral + semantic colors + typography vars + charts lineares) ja esta LIVE — o resto ainda e scoped/preview."
       />
+
+      {/* Status banner: Phase 1 applied */}
+      <div
+        className="rounded-lg border border-success/30 bg-success/10 px-4 py-3"
+        role="status"
+      >
+        <div className="flex items-center gap-2 text-sm">
+          <CheckCircle2 className="h-4 w-4 text-success" />
+          <span className="font-medium text-success">Phase 1 aplicada</span>
+          <span className="text-muted-foreground">
+            · zinc → neutral · semantic colors (success/warning/info/destructive) ·
+            typography CSS vars · charts com type="linear"
+          </span>
+        </div>
+      </div>
 
       {/* === Section H: Typography scale ============================ */}
       <Section
@@ -342,6 +378,81 @@ export default function DesignPreviewPage() {
             <p className="mt-2 text-xs text-muted-foreground italic">
               Icon + title + description + action slot. Uma UX
               consistente pra todas as list pages vazias.
+            </p>
+          </Column>
+        </Row>
+      </Section>
+
+      {/* === Section: Chart smoothing (APPLIED) ====================== */}
+      <Section
+        title="Charts: smooth (monotone) → linear [aplicado]"
+        subtitle="3 charts no codebase trocaram de type='monotone' pra type='linear' — sem suavizacao de curva"
+      >
+        <Row>
+          <Column heading="Antes (monotone / smooth)">
+            <div className="rounded-md border border-border p-3">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={CHART_SAMPLE}>
+                  <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="day"
+                    stroke="var(--color-muted-foreground)"
+                    fontSize={11}
+                  />
+                  <YAxis stroke="var(--color-muted-foreground)" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--color-card)",
+                      border: "1px solid var(--color-border)",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="var(--color-chart-2)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground italic">
+              Curva suavizada — interpola pontos com splines, pode dar
+              falsa sensacao de tendencia entre medicoes.
+            </p>
+          </Column>
+          <Column heading="Depois (linear / sem smoothing)">
+            <div className="rounded-md border border-border p-3">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={CHART_SAMPLE}>
+                  <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="day"
+                    stroke="var(--color-muted-foreground)"
+                    fontSize={11}
+                  />
+                  <YAxis stroke="var(--color-muted-foreground)" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--color-card)",
+                      border: "1px solid var(--color-border)",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="linear"
+                    dataKey="value"
+                    stroke="var(--color-chart-3)"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground italic">
+              Retas entre pontos — reflete os dados reais sem interpolacao.
+              Aplicado nos 3 charts: llm-logs, hardware analytics (2 spots).
             </p>
           </Column>
         </Row>
