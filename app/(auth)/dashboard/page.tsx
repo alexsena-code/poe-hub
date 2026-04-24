@@ -1,12 +1,12 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { KpiCards } from "@/components/modules/dashboard/kpi-cards";
 import { RecentSales } from "@/components/modules/dashboard/recent-sales";
 import { PriceCharts } from "@/components/modules/dashboard/price-charts";
 import { TaskSummary } from "@/components/modules/dashboard/task-summary";
 import { PageHeader } from "@/components/ui/page-header";
-import { Spinner } from "@/components/ui/spinner";
+import { fetchEngine } from "@/lib/fetch-engine";
+
+// Session 04 S04.a — converted from client useEffect fetch to RSC async fetch.
+// Data is available at render time; no loading spinner needed.
 
 interface DashboardData {
   activeBots: number;
@@ -38,37 +38,22 @@ interface DashboardData {
   currentLeagues: { name: string; poeVersion: string }[];
 }
 
-export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default async function DashboardPage() {
+  let data: DashboardData | null = null;
+  let fetchError: string | null = null;
 
-  useEffect(() => {
-    fetch("/api/dashboard")
-      .then((res) => {
-        if (!res.ok) throw new Error("Falha ao carregar dados do dashboard");
-        return res.json();
-      })
-      .then(setData)
-      .catch((err) => setError(err.message));
-  }, []);
+  try {
+    data = await fetchEngine<DashboardData>("/api/dashboard");
+  } catch (err) {
+    fetchError = err instanceof Error ? err.message : "Falha ao carregar dados do dashboard";
+  }
 
-  if (error) {
+  if (fetchError || !data) {
     return (
       <div className="space-y-6">
         <PageHeader title="Dashboard" />
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Dashboard" />
-        <div className="flex items-center justify-center py-20">
-          <Spinner size="lg" className="h-8 w-8 text-muted-foreground" />
+          {fetchError ?? "Dados indisponíveis"}
         </div>
       </div>
     );

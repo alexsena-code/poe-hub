@@ -1,5 +1,6 @@
 'use client';
 
+import { Input } from '@/components/ui/input';
 import PobSummaryCard from '@/components/engine/PobSummaryCard';
 import type { PobSummary } from '@/lib/engine-types';
 
@@ -33,14 +34,14 @@ export function PobImporter({
         </span>
       </label>
       <div className="flex gap-2">
-        <input
+        <Input
           type="url"
           placeholder="https://pobb.in/..."
           value={pobUrl}
           onChange={(e) => {
             onPobUrlChange(e.target.value);
           }}
-          className="flex-1 rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          className="flex-1 font-mono text-sm"
         />
         <button
           type="button"

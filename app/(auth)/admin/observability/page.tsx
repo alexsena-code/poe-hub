@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/ui/page-header";
@@ -9,6 +6,9 @@ import { PageHeader } from "@/components/ui/page-header";
 // /analytics, /monitor) collapsed into this single admin dashboard.
 // Tabs are lazy-loaded so the heavy recharts/WebSocket code only hits
 // the bundle when the operator actually visits each pane.
+//
+// Session 04 S04.a — converted to RSC. Radix Tabs manages active-tab
+// state internally via defaultValue; no useState needed here.
 
 const LogsTab = dynamic(() => import("@/components/admin/observability/logs-tab"), {
   loading: () => <TabLoading />,
@@ -23,15 +23,11 @@ const MonitorTab = dynamic(() => import("@/components/admin/observability/monito
   loading: () => <TabLoading />,
 });
 
-type TabId = "logs" | "llm" | "analytics" | "monitor";
-
 function TabLoading() {
   return <div className="py-12 text-center text-muted-foreground">Carregando...</div>;
 }
 
 export default function ObservabilityPage() {
-  const [tab, setTab] = useState<TabId>("logs");
-
   return (
     <div className="p-6 max-w-[1800px] mx-auto">
       <PageHeader
@@ -40,7 +36,7 @@ export default function ObservabilityPage() {
         className="mb-6"
       />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)}>
+      <Tabs defaultValue="logs">
         <TabsList>
           <TabsTrigger value="logs">Logs</TabsTrigger>
           <TabsTrigger value="llm">LLM</TabsTrigger>

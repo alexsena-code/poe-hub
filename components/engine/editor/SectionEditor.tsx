@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -365,12 +367,12 @@ export default function SectionEditor() {
           >
             {showRegenInput && (
               <div className="flex gap-1 mb-1">
-                <input
+                <Input
                   type="text"
                   value={regenInstruction}
                   onChange={(e) => setRegenInstruction(e.target.value)}
                   placeholder="Instrucao (opcional)..."
-                  className="px-2 py-1 rounded text-xs bg-background border border-border text-foreground w-48 focus:outline-none focus:ring-1 focus:ring-foreground/50"
+                  className="w-48 h-7 text-xs"
                   autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handleRegenSelection(); }}
                 />
@@ -406,10 +408,10 @@ export default function SectionEditor() {
             <div className="bg-surface border border-border rounded-xl p-5 max-w-2xl w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <h4 className="text-sm font-semibold text-foreground mb-2">Editar trecho selecionado</h4>
               <p className="text-xs text-muted-foreground mb-3">Original: &quot;{inlineEdit.original.slice(0, 100)}...&quot;</p>
-              <textarea
+              <Textarea
                 value={inlineEdit.replacement}
                 onChange={(e) => setInlineEdit({ ...inlineEdit, replacement: e.target.value })}
-                className="w-full rounded-lg border border-border bg-background p-3 text-foreground text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/30 resize-y min-h-[120px]"
+                className="font-mono resize-y min-h-[120px]"
                 rows={6}
                 autoFocus
               />
@@ -474,10 +476,10 @@ export default function SectionEditor() {
           hasDraft &&
           (isEditing ? (
             <div className="flex flex-col gap-3">
-              <textarea
+              <Textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background p-4 text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-foreground/30 resize-y min-h-[300px]"
+                className="font-mono resize-y min-h-[300px]"
               />
               <div className="flex gap-2">
                 <button
@@ -600,12 +602,12 @@ export default function SectionEditor() {
           )}
 
           <div className="flex gap-3 items-end">
-            <textarea
+            <Textarea
               rows={2}
               placeholder="Adicione sua opiniao ou instrucoes..."
               value={humanInput}
               onChange={(e) => setHumanInput(e.target.value)}
-              className="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-1 focus:ring-foreground/30 resize-none"
+              className="flex-1 resize-none"
             />
 
             {/* Action buttons */}

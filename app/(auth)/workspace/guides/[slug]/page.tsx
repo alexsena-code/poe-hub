@@ -1,70 +1,56 @@
-'use client';
+import { notFound } from "next/navigation";
+import { fetchEngine } from "@/lib/fetch-engine";
+import { GuideContent } from "./guide-content";
+import type { PostDetail } from "@/lib/content-api";
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { GuideContent } from './guide-content';
+// Session 04 S04.a — converted from client useEffect+useParams to RSC async.
+// Slug comes from route params (Promise<{ slug: string }> in Next.js 15+).
 
-const API = '/api/engine';
-
-interface PostSection {
-  id: string;
-  heading: string;
-  content: { 'pt-br': string; en: string };
-  order: number;
+interface RawSection {
+  sectionId?: string;
+  id?: string;
+  title?: string;
+  heading?: string;
+  content: { "pt-br": string; en: string };
 }
 
-interface PostMeta {
-  title: { 'pt-br': string; en: string };
-  description: { 'pt-br': string; en: string };
-  ogTitle?: { 'pt-br': string; en: string };
-  ogDescription?: { 'pt-br': string; en: string };
+interface RawPost extends Omit<PostDetail, "sections"> {
+  sections: RawSection[];
 }
 
-interface PostDetail {
-  slug: string;
-  title: { 'pt-br': string; en: string };
-  template: string;
-  status: string;
-  generatedAt: string;
-  sections: PostSection[];
-  meta: PostMeta;
-}
+export default async function GuidePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
 
-export default function GuidePage() {
-  const params = useParams();
-  const slug = params?.slug as string;
-  const [post, setPost] = useState<PostDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  let post: PostDetail;
 
-  useEffect(() => {
-    if (!slug) return;
-    setLoading(true);
-    fetch(`${API}/content/posts/${slug}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`${res.status}`);
-        const raw = await res.json();
-        const sections = (raw.sections || []).map((s: any, i: number) => ({
-          id: s.sectionId || s.id,
-          heading: s.title || s.heading,
-          content: s.content,
-          order: i,
-        }));
-        setPost({ ...raw, sections });
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [slug]);
+  try {
+    const raw = await fetchEngine<RawPost>(
+      `/api/engine/content/posts/${encodeURIComponent(slug)}`
+    );
 
-  if (loading) {
-    return <div className="py-16 text-center text-muted-foreground">Carregando...</div>;
-  }
+    const sections = (raw.sections ?? []).map((s, i) => ({
+      id: s.sectionId ?? s.id ?? String(i),
+      heading: s.title ?? s.heading ?? "",
+      content: s.content,
+      order: i,
+    }));
 
-  if (error || !post) {
+    post = { ...raw, sections };
+  } catch (err) {
+    const status = err instanceof Error ? err.message : "";
+    // 404 from engine → Next not-found boundary
+    if (status.includes("404")) notFound();
+
     return (
       <div className="py-16 text-center">
-        <p className="text-muted-foreground">Post nao encontrado.</p>
-        <p className="text-xs text-muted-foreground mt-2">Erro: {error}</p>
+        <p className="text-muted-foreground">Post não encontrado.</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          Erro: {err instanceof Error ? err.message : "desconhecido"}
+        </p>
       </div>
     );
   }

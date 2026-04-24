@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePostStore } from '@/lib/engine-store';
 import { optimizeSeo, savePost, updatePost } from '@/lib/content-api';
 import type { GeneratedSection } from '@/lib/engine-types';
+import { Textarea } from '@/components/ui/textarea';
 import SectionSidebar from './SectionSidebar';
 import SectionEditor from './SectionEditor';
 import PostPreview from '@/components/engine/preview/PostPreview';
@@ -335,12 +336,12 @@ export default function EditorShell({ postId }: { postId: string }) {
             </button>
             {showGlobalComment && (
               <div className="px-4 pb-3">
-                <textarea
+                <Textarea
                   value={globalComment}
                   onChange={(e) => setGlobalComment(e.target.value)}
                   placeholder='Ex: "tom casual, evitar jargão TFT", "priorizar exemplos com Scarab of Divinity", "não mencionar TFT trades". Vai junto em toda regeneração de seção.'
                   rows={3}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 resize-none focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="resize-none placeholder:text-muted-foreground/70"
                 />
                 <div className="flex items-center justify-between mt-1">
                   <span className="text-[10px] text-muted-foreground">

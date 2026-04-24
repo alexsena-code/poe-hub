@@ -1,5 +1,7 @@
 'use client';
 
+import { Textarea } from '@/components/ui/textarea';
+
 interface NotesTextareaProps {
   value: string;
   onChange: (value: string) => void;
@@ -22,12 +24,12 @@ export function NotesTextarea({ value, onChange, hasBriefSource }: NotesTextarea
           <span className="text-xs text-muted-foreground/70">(adendo do editor — opcional)</span>
         )}
       </label>
-      <textarea
+      <Textarea
         rows={3}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+        className="resize-none"
       />
     </div>
   );

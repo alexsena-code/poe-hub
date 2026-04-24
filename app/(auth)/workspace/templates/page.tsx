@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 const API_URL = '/api/engine';
 
@@ -184,23 +186,22 @@ function SectionEditor({
           {/* Title */}
           <div className="mt-4">
             <label className="block text-xs text-muted-foreground mb-1">Title</label>
-            <input
+            <Input
               value={section.title}
               onChange={(e) => onChange({ ...section, title: e.target.value })}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
 
           {/* Instruction */}
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Instruction</label>
-            <textarea
+            <Textarea
               value={section.instruction}
               onChange={(e) =>
                 onChange({ ...section, instruction: e.target.value })
               }
               rows={5}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none font-mono leading-relaxed"
+              className="resize-none font-mono leading-relaxed"
             />
           </div>
 
@@ -224,13 +225,12 @@ function SectionEditor({
             </div>
             <div className="w-32">
               <label className="block text-xs text-muted-foreground mb-1">Max tokens</label>
-              <input
+              <Input
                 type="number"
                 value={section.maxTokens}
                 onChange={(e) =>
                   onChange({ ...section, maxTokens: Number(e.target.value) })
                 }
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
           </div>
@@ -535,24 +535,24 @@ export default function TemplateManager() {
                     <label className="block text-xs text-muted-foreground mb-1">
                       Template name
                     </label>
-                    <input
+                    <Input
                       value={current.name}
                       onChange={(e) =>
                         setCurrent({ ...current, name: e.target.value })
                       }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground font-bold focus:outline-none focus:ring-1 focus:ring-accent"
+                      className="font-bold"
                     />
                   </div>
                   <div className="w-48">
                     <label className="block text-xs text-muted-foreground mb-1">
                       Slug pattern
                     </label>
-                    <input
+                    <Input
                       value={current.slug}
                       onChange={(e) =>
                         setCurrent({ ...current, slug: e.target.value })
                       }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                      className="font-mono"
                     />
                   </div>
                 </div>
@@ -561,7 +561,7 @@ export default function TemplateManager() {
                     <label className="block text-xs text-muted-foreground mb-1">
                       Target word count
                     </label>
-                    <input
+                    <Input
                       type="number"
                       value={current.targetWordCount}
                       onChange={(e) =>
@@ -570,14 +570,13 @@ export default function TemplateManager() {
                           targetWordCount: Number(e.target.value),
                         })
                       }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
                   <div className="w-48">
                     <label className="block text-xs text-muted-foreground mb-1">
                       Max tokens per section (default)
                     </label>
-                    <input
+                    <Input
                       type="number"
                       value={current.maxTokensPerSection}
                       onChange={(e) =>
@@ -586,7 +585,6 @@ export default function TemplateManager() {
                           maxTokensPerSection: Number(e.target.value),
                         })
                       }
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                     />
                   </div>
                 </div>
@@ -628,7 +626,7 @@ export default function TemplateManager() {
                       <label className="block text-xs text-muted-foreground mb-1">
                         Primary keyword
                       </label>
-                      <input
+                      <Input
                         value={current.seo.primaryKeyword}
                         onChange={(e) =>
                           setCurrent({
@@ -636,14 +634,13 @@ export default function TemplateManager() {
                             seo: { ...current.seo, primaryKeyword: e.target.value },
                           })
                         }
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </div>
                     <div className="w-40">
                       <label className="block text-xs text-muted-foreground mb-1">
                         Schema type
                       </label>
-                      <input
+                      <Input
                         value={current.seo.schemaType}
                         onChange={(e) =>
                           setCurrent({
@@ -651,7 +648,6 @@ export default function TemplateManager() {
                             seo: { ...current.seo, schemaType: e.target.value },
                           })
                         }
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                       />
                     </div>
                   </div>
@@ -732,11 +728,11 @@ export default function TemplateManager() {
               <p className="text-xs text-muted-foreground mb-3">
                 Paste a template YAML (same format as config/templates/*.yaml). It will be parsed and loaded into the editor.
               </p>
-              <textarea
+              <Textarea
                 value={yamlText}
                 onChange={(e) => setYamlText(e.target.value)}
                 placeholder={`template:\n  name: My Guide\n  slug_pattern: my-guide-{topic}\n  target_length_words: 1500-2000\n\nsections:\n  - id: intro\n    title: Introduction\n    instruction: Write an introduction...\n    query_type: qa\n    rag_queries:\n      - "{topic} overview"\n\nseo:\n  primary_keyword: "{topic}"\n  schema_type: Article`}
-                className="w-full h-72 bg-background border border-border rounded-md p-3 text-sm font-mono text-foreground resize-none focus:ring-1 focus:ring-accent"
+                className="h-72 font-mono resize-none"
                 spellCheck={false}
               />
             </div>

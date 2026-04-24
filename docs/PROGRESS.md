@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 03 landed — 3 more parallel god-file splits).
+Last updated: 2026-04-23 (session 04 landed — Tier 1 RSC + design sweep + workspace/ideas split).
 
 ## Current status
 
@@ -45,10 +45,19 @@ Session 03 landed (3 parallel god-file splits + 3 parallel finalization):
 - **Design sweep** — `<Spinner>` compartilhado criado + substituído em 13
   arquivos (agent absorveu também `Loader2` do lucide, não só SVG custom).
 
-Carryover para session 04: Tier 1 RSC migrations (4 pages, precisa
-fetch+cookie forward helper), inputs manuais sweep (19+ files → shadcn
-`<Input>`), cores hardcoded sweep (66 files → semantic tokens), god files
-500-1000L não críticos.
+Session 04 landed (4 parallel workstreams):
+- **S04.a** — Tier 1 RSC migrations: 3 pages RSC puras (/admin/observability,
+  /dashboard, /workspace/guides/[slug]) + 1 híbrida (guides/[slug]/log com
+  client island). Helper novo `lib/fetch-engine.ts`.
+- **S04.b** — Inputs sweep: 9 arquivos migrados pra shadcn `<Input>`/`<Textarea>`.
+- **S04.c** — ContentScorer UI em `/seo/analysis` (draft textarea + score card +
+  gaps panel). POST `/seo/score` wired com `triggerAnalysisIfMissing`.
+- **S04.d** — `/workspace/ideas` 929L → 229L + 9 sub-files em
+  `components/modules/workspace/ideas/`. Side-effect: `components/ui/textarea.tsx`
+  primitive criado.
+
+Carryover para session 05: Tier 2 RSC migrations (7 pages), cores hardcoded
+sweep (66 files → semantic tokens), god files médios (9 files 500-1000L).
 
 ## Working agreement
 
@@ -72,7 +81,8 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
-| [03](progress/session-03.md) | 2026-04-23 | **active** — carryover da session 02 (god files /seo/youtube, /seo/reddit, store-prices-tab) + /seo/research rearquitetura + RSC audit |
+| [04](progress/session-04.md) | 2026-04-23 | **active** — Tier 1 RSC migrations + inputs sweep + ContentScorer UI + workspace/ideas split |
+| [03](progress/session-03.md) | 2026-04-23 | carryover da session 02 (god files /seo/youtube, /seo/reddit, store-prices-tab) + /seo/research rearquitetura + RSC audit |
 | [02](progress/session-02.md) | 2026-04-23 | 4 parallel refactors: BriefingForm/simulation-comparison/hardware splits + Phase 2 style (PageHeader backfill + SEO accent) |
 | [01](progress/session-01.md) | 2026-04-23 | IA rework (5 domains) + admin/config fusion + engine-config split + style Phase 1 |
 
@@ -85,13 +95,15 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~425 | session 03 adicionou ~20 arquivos em `components/modules/seo/{shared,research,opportunities,analysis}/` + `components/ui/spinner.tsx` |
+| TS/TSX files | ~445 | session 04 adicionou 9 sub-files em `components/modules/workspace/ideas/` + 4 em `components/modules/seo/analysis/` + helper `lib/fetch-engine.ts` + shadcn `components/ui/textarea.tsx` + client island `log-timeline.tsx` |
 | Routes | 70 | stable |
-| `'use client'` pages | ~28 (app/auth) + ~104 (components/) | RSC audit feito (Tier 1/2/3); migrations carryover session 04 |
-| Vitest tests | ~398 | +9 `stitch-notes.test.ts` (session 02) + 16 `reddit/helpers.test.ts` (session 03) |
+| `'use client'` pages | **24** (app/auth) | was 28 — 4 Tier 1 migradas pra RSC (S04.a) |
+| Vitest tests | ~398 | unchanged (testes novos da session 04 nenhum) |
 | Playwright E2E | 32 | unchanged |
-| God files >1000L | **0** | was 4 pre-session-02; resolvidos: hardware, simulation-comparison, seo/youtube, seo/research |
-| Shared primitives | PageHeader, EmptyState, Spinner | Spinner adicionado session 03 design sweep |
+| God files >1000L | **0** | stable — all eliminated pre-session-04 |
+| God files 500-1000L | 9 | was 10 — workspace/ideas resolvido (928L → 229L) |
+| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea | +Textarea session 04 (shadcn primitive que faltava) |
+| Server Components in app/(auth) | 4 pages RSC puras + 1 híbrida | was 2 (feature-flags, config/layout) |
 | God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

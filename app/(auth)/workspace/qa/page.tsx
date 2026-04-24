@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Input } from '@/components/ui/input';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -638,7 +639,7 @@ export default function QAChat() {
         {/* Input */}
         <div className="shrink-0 border-t border-border bg-surface px-4 py-4">
           <div className="max-w-3xl mx-auto flex gap-3">
-            <input
+            <Input
               ref={inputRef}
               type="text"
               value={input}
@@ -646,7 +647,7 @@ export default function QAChat() {
               onKeyDown={handleKeyDown}
               placeholder="Pergunte sobre PoE... (Enter para enviar)"
               disabled={loading}
-              className="flex-1 rounded-xl border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
+              className="flex-1"
             />
             <button
               onClick={() => handleSend()}

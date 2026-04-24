@@ -4,14 +4,16 @@
 // Layout: keyword input + two panels side by side (SERP snapshot | Competitor Analysis)
 // SERP: GET /api/engine/seo/serp/latest (triggers POST analyze if stale/missing)
 // Competitor Analysis: GET /api/engine/seo/analyze/keyword (CompetitorAnalyzerService)
-// ContentScorer (POST /api/engine/seo/score) requires a draft — stubbed for now.
-// TODO engine session N — add draft textarea + score action when gap-filler is implemented
+// ContentScorer: POST /api/engine/seo/score — operator pastes draft markdown, sees score + gaps.
 
 import { PageHeader } from '@/components/ui/page-header';
 import { useAnalysisState } from '@/components/modules/seo/analysis/use-analysis-state';
 import { KeywordInput } from '@/components/modules/seo/analysis/keyword-input';
 import { SerpResultsTable } from '@/components/modules/seo/analysis/serp-results-table';
 import { CompetitorAnalysisPanel } from '@/components/modules/seo/analysis/competitor-analysis-panel';
+import { DraftTextarea } from '@/components/modules/seo/analysis/draft-textarea';
+import { ContentScoreCard } from '@/components/modules/seo/analysis/content-score-card';
+import { GapsPanel } from '@/components/modules/seo/analysis/gaps-panel';
 
 export default function SeoAnalysisPage() {
   const state = useAnalysisState();
@@ -24,6 +26,8 @@ export default function SeoAnalysisPage() {
     state.fetchSerp();
     state.runCompetitorAnalysis();
   }
+
+  const canScore = Boolean(state.keyword.trim()) && Boolean(state.draft.trim());
 
   return (
     <div className="flex flex-col h-full max-w-[1800px] mx-auto">
@@ -76,8 +80,45 @@ export default function SeoAnalysisPage() {
           </div>
         )}
 
-        {/* ContentScorer stub — requires draft body, not available until gap-filler UI lands */}
-        {/* TODO engine session N — add draft textarea + POST /api/engine/seo/score when gap-filler is implemented */}
+        {/* Content Scorer — operator pastes draft markdown, scores against SERP centroid */}
+        <div className="space-y-4 border-t border-border/50 pt-6">
+          <div className="text-xs text-muted-foreground uppercase tracking-wider">
+            Content Scorer
+          </div>
+
+          <DraftTextarea
+            value={state.draft}
+            onChange={state.setDraft}
+            disabled={state.scoreLoading}
+          />
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={state.scoreContent}
+              disabled={!canScore || state.scoreLoading}
+              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40
+                         rounded text-sm font-medium text-white transition-colors"
+            >
+              {state.scoreLoading ? 'Scoring...' : 'Score Content'}
+            </button>
+            {!canScore && !state.scoreLoading && (
+              <span className="text-xs text-muted-foreground">
+                Enter a keyword and paste your draft to enable scoring
+              </span>
+            )}
+            {state.scoreError && (
+              <span className="text-xs text-red-400">{state.scoreError}</span>
+            )}
+          </div>
+
+          {/* Score result */}
+          {state.score && !state.scoreLoading && (
+            <div className="space-y-4">
+              <ContentScoreCard score={state.score} />
+              <GapsPanel score={state.score} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

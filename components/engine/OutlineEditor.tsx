@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CustomSection, ProposedOutline } from '@/lib/engine-types';
+import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 
 /**
@@ -254,12 +255,11 @@ export default function OutlineEditor({
               </div>
             </div>
 
-            <input
+            <Input
               type="text"
               value={s.title}
               onChange={(e) => updateField(idx, 'title', e.target.value)}
               placeholder="Título da seção"
-              className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
             />
 
             <AutoGrowTextarea
@@ -267,7 +267,7 @@ export default function OutlineEditor({
               onChange={(next) => updateField(idx, 'goal', next)}
               placeholder="Goal: em uma frase, o que essa seção precisa entregar ao leitor."
               minRows={3}
-              className="w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent resize-none leading-relaxed overflow-hidden"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:border-ring resize-none leading-relaxed overflow-hidden transition-[color,box-shadow]"
             />
           </div>
         ))}
