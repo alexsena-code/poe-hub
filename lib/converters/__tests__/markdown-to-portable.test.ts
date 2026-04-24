@@ -208,21 +208,19 @@ describe("{{currency:...}} placeholder", () => {
     expect(raw).toContain("{{currency:Chaos Orb}}");
   });
 
-  it("standalone placeholder paragraph becomes a poeCurrency block", () => {
+  it("standalone placeholder paragraph stays as block with token preserved", () => {
     const blocks = markdownToPortableText("{{currency:Chaos Orb}}");
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]._type).toBe("poeCurrency");
-    const b = blocks[0] as unknown as { currencyName: string };
-    expect(b.currencyName).toBe("Chaos Orb");
+    expect(blocks[0]._type).toBe("block");
+    expect(spanText(blocks[0] as PortableTextBlock)).toContain("{{currency:Chaos Orb}}");
   });
 });
 
 describe("{{item:...}} placeholder", () => {
-  it("standalone item placeholder becomes poeItem block", () => {
+  it("standalone item placeholder stays as block with token preserved", () => {
     const blocks = markdownToPortableText("{{item:Kaom's Heart}}");
-    expect(blocks[0]._type).toBe("poeItem");
-    const b = blocks[0] as unknown as { itemName: string };
-    expect(b.itemName).toBe("Kaom's Heart");
+    expect(blocks[0]._type).toBe("block");
+    expect(spanText(blocks[0] as PortableTextBlock)).toContain("{{item:Kaom's Heart}}");
   });
 
   it("item placeholder in a list item stays as inline token", () => {
@@ -234,30 +232,29 @@ describe("{{item:...}} placeholder", () => {
 });
 
 describe("{{passive:...}} placeholder", () => {
-  it("standalone passive placeholder becomes poePassive block", () => {
+  it("standalone passive placeholder stays as block with token preserved", () => {
     const blocks = markdownToPortableText("{{passive:Iron Will}}");
-    expect(blocks[0]._type).toBe("poePassive");
-    const b = blocks[0] as unknown as { passiveName: string };
-    expect(b.passiveName).toBe("Iron Will");
+    expect(blocks[0]._type).toBe("block");
+    expect(spanText(blocks[0] as PortableTextBlock)).toContain("{{passive:Iron Will}}");
   });
 });
 
 describe("{{price:...}} placeholder", () => {
-  it("standalone price placeholder becomes poePrice block", () => {
+  it("standalone price placeholder stays as block with token preserved", () => {
     const blocks = markdownToPortableText("{{price:Void Battery}}");
-    expect(blocks[0]._type).toBe("poePrice");
-    const b = blocks[0] as unknown as { itemName: string };
-    expect(b.itemName).toBe("Void Battery");
+    expect(blocks[0]._type).toBe("block");
+    expect(spanText(blocks[0] as PortableTextBlock)).toContain("{{price:Void Battery}}");
   });
 });
 
 describe("{{cta:...}} placeholder", () => {
-  it("standalone cta placeholder becomes poeCta block", () => {
+  it("standalone cta placeholder stays as block with token preserved", () => {
+    // Sanity blockContent schema only allows block/image/code/table/poeItem.
+    // Custom poeCta blocks would be silently dropped on write — keep the
+    // token literal so the resolver expands it at render time.
     const blocks = markdownToPortableText("{{cta:currency|buy}}");
-    expect(blocks[0]._type).toBe("poeCta");
-    const b = blocks[0] as unknown as { variant: string; modifier?: string };
-    expect(b.variant).toBe("currency");
-    expect(b.modifier).toBe("buy");
+    expect(blocks[0]._type).toBe("block");
+    expect(spanText(blocks[0] as PortableTextBlock)).toContain("{{cta:currency|buy}}");
   });
 });
 

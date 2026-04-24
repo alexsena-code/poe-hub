@@ -23,7 +23,6 @@ import remarkParse from "remark-parse";
 import remarkGfm from "remark-gfm";
 import { toString as mdastToString } from "mdast-util-to-string";
 import { nanoid } from "nanoid";
-import { parsePlaceholders } from "@/components/editor/serializer/placeholders";
 import type {
   PortableTextContent,
   PortableTextBlock,
@@ -34,38 +33,16 @@ import type {
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-/** A custom inline Portable Text block for PoE placeholders. */
-interface PoeCustomBlock {
-  _type: "poeCurrency" | "poeItem" | "poePassive" | "poePrice";
-  _key: string;
-  [attr: string]: unknown;
-}
-
-/** Union of all blocks this converter may emit. */
-type EmittedBlock = PortableTextContent | PoeCustomBlock;
+/** Blocks emitted by this converter — only types the Sanity blockContent
+ * schema accepts: `block`, `code`. (`image` and `table` aren't produced by
+ * the LLM markdown.) Custom block types like poeCurrency/poePassive used to
+ * be emitted here but Sanity schema dropped them silently — placeholders
+ * `{{kind:value}}` now stay as literal span text and are expanded at render
+ * time by the resolver. */
+type EmittedBlock = PortableTextContent;
 
 /** Portable Text span marks recognised by the editor. */
 type SpanMark = "strong" | "em" | "code";
-
-// ─── Placeholder → Portable Text block mapping ────────────────────────────────
-
-/**
- * Maps `{{kind:...}}` placeholder kinds to Portable Text `_type` + value attr.
- * Mirrors the reverse table in `portable-to-tiptap.ts`.
- *
- * `cta` becomes a `poeCta` block-level node (variant = modifier or value).
- */
-const POE_BLOCK_TYPE_FOR_KIND: Record<
-  string,
-  { _type: string; valueAttr: string } | undefined
-> = {
-  currency: { _type: "poeCurrency", valueAttr: "currencyName" },
-  item:     { _type: "poeItem",     valueAttr: "itemName" },
-  passive:  { _type: "poePassive",  valueAttr: "passiveName" },
-  price:    { _type: "poePrice",    valueAttr: "itemName" },
-  // `cta` is handled inline as a span token; block-level conversion is
-  // only needed for the serialiser going the other way.
-};
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -133,28 +110,20 @@ function convertHeading(node: MdastNode): PortableTextBlock {
 // ─── Paragraph (may contain placeholders → split into spans + custom blocks) ──
 
 /**
- * A paragraph with placeholders is split: each placeholder becomes a custom
- * Portable Text block (poeCurrency, poeItem, etc.) adjacent to the paragraph
- * text spans. Plain text and marks are preserved as spans within PortableTextBlock.
+ * Converts a paragraph to a Portable Text block. Placeholder tokens
+ * `{{kind:value|modifier}}` are preserved as literal span text — the
+ * blog frontend's resolver (and the editor's portableToTiptap) detect
+ * them at render-time and expand into chips/refs.
+ *
+ * Why not emit custom blocks (poeCurrency, poePassive, etc.): the Sanity
+ * `blockContent` schema only allows `block | image | code | table | poeItem`.
+ * Custom block types are silently dropped on write — that was the cause of
+ * "body Empty" after publish. Keeping placeholders as span text guarantees
+ * the body round-trips through Sanity intact.
  */
 function convertParagraph(node: MdastNode): EmittedBlock[] {
   const { spans, markDefs } = convertInlineChildren(node.children ?? []);
-
   if (!spans.length) return [];
-
-  // Reconstruct full raw text to detect placeholder-only paragraphs that
-  // should become block-level nodes (no surrounding text).
-  const rawText = spans.map((s) => s.text).join("");
-  const phs = parsePlaceholders(rawText);
-
-  // If the whole paragraph is a single placeholder, emit it as a custom block.
-  if (phs.length === 1 && rawText.trim() === phs[0].raw.trim()) {
-    const custom = placeholderToBlock(phs[0].kind, phs[0].value, phs[0].modifier);
-    if (custom) return [custom];
-  }
-
-  // Mixed text + placeholders: keep as normal paragraph with span tokens.
-  // The `portableToTiptap` deserialiser's `splitByPlaceholders` will expand them.
   return [{ _type: "block", _key: nanoid(), style: "normal", children: spans, markDefs }];
 }
 
@@ -285,36 +254,6 @@ function convertInlineNode(
       // Unknown inline node — extract plain text as fallback.
       return [makeSpan(mdastToString(node as Parameters<typeof mdastToString>[0]), marks)];
   }
-}
-
-// ─── Placeholder → custom block ───────────────────────────────────────────────
-
-/**
- * Converts a single `{{kind:value|modifier}}` placeholder to a Portable Text
- * custom block. Returns null for unknown kinds.
- */
-function placeholderToBlock(
-  kind: string,
-  value: string,
-  modifier?: string,
-): PoeCustomBlock | null {
-  if (kind === "cta") {
-    return {
-      _type: "poeCta" as unknown as PoeCustomBlock["_type"],
-      _key: nanoid(),
-      variant: value,
-      modifier,
-    } as unknown as PoeCustomBlock;
-  }
-
-  const mapping = POE_BLOCK_TYPE_FOR_KIND[kind];
-  if (!mapping) return null;
-
-  return {
-    _type: mapping._type as PoeCustomBlock["_type"],
-    _key: nanoid(),
-    [mapping.valueAttr]: value,
-  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
