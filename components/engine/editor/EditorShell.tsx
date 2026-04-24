@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { usePostStore } from '@/lib/engine-store';
 import { optimizeSeo, savePost, updatePost } from '@/lib/content-api';
 import type { GeneratedSection } from '@/lib/engine-types';
+import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
+import { ContentScoreCard } from '@/components/modules/workspace/guides/content-score-card';
+import { SlangReportCard } from '@/components/modules/workspace/guides/slang-report-card';
 import { Textarea } from '@/components/ui/textarea';
 import SectionSidebar from './SectionSidebar';
 import SectionEditor from './SectionEditor';
@@ -38,6 +41,8 @@ export default function EditorShell({ postId }: { postId: string }) {
   } = usePostStore();
 
   const [showGlobalComment, setShowGlobalComment] = useState(false);
+  const [contentScore, setContentScore] = useState<ContentScoreReport | null>(null);
+  const [slangReport, setSlangReport] = useState<SlangReport | null>(null);
 
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
@@ -84,6 +89,9 @@ export default function EditorShell({ postId }: { postId: string }) {
           meta: data.meta || null,
           phase: data.phase || 'writing',
         });
+        // Capture quality reports if the post was generated with engine session 21 Fase C.
+        if (data.contentScore) setContentScore(data.contentScore);
+        if (data.slangReport) setSlangReport(data.slangReport);
       })
       .catch(() => {}); // Silently fail — new post flow continues
   }, [postId]);
@@ -370,6 +378,14 @@ export default function EditorShell({ postId }: { postId: string }) {
               </div>
             )}
           </div>
+
+          {/* Quality reports — shown post-generation when engine returned scores */}
+          {(contentScore || slangReport) && (
+            <div className="shrink-0 border-t border-border bg-surface/30 p-4 space-y-3">
+              {contentScore && <ContentScoreCard score={contentScore} />}
+              {slangReport && <SlangReportCard report={slangReport} />}
+            </div>
+          )}
 
           {/* Bottom bar */}
           <div className="flex items-center justify-between h-12 px-6 border-t border-border bg-surface shrink-0">

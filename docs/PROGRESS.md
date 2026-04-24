@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 06 landed — engine Fase C consumers).
+Last updated: 2026-04-23 (session 07 landed — zerou carryover god files, pré-editor rewrite).
 
 ## Current status
 
@@ -82,9 +82,22 @@ Session 06 landed (4 parallel workstreams — engine session 21 Fase C consumers
   `components/modules/admin/benchmark/` + `lib/benchmark-types.ts`. Sidebar
   entry. Listing endpoint TBD (não existe no engine).
 
-Carryover para session 07: listing endpoint de benchmark no engine, editor
-preview com contentScore/slangReport, sub-agrupar Admin sidebar (11 entries),
-god files médios remanescentes (7 files 500-1000L).
+Session 07 landed (8 parallel workstreams — zeroing carryover pre-editor-rewrite):
+- **S07.a** — workspace/templates 763→108L + 9 sub-files. 2 `any` eliminados.
+- **S07.b** — simulation-editor 755→249L + 7 sub-files. `DisplayCurrency` type promovido a exported.
+- **S07.c** — admin/config/costs 727→77L + 8 sub-files.
+- **S07.d** — week-editor 718→301L + 6 sub-files (consumers preservados).
+- **S07.e** — workspace/qa 663→82L + 8 sub-files (chat SSE + 2 hooks).
+- **S07.f** — farm/simulations/annual/[id] 656→100L + 7 sub-files.
+- **S07.g** — EditorShell inline contentScore/slangReport cards (+15L).
+- **S07.h** — Sidebar Admin 11 entries flat → 3 sub-grupos
+  (Operações/SEO Tools/Config); `NavGroup` recursivo.
+
+Carryover para session 08 (pré-etapas grandes: editor novo + Sanity API):
+- `SectionEditor.tsx` 676L mantido intencionalmente (será reescrito).
+- Benchmark listing endpoint fica no engine repo.
+- **Próxima etapa**: planejar editor novo + integração Sanity API pra
+  publicação direta.
 
 ## Working agreement
 
@@ -108,7 +121,8 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
-| [06](progress/session-06.md) | 2026-04-23 | **active** — engine session 21 Fase C consumers (post preview contentScore/slangReport, /admin/gsc, slang bulk approve, /admin/benchmark) |
+| [07](progress/session-07.md) | 2026-04-23 | **active** — zerar carryover (6 god files médios splits + editor inline score + sidebar regroup) pré-editor-rewrite |
+| [06](progress/session-06.md) | 2026-04-23 | engine session 21 Fase C consumers (post preview contentScore/slangReport, /admin/gsc, slang bulk approve, /admin/benchmark) |
 | [05](progress/session-05.md) | 2026-04-23 | RSC Tier 2 (5 migradas + 2 via hardware proxy) + god files médios (pipelines-tab, hardware/settings) + StatusBadge semantic tokens |
 | [04](progress/session-04.md) | 2026-04-23 | Tier 1 RSC migrations + inputs sweep + ContentScorer UI + workspace/ideas split |
 | [03](progress/session-03.md) | 2026-04-23 | carryover da session 02 (god files /seo/youtube, /seo/reddit, store-prices-tab) + /seo/research rearquitetura + RSC audit |
@@ -124,17 +138,18 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~500 | session 06 adicionou 2 cards guides + gsc (2) + slang sub-files (3) + benchmark (8) + benchmark-types + benchmark page + gsc page |
-| Routes | **72** | +2 new: `/admin/gsc`, `/admin/benchmark` |
-| `'use client'` pages | **18** (app/auth) | was 17 — `/admin/benchmark` nova é client (forms interativos) |
+| TS/TSX files | ~555 | session 07 adicionou ~55 sub-files (templates 9, simulation-editor 7, costs 8, week-editor 6, qa 8, annual-detail 7) |
+| Routes | **72** | stable |
+| `'use client'` pages | **18** (app/auth) | stable (splits não migraram pra RSC — pages Tier 3 mantêm client) |
 | Vitest tests | ~398 | unchanged |
 | Playwright E2E | 32 | unchanged |
 | God files >1000L | **0** | stable |
-| God files 500-1000L | 8 | was 7 — `guide-content.tsx` 573L flagged (era 560 pré-session, +13L com cards — dentro do limite ±10%) |
+| God files 500-1000L | **1** (SectionEditor 676L, intentional) | was 8 — 6 resolvidos session 07 + guide-content 573L dentro da margem ±10% |
 | Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge | stable |
-| Server Components in app/(auth) | 12 pages RSC puras + 1 híbrida | +/admin/gsc RSC shell |
-| Proxy routes | 2 catch-all (`/api/engine/*`, `/api/hardware/*`) | stable |
-| Engine Fase C consumers | 4/4 | contentScore+slangReport (guides), gsc admin, slang bulk approve, benchmark page |
+| Server Components in app/(auth) | 12 pages RSC puras + 1 híbrida | stable |
+| Proxy routes | 2 catch-all | stable |
+| Engine Fase C consumers | 4/4 + editor inline | S07.g adicionou display inline no EditorShell |
+| Sidebar Admin | 3 sub-grupos (Operações/SEO Tools/Config) | was 11 flat entries |
 | God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

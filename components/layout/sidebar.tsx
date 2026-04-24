@@ -47,11 +47,21 @@ import { useCurrency } from "@/hooks/use-currency";
 type DisplayCurrency = "usd" | "brl";
 
 type NavItem = { title: string; href: string; icon: LucideIcon };
-type NavGroup = { title: string; icon: LucideIcon; children: NavItem[] };
+
+// NavGroup children can be flat NavItems or nested NavGroups (2-level max).
+type NavGroup = { title: string; icon: LucideIcon; children: NavEntry[] };
 type NavEntry = NavItem | NavGroup;
 
 function isGroup(entry: NavEntry): entry is NavGroup {
   return "children" in entry;
+}
+
+// Returns true if any descendant NavItem is active (recursive, for nested groups).
+function hasActiveDescendant(entry: NavEntry, pathname: string): boolean {
+  if (!isGroup(entry)) {
+    return pathname === entry.href || pathname.startsWith(entry.href + "/");
+  }
+  return entry.children.some((child) => hasActiveDescendant(child, pathname));
 }
 
 // Session 01 IA rework: 5 top-level domains + Dashboard.
@@ -115,20 +125,42 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         ],
       },
       {
+        // Admin sub-grouped into 3 semantic clusters (S07.h):
+        //   Operacoes — runtime observability + task tracking + benchmarks
+        //   SEO Tools — GSC (admin-level, distinct from /seo workspace)
+        //   Config    — all YAML / system configuration pages
         title: "Admin",
         icon: Settings,
         children: [
-          { title: "Observability", href: "/admin/observability", icon: Activity },
-          { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
-          // Session 06 S06.d — benchmark page for QA/Ideation/ContentGen runs
-          { title: "Benchmark", href: "/admin/benchmark", icon: Activity },
-          { title: "Engine Config", href: "/admin/config/engine", icon: Wrench },
-          { title: "GSC", href: "/admin/gsc", icon: BarChart3 },
-          { title: "Custos", href: "/admin/config/costs", icon: DollarSign },
-          { title: "Proxy", href: "/admin/config/proxy", icon: Wrench },
-          { title: "Ligas", href: "/admin/config/leagues", icon: ListTodo },
-          { title: "Usuarios", href: "/admin/config/users", icon: Users },
-          { title: "Feature Flags", href: "/admin/config/feature-flags", icon: Settings },
+          {
+            title: "Operacoes",
+            icon: Activity,
+            children: [
+              { title: "Observability", href: "/admin/observability", icon: Activity },
+              { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
+              // Session 06 S06.d — benchmark page for QA/Ideation/ContentGen runs
+              { title: "Benchmark", href: "/admin/benchmark", icon: Activity },
+            ],
+          },
+          {
+            title: "SEO Tools",
+            icon: BarChart3,
+            children: [
+              { title: "GSC", href: "/admin/gsc", icon: BarChart3 },
+            ],
+          },
+          {
+            title: "Config",
+            icon: Wrench,
+            children: [
+              { title: "Engine Config", href: "/admin/config/engine", icon: Wrench },
+              { title: "Custos", href: "/admin/config/costs", icon: DollarSign },
+              { title: "Proxy", href: "/admin/config/proxy", icon: Wrench },
+              { title: "Ligas", href: "/admin/config/leagues", icon: ListTodo },
+              { title: "Usuarios", href: "/admin/config/users", icon: Users },
+              { title: "Feature Flags", href: "/admin/config/feature-flags", icon: Settings },
+            ],
+          },
         ],
       },
     ],
@@ -173,19 +205,46 @@ function NavLink({
   );
 }
 
+// Renders a single NavEntry — dispatches to NavLink or NavGroupItem.
+// Keeping this as a named function avoids inline ternaries in the parent JSX.
+function NavEntryRenderer({
+  entry,
+  pathname,
+  onClose,
+  depth,
+}: {
+  entry: NavEntry;
+  pathname: string;
+  onClose?: () => void;
+  depth: number;
+}) {
+  if (isGroup(entry)) {
+    return (
+      <NavGroupItem
+        group={entry}
+        pathname={pathname}
+        onClose={onClose}
+        depth={depth}
+      />
+    );
+  }
+  return <NavLink item={entry} pathname={pathname} onClose={onClose} />;
+}
+
+// depth controls left-indent progression for nested groups (0 = top, 1 = sub).
 function NavGroupItem({
   group,
   pathname,
   onClose,
+  depth = 0,
 }: {
   group: NavGroup;
   pathname: string;
   onClose?: () => void;
+  depth?: number;
 }) {
-  const hasActiveChild = group.children.some(
-    (c) => pathname === c.href || pathname.startsWith(c.href + "/")
-  );
-  const [open, setOpen] = useState(hasActiveChild);
+  const hasActive = group.children.some((c) => hasActiveDescendant(c, pathname));
+  const [open, setOpen] = useState(hasActive);
 
   return (
     <div>
@@ -193,7 +252,7 @@ function NavGroupItem({
         onClick={() => setOpen(!open)}
         className={cn(
           "flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-          hasActiveChild
+          hasActive
             ? "text-sidebar-accent-foreground"
             : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         )}
@@ -209,12 +268,13 @@ function NavGroupItem({
       </button>
       {open && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
-          {group.children.map((child) => (
-            <NavLink
-              key={child.href}
-              item={child}
+          {group.children.map((child, i) => (
+            <NavEntryRenderer
+              key={isGroup(child) ? `group-${child.title}-${i}` : child.href}
+              entry={child}
               pathname={pathname}
               onClose={onClose}
+              depth={depth + 1}
             />
           ))}
         </div>
@@ -253,27 +313,15 @@ function SidebarContent({
               </p>
             )}
             <div className="space-y-0.5">
-              {section.items.map((entry, i) => {
-                if ("children" in entry) {
-                  return (
-                    <NavGroupItem
-                      key={`group-${entry.title}`}
-                      group={entry as NavGroup}
-                      pathname={pathname}
-                      onClose={onClose}
-                    />
-                  );
-                }
-                const item = entry as NavItem;
-                return (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    pathname={pathname}
-                    onClose={onClose}
-                  />
-                );
-              })}
+              {section.items.map((entry, i) => (
+                <NavEntryRenderer
+                  key={isGroup(entry) ? `group-${entry.title}-${i}` : entry.href}
+                  entry={entry}
+                  pathname={pathname}
+                  onClose={onClose}
+                  depth={0}
+                />
+              ))}
             </div>
           </div>
         ))}

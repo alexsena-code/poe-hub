@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 
-type DisplayCurrency = "usd" | "brl";
+export type DisplayCurrency = "usd" | "brl";
 
 interface ExchangeRateResponse {
   rate: number;
