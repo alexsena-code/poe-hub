@@ -33,6 +33,7 @@ import {
   BellRing,
   Activity,
   Newspaper,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -149,6 +150,8 @@ const navSections: { label: string; items: NavEntry[] }[] = [
               { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
               // Session 06 S06.d — benchmark page for QA/Ideation/ContentGen runs
               { title: "Benchmark", href: "/admin/benchmark", icon: Activity },
+              // Session 21 Fase 3 — curated ingest for 5 Qdrant collections
+              { title: "Curated Ingest", href: "/admin/curated-ingest", icon: Database },
             ],
           },
           {
