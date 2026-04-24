@@ -1,20 +1,9 @@
-import { Suspense } from "react";
-import BriefingForm from "@/components/engine/BriefingForm";
-import { PageHeader } from "@/components/ui/page-header";
+/**
+ * Legacy redirect — /workspace/new → /workspace/blog/new
+ * Editor antigo removido em session 08 (S08.h).
+ */
+import { redirect } from "next/navigation";
 
-export default function NewPostPage() {
-  return (
-    <div className="flex flex-col flex-1 items-center py-12 px-4">
-      <div className="w-full max-w-2xl">
-        <PageHeader
-          title="Novo Post"
-          description="Preencha o briefing para gerar o outline do conteudo."
-          className="mb-8"
-        />
-        <Suspense fallback={<div>Loading...</div>}>
-          <BriefingForm />
-        </Suspense>
-      </div>
-    </div>
-  );
+export default function LegacyNewPostPage() {
+  redirect("/workspace/blog/new");
 }

@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 07 landed — zerou carryover god files, pré-editor rewrite).
+Last updated: 2026-04-23 (session 08 landed — editor Tiptap + publish direto no Sanity).
 
 ## Current status
 
@@ -121,7 +121,8 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
-| [07](progress/session-07.md) | 2026-04-23 | **active** — zerar carryover (6 god files médios splits + editor inline score + sidebar regroup) pré-editor-rewrite |
+| [08](progress/session-08.md) | 2026-04-23 | editor profissional (Tiptap) + publish direto no Sanity + drag-drop currencies + Q&A inline + preview render fiel do poetrade-dev |
+| [07](progress/session-07.md) | 2026-04-23 | zerar carryover (6 god files médios splits + editor inline score + sidebar regroup) pré-editor-rewrite |
 | [06](progress/session-06.md) | 2026-04-23 | engine session 21 Fase C consumers (post preview contentScore/slangReport, /admin/gsc, slang bulk approve, /admin/benchmark) |
 | [05](progress/session-05.md) | 2026-04-23 | RSC Tier 2 (5 migradas + 2 via hardware proxy) + god files médios (pipelines-tab, hardware/settings) + StatusBadge semantic tokens |
 | [04](progress/session-04.md) | 2026-04-23 | Tier 1 RSC migrations + inputs sweep + ContentScorer UI + workspace/ideas split |
@@ -138,14 +139,14 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~555 | session 07 adicionou ~55 sub-files (templates 9, simulation-editor 7, costs 8, week-editor 6, qa 8, annual-detail 7) |
-| Routes | **72** | stable |
-| `'use client'` pages | **18** (app/auth) | stable (splits não migraram pra RSC — pages Tier 3 mantêm client) |
-| Vitest tests | ~398 | unchanged |
+| TS/TSX files | ~600 | session 08 adicionou ~45 arquivos novos em `components/editor/` + `lib/sanity/` + routes blog (editor completo ~2 god-files substituídos) |
+| Routes | **75** | +3 (blog list, blog new, blog edit) -0 (legacy workspace/new e workspace/editor viraram redirects) |
+| `'use client'` pages | **19** (app/auth) | +1 (blog edit é client wrapper) |
+| Vitest tests | **~532** (494 passed + baseline 38 falhos pre-existing) | +174 novos passando da session 08 (serializer 41, extensions 49, preview 11, publish 36, autosave 7, hooks editor 19, ...) |
 | Playwright E2E | 32 | unchanged |
 | God files >1000L | **0** | stable |
-| God files 500-1000L | **1** (SectionEditor 676L, intentional) | was 8 — 6 resolvidos session 07 + guide-content 573L dentro da margem ±10% |
-| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge | stable |
+| God files 500-1000L | **0** | SectionEditor 676L **deletado** pela session 08 (editor novo em `components/editor/`, arquivos ≤300L cada) |
+| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge + (session 08) Tiptap editor + Sanity client | incremental |
 | Server Components in app/(auth) | 12 pages RSC puras + 1 híbrida | stable |
 | Proxy routes | 2 catch-all | stable |
 | Engine Fase C consumers | 4/4 + editor inline | S07.g adicionou display inline no EditorShell |

@@ -43,6 +43,7 @@ prisma/migrations/*/migration_lock.toml
 .scraper-temp/
 exports/
 playwright-report/
+.playwright-mcp/
 
 .vercel
 .env.vercel

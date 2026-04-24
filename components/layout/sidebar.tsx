@@ -32,6 +32,7 @@ import {
   Clock,
   BellRing,
   Activity,
+  Newspaper,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,15 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         title: "Workspace",
         icon: PenTool,
         children: [
-          { title: "Novo Post", href: "/workspace/new", icon: PenTool },
+          // Blog subgroup — S08.h (replaces legacy /workspace/new single link)
+          {
+            title: "Blog",
+            icon: Newspaper,
+            children: [
+              { title: "Lista", href: "/workspace/blog", icon: FileText },
+              { title: "Novo post", href: "/workspace/blog/new", icon: Newspaper },
+            ],
+          },
           { title: "Guides", href: "/workspace/guides", icon: BookOpen },
           { title: "Q&A", href: "/workspace/qa", icon: MessageSquare },
           { title: "Ideas", href: "/workspace/ideas", icon: Lightbulb },
