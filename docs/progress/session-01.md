@@ -321,6 +321,27 @@ internos. Clean break (sem redirect) conforme decisão do operador.
 **Arquivos tocados** (total ~70): 40+ renames (git mv), ~30
 modifications (sed sweep), 3 creates (sidebar rewrite, 2 placeholders).
 
+### S01.c — B3: Layout + ConfigNav pro `/admin/config` — DONE (parcial)
+
+Fusão visual das 6 subrotas de config num chrome compartilhado.
+Split do engine-config (god file 1944L) fica pra S01.d (agent em
+background — parallelizado com style research retornado nesta
+sessão).
+
+- `app/(auth)/admin/config/layout.tsx` (novo, 20L): shell com título
+  "Configuracoes" + descrição + `<ConfigNav />` + `{children}`.
+- `app/(auth)/admin/config/config-nav.tsx` (novo, 66L): horizontal
+  tab nav client component, highlight por `usePathname`. 7 entradas:
+  Overview (exact match), Engine, Custos, Ligas, Proxy, Usuarios,
+  Feature Flags. Padrão "border-bottom primary on active" estilo
+  aba.
+- Landing `/admin/config/page.tsx` (76L, inalterado) vira Overview
+  tab — mantém os cards como quick-links + nav dá navegação rápida
+  entre tabs.
+
+Validação: `npx next build` passa limpo, as 7 rotas de /admin/config
+listadas no build output, zero warnings.
+
 ## O que resta na session 01
 
 **Bloqueio**: aguardando decisão do operador sobre os 3 design
