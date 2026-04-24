@@ -1,23 +1,28 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 01 — IA rework, pre-work + phase plan).
+Last updated: 2026-04-23 (session 02 kicked off — Track B continuation).
 
 ## Current status
 
 Operational control panel consuming the `path-of-trade-content` engine
-plus self-hosted PoE data pipelines. Live modules: dashboard, bots,
-sales, prices, simulations, tasks, settings, engine-config, hardware
-deals, seo (research/analysis/opportunities consuming engine API),
-logs, llm-logs, analytics, monitor.
+plus self-hosted PoE data pipelines. Live modules (post session 01 IA
+rework): `/workspace` (content engine), `/seo`
+(research/analysis/opportunities), `/farm` (bots/prices/sales/
+simulations), `/admin` (config/observability/tasks), `/hardware`
+(deals/builder), `/dashboard`.
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
-(Tailwind v4) + NextAuth credentials. Tests: Vitest (~373 tests) +
-Playwright (32 E2E).
+(Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
+(~373 tests) + Playwright (32 E2E).
 
-**Active session:** [session-01](progress/session-01.md) — Track B from
-engine session 21: IA rework, route consolidation, god component
-decomposition. Kicked off 2026-04-23 after the engine-side Track A
-(SEO splits + ContentGapFillNode) landed.
+Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
+engine-config split (1944L → 182L + 9 tabs), style Phase 1 (neutral +
+semantic colors + typography scale + linear charts).
+
+**Active session:** [session-02](progress/session-02.md) — Track B
+continuation: god component decomposition (BriefingForm, simulation-
+comparison, hardware), Phase 2 style (PageHeader backfill, SEO accent
+sweep), B4 `/seo/research` rearquitetura.
 
 ## Working agreement
 
@@ -41,7 +46,8 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
-| [01](progress/session-01.md) | 2026-04-23 | **active** — IA rework (5 domains), admin/config fusion, god component split |
+| [02](progress/session-02.md) | 2026-04-23 | **active** — god component decomposition (BriefingForm/simulation-comparison/hardware) + Phase 2 style + B4 rearquitetura |
+| [01](progress/session-01.md) | 2026-04-23 | IA rework (5 domains) + admin/config fusion + engine-config split + style Phase 1 |
 
 Pre-session history (flat, phase-by-phase) is preserved in
 [`progress/legacy-phases.md`](progress/legacy-phases.md) — covers Fase 1
@@ -50,16 +56,17 @@ new work lives in numbered sessions.
 
 ## Metrics
 
-| Metric | Value |
-|---|---:|
-| TS/TSX files | 304 |
-| Routes | 48 |
-| `'use client'` pages | 147 (Server Components: 0) |
-| Vitest tests | ~373 |
-| Playwright E2E | 32 |
-| God files >1000L | 5 (hardware 2403, engine-config 1944, simulation-comparison 1379, hardware/builder 1346, seo 1291) |
-| God files 500-1000L | 2 (BriefingForm 710, SectionEditor 676) |
-| Sidebar items | 25+ (no hierarchy — target <15) |
+| Metric | Value | Since session 01 |
+|---|---:|---|
+| TS/TSX files | ~340 | +9 engine tabs, +2 UI components, +placeholders |
+| Routes | 71 | stable (5-domain IA, /llm deleted) |
+| `'use client'` pages | 147 (Server Components: 0) | unchanged — RSC migration in session 02 B7 |
+| Vitest tests | ~373 | unchanged |
+| Playwright E2E | 32 | unchanged (URLs updated in B1) |
+| God files >1000L | 4 | was 5 — engine-config 1944L → 182L split |
+| God files 500-1000L | 2 (BriefingForm 710, pipelines-tab 700) | SectionEditor already split pre-session; pipelines-tab flagged from S01.d |
+| Sidebar top-level | 6 (was 25+ flat) | Dashboard + Workspace + SEO + Farm + Admin + Hardware, target ≤15 met |
+| Theme base | neutral (was zinc) | session 01 S01.f, operator preference |
 
 ## Architecture reference
 
