@@ -200,6 +200,86 @@ Validação:
 - `npx next build` — ✓ exit 0, `/seo/youtube` listado como Dynamic.
 - `npx vitest run` — 6 failed | 20 passed / 38 failed | 320 passed (baseline: 38 failed; zero regressões).
 
+### S03.d — /seo research rearquitetura (1289L → 3 rotas reais)
+
+**Auto-spec executada (Opção B, autonomia concedida)**: redistribuiu os 7 tabs do
+antigo `/seo/research` em 3 rotas com propósito distinto.
+
+**Pages finais**:
+- `app/(auth)/seo/research/page.tsx` — 197L (was 1289L). Discovery & pipeline:
+  All Keywords (server-paginated), Scan History, Blacklist. Header actions:
+  suggest scan, competitor crawl, import gaps.
+- `app/(auth)/seo/opportunities/page.tsx` — 131L (was 14L placeholder). Priority
+  views: Striking Distance, CTR Problems, Ramping. Lazy load por tab.
+- `app/(auth)/seo/analysis/page.tsx` — 84L (was 15L placeholder). Deep dive por
+  keyword: input → SERP snapshot + Competitor Analysis side-by-side.
+
+**Sub-files** (17 em `components/modules/seo/`):
+- `shared/` — `types.ts` (121L), `helpers.ts` (86L), `seo-primitives.tsx` (149L).
+- `research/` — `use-research-state.ts` (246L), `filters-bar.tsx` (129L),
+  `scan-actions.tsx` (88L), `keywords-tab.tsx` (252L), `scan-history-tab.tsx`
+  (66L), `blacklist-tab.tsx` (81L).
+- `opportunities/` — `use-opportunities-state.ts` (87L), `striking-distance-tab.tsx`
+  (76L), `ctr-problems-tab.tsx` (64L), `ramping-tab.tsx` (112L).
+- `analysis/` — `use-analysis-state.ts` (94L), `keyword-input.tsx` (61L),
+  `serp-results-table.tsx` (76L), `competitor-analysis-panel.tsx` (157L).
+
+Maior arquivo: `keywords-tab.tsx` (252L). Todos os 7 tabs originais preservados
+na redistribuição. ContentScorer stubbed — precisa textarea de draft pra gap
+fill (marked TODO engine session N).
+
+Endpoints confirmados: `/seo/dashboard`, `/seo/keywords`, `/seo/keywords/count`,
+`/seo/striking-distance`, `/seo/ctr-problems`, `/seo/keywords/ramping`,
+`/seo/scans`, `/seo/blacklist` GET/POST/DELETE, `/seo/scan/suggest`,
+`/seo/competitors/crawl`, `/seo/competitors/import-gaps`, `/seo/serp/latest`,
+`/seo/serp/analyze`, `/seo/analyze/keyword`.
+
+### Design sweep — Spinner compartilhado (2026-04-23)
+
+Triggered pelo feedback do operator (memory: design-project-wide).
+
+Criado `components/ui/spinner.tsx` com prop `size` (xs/sm/md/lg) + `className`
++ `ariaLabel`. Usa `currentColor` — herda cor do container.
+
+Substituído em 13 arquivos (agent também identificou `Loader2` do lucide-react
+como pattern equivalente, além do SVG custom):
+- `components/engine/briefing/submit-button.tsx`, `OutlineEditor.tsx`,
+  `editor/SectionEditor.tsx`.
+- `app/(auth)/dashboard/page.tsx`, `farm/prices/page.tsx`, `workspace/guides/
+  [slug]/guide-content.tsx`.
+- `app/(auth)/admin/config/{leagues,proxy,users}/page.tsx`.
+- `components/modules/tasks/{task-list,kanban-board}.tsx`.
+- `components/modules/prices/{price-chart,cross-league-price-chart}.tsx`.
+
+Skipped:
+- `/seo/*` (S03.d concorrente).
+- `components/ui/sonner.tsx` (Loader2Icon usado como toast icon, não spinner).
+- Vários com `RefreshCw` conditional `animate-spin` (ícone de refresh, não
+  spinner de loading — semântica diferente).
+
+### S03.e — RSC audit read-only (2026-04-23)
+
+Audit de 28 pages `'use client'` em `app/(auth)/` classificou em 3 tiers:
+
+**Tier 1 (EASY, 4 files)** — migração trivial, chunk único:
+- `/admin/observability/page.tsx` (tab orchestrator, tabs internos ficam client).
+- `/dashboard/page.tsx` (um fetch inicial + KPI cards).
+- `/workspace/guides/[slug]/log/page.tsx` (useParams + fetch único).
+- `/workspace/guides/[slug]/page.tsx` (useParams + fetch + passa pra `<GuideContent>`).
+
+**Tier 2 (HYBRID, 7 files)** — RSC shell + client island, um por PR:
+- `/hardware/recent`, `/hardware/alerts` — fetch + filter/sort local.
+- `/workspace/guides`, `/workspace/people`, `/admin/config/proxy` — fetch + simples CRUD.
+- `/seo/keybert` — polling + dispatch.
+- `/farm/simulations/annual` — useRouter + dialogs.
+
+**Tier 3 (LOCK, 17 files)** — manter client:
+- 6 com react-hook-form (config/costs, config/users, config/leagues, workspace/templates, workspace/slang, farm/simulations/annual/[id] — partial).
+- 4 com recharts (hardware/analytics, farm/prices, farm/simulations/annual/[id], hardware/builder — partial).
+- 5 com heavy interactive state (seo/youtube, seo/reddit, hardware/page, hardware/builder, seo/research).
+- 2 com streaming/SSE (farm/prices, workspace/qa).
+- Engine config page (10 lazy-loaded tabs), workspace/ideas (streaming briefs).
+
 ### Final wrap (2026-04-23)
 
 Validação integrada dos 3 agents (S03.a + S03.b + S03.c) rodando em paralelo:
@@ -214,24 +294,38 @@ Three god files resolvidos: `/seo/youtube` 2120→443L, `/seo/reddit` 924→197L
 
 ## Carryover para session 04
 
-- **S03.d — /seo/research rearquitetura** (1289L → 3 rotas reais):
-  research/analysis/opportunities. Precisa confirmação de spec com o
-  operator + checar endpoints no engine (SerpAnalyzer, ContentScorer,
-  Gap Filler).
-- **S03.e — Server Components audit**: hoje ~46 pages `'use client'` em
-  app/. Precisa classificação caso-a-caso (hooks vs pure data fetching).
-- **Design consistency sweep** (novo, triggered por feedback do operator):
-  - 19+ arquivos com inputs manuais (`rounded-lg border border-border
-    bg-surface`) — candidatos a shadcn `<Input>`.
-  - 15+ arquivos com spinner SVG custom (`<svg className="animate-spin"`)
-    — candidato a componente `<Spinner>` compartilhado.
-  - 66 arquivos com cores hardcoded (`bg-{red,green,...}-{100..900}`) —
-    candidatos a migrar pra semantic tokens (`--color-success/warning/
-    danger/info/seo`).
-- Outros god files 500-1000L flagged (não críticos): `/workspace/ideas`
-  (928L), `/hardware/settings` (801L), `/workspace/templates` (763L),
-  `simulation-editor` (755L), `/admin/config/costs` (727L), `week-editor`
-  (718L), `pipelines-tab` (700L).
+**RSC Batch 1 (Tier 1 migrations)** — audit feito, execução pendente. 4
+candidatos imediatos (trabalho ~2h com cuidado):
+- `/admin/observability/page.tsx` — se converter pra shadcn Tabs
+  `defaultValue` (sem state explícito), page vira RSC.
+- `/dashboard/page.tsx` — fetch `/api/dashboard` → RSC com `headers()`
+  forward do cookie pra auth.
+- `/workspace/guides/[slug]/page.tsx` — idem (`/api/engine/content/
+  posts/[slug]`).
+- `/workspace/guides/[slug]/log/page.tsx` — page RSC faz fetch, timeline
+  vira client island (`expanded: Set` state).
+
+Considerar primeiro extrair função shared `fetchEngine(path, opts)` que
+resolve host + forward cookie — evita repetir o boilerplate em cada RSC.
+
+**Design sweep — pendências**:
+- **Inputs manuais**: 19+ arquivos com `rounded-lg border border-border
+  bg-surface` pattern. Substituir por shadcn `<Input>` — ~1h scope.
+- **Cores hardcoded**: 66 arquivos com `bg-{red,green,orange,amber,blue,
+  purple,emerald,zinc}-{100..900}`. Migrar pra semantic tokens. Escopo
+  grande — separar em waves: status badges primeiro, depois
+  background/border colors.
+
+**God files 500-1000L** (não críticos, só se crescerem):
+- `/workspace/ideas` (928L), `/hardware/settings` (801L), `/workspace/
+  templates` (763L), `simulation-editor` (755L), `/admin/config/costs`
+  (727L), `week-editor` (718L), `pipelines-tab` (700L).
+
+**Outros carryover**:
+- ContentScorer UI: textarea de draft + POST `/seo/score` pra gap fill.
+- Create-brief-from-analysis action: integrar `/seo/analysis` com
+  `/workspace/new?briefId=X` (endpoint de creation precisa ser confirmado
+  no engine).
 
 ## Notas
 

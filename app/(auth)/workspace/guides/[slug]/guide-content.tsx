@@ -15,11 +15,11 @@ import {
   Check,
   ClipboardList,
   List,
-  Loader2,
   Pencil,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/spinner";
 
 type Lang = "pt-br" | "en";
 
@@ -386,7 +386,7 @@ export function GuideContent({ post }: { post: PostDetail }) {
                   disabled={isSaving || !hasAnyChanges}
                 >
                   {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Spinner size="sm" />
                   ) : (
                     <Check className="h-4 w-4" />
                   )}

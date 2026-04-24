@@ -17,7 +17,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { useLeagues } from "@/hooks/use-leagues";
 
@@ -235,7 +235,7 @@ export function CrossLeaguePriceChart({ item }: CrossLeaguePriceChartProps) {
         {/* League toggle buttons */}
         {leaguesLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
             Carregando leagues...
           </div>
         ) : (
@@ -283,7 +283,7 @@ export function CrossLeaguePriceChart({ item }: CrossLeaguePriceChartProps) {
         {/* Chart area */}
         {loading ? (
           <div className="flex h-[300px] items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Spinner size="lg" className="text-muted-foreground" />
           </div>
         ) : error ? (
           <div className="flex h-[300px] items-center justify-center">

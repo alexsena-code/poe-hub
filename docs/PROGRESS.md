@@ -30,18 +30,25 @@ Session 02 landed (4 parallel refactors):
   orchestrator + 10 sub-files em `components/modules/hardware/`.
 - **Wrap** — `/admin/design-preview` deletado, sidebar entry removida.
 
-Session 03 landed (3 parallel god-file splits):
+Session 03 landed (3 parallel god-file splits + 3 parallel finalization):
 - **S03.a** — `/seo/youtube` 2120L → 443L orchestrator + 12 sub-files em
   `components/modules/seo/youtube/`.
 - **S03.b** — `/seo/reddit` 924L → 197L orchestrator + 11 sub-files em
   `components/modules/seo/reddit/` + 16 testes novos (`helpers.test.ts`).
 - **S03.c** — `store-prices-tab.tsx` 955L → 210L orchestrator + 9
   sub-files em `components/modules/hardware/store-prices/`.
+- **S03.d** — `/seo/research` 1289L → 3 rotas reais (research 197L,
+  opportunities 131L, analysis 84L) + 17 sub-files em
+  `components/modules/seo/{shared,research,opportunities,analysis}/`.
+- **S03.e** — RSC audit read-only: 28 pages `'use client'` classificadas
+  em 4 Tier 1 (EASY), 7 Tier 2 (HYBRID), 17 Tier 3 (LOCK).
+- **Design sweep** — `<Spinner>` compartilhado criado + substituído em 13
+  arquivos (agent absorveu também `Loader2` do lucide, não só SVG custom).
 
-Carryover para session 04: `/seo/research` rearquitetura (1289L → 3 rotas
-reais, spec needed), Server Components audit (46 pages `'use client'`),
-design consistency sweep (inputs manuais, spinner custom, cores inline
-→ semantic tokens).
+Carryover para session 04: Tier 1 RSC migrations (4 pages, precisa
+fetch+cookie forward helper), inputs manuais sweep (19+ files → shadcn
+`<Input>`), cores hardcoded sweep (66 files → semantic tokens), god files
+500-1000L não críticos.
 
 ## Working agreement
 
@@ -78,12 +85,13 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~405 | +32 sub-components session 02 + 32 session 03 (seo/youtube, seo/reddit, hardware/store-prices), -1 store-prices-tab monolito |
-| Routes | 70 | stable (none added; session 03 só split components) |
-| `'use client'` pages | ~46 (app/) + ~104 (components/) | unchanged — RSC migration carryover session 04 |
+| TS/TSX files | ~425 | session 03 adicionou ~20 arquivos em `components/modules/seo/{shared,research,opportunities,analysis}/` + `components/ui/spinner.tsx` |
+| Routes | 70 | stable |
+| `'use client'` pages | ~28 (app/auth) + ~104 (components/) | RSC audit feito (Tier 1/2/3); migrations carryover session 04 |
 | Vitest tests | ~398 | +9 `stitch-notes.test.ts` (session 02) + 16 `reddit/helpers.test.ts` (session 03) |
 | Playwright E2E | 32 | unchanged |
-| God files >1000L | 1 (seo/research 1289) | was 4 pre-session-02 — session 02 resolveu hardware+simulation-comparison; session 03 resolveu seo/youtube |
+| God files >1000L | **0** | was 4 pre-session-02; resolvidos: hardware, simulation-comparison, seo/youtube, seo/research |
+| Shared primitives | PageHeader, EmptyState, Spinner | Spinner adicionado session 03 design sweep |
 | God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

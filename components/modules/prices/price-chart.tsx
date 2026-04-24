@@ -17,7 +17,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 
 interface DailyPricePoint {
@@ -165,7 +165,7 @@ export function PriceChart({ item, league, channelId }: PriceChartProps) {
       <CardContent>
         {loading ? (
           <div className="flex h-[300px] items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Spinner size="lg" className="text-muted-foreground" />
           </div>
         ) : error ? (
           <div className="flex h-[300px] items-center justify-center">

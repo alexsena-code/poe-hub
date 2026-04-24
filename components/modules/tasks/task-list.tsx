@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
   ArrowUpDown,
-  Loader2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -236,7 +236,7 @@ export function TaskList({ filters }: TaskListProps) {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <Spinner size="lg" className="text-muted-foreground" />
         </div>
       ) : (
         <>

@@ -36,7 +36,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
-import { ArrowLeft, Plus, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/ui/page-header";
 
 interface League {
@@ -234,7 +235,7 @@ export default function LeaguesSettingsPage() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                  <Spinner size="sm" className="inline mr-2" />
                   Carregando...
                 </TableCell>
               </TableRow>

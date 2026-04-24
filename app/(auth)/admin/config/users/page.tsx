@@ -46,8 +46,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Plus, Pencil, Trash2, Loader2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { Spinner } from "@/components/ui/spinner";
 
 interface User {
   id: string;
@@ -254,7 +255,7 @@ export default function UsersSettingsPage() {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                  <Spinner size="sm" className="inline mr-2" />
                   Carregando...
                 </TableCell>
               </TableRow>

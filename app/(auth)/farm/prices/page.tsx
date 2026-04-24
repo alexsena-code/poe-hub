@@ -8,7 +8,8 @@ import { PriceHistoryTable } from "@/components/modules/prices/price-history-tab
 import { CrossLeaguePriceChart } from "@/components/modules/prices/cross-league-price-chart";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Settings, RefreshCw, Loader2, X, Terminal } from "lucide-react";
+import { Settings, RefreshCw, X, Terminal } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useLeagues } from "@/hooks/use-leagues";
 import {
@@ -104,7 +105,7 @@ export default function PricesPage() {
           <>
             <Button onClick={handleScrape} disabled={scraping}>
               {scraping ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
               ) : (
                 <RefreshCw className="h-4 w-4 mr-2" />
               )}
@@ -126,7 +127,7 @@ export default function PricesPage() {
             <div className="flex items-center gap-2 text-sm text-zinc-400">
               <Terminal className="h-4 w-4" />
               Scraper Log
-              {scraping && <Loader2 className="h-3 w-3 animate-spin" />}
+              {scraping && <Spinner size="xs" />}
             </div>
             <Button
               variant="ghost"
