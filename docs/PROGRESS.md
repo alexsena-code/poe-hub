@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 10 landed — wizard Edit→Publish, right rail de tools, fix publish (transform IDs→refs + slug collision), importar guide LLM PT-BR+EN do engine para drafts Sanity, toolbar completa + UI/UX polish; 648 tests / 0 falhas).
+Last updated: 2026-04-24 (session 10 + 11 hotfixes landed — Wave 1-3 ok, mas smoke ao vivo expôs cadeia de 11 bugs no flow guide-import → publish. Bug ABERTO: body=Empty no Sanity após publish mesmo com body=107 no client; ver session-10.md "Hipóteses ainda não testadas").
 
 ## Current status
 

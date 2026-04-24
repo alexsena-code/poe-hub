@@ -363,6 +363,54 @@ do plano).
 **Validação integrada:** vitest 49 files / 648 tests / 0 falhas;
 tsc 0 erros novos; next build exit 0.
 
+## Hotfixes pós-Wave 3 (mesma session, não-planejados)
+
+Smoke test ao vivo via Playwright revelou cadeia de bugs no flow
+`/workspace/guides → import → /edit → /publish`. 8 commits de hotfix:
+
+| Commit | Bug |
+|---|---|
+| `2d39975` | scrollbar do page-level no editor (utility `editor-fullscreen` no globals.css existia mas nenhum componente ativava — fix: shell aplica via useEffect no mount) |
+| `7fed666` | título inline na toolbar (Google Docs style) ficou apertado e quebrava em 2 filas — revertido pra título acima da toolbar (Notion/Ghost), discreto (text-base font-medium px-6 pt-3 pb-1) |
+| `c7e7650` | passive icons não renderizavam: `pathoftrade.net/images/passives/<slug>.webp` retorna 403 (Cloudflare bot challenge). Fallback: placeholder visual com primeira letra tintada na cor da rarity |
+| `3f66eaf` | (1) autosave 400 — `editorMetaSchema.partial()` ainda validava `min(1)` em strings vazias, drafts importados começam com `categoryId/authorId/tags` vazios → novo `editorDraftMetaSchema` aceita vazios. (2) drafts não apareciam no `/blog list` — sanity client tinha `perspective: 'published'` que silentemente filtra `drafts.*` → trocado pra `'raw'` (queries já filtram explicitamente) |
+| `86689a4` | autosave race apaga body de drafts importados — useTiptapEditor monta com doc vazio, useAutosave timer (5s) dispara antes do `setContent(initialBody)` rodar; meta.title vinha preenchido → `isContentEmpty` false → grava body vazio em cima dos 100+ blocks. Fix: `enabled` flag no useAutosave, gating até `initialContentLoaded` flip true |
+| `6ba9b37` | `<select>` HTML nativo no /publish (Categoria/Autor) com tema light — trocado pra shadcn `<Select>`. Bonus: botão "+ Nova categoria" + dialog + endpoint POST /api/sanity/categories |
+| `b223c4d` | (1) mapping local de 1590 passive .webp (~11MB) copiados de poetrade-dev/public/images/passives/ pra hub. fetch-helpers ganha `rewriteLocalPassiveIcon` (mirror do poetrade-dev) que converte URLs `pathoftrade.net/images/passives/<slug>` em `/images/passives/<slug>` same-origin. (2) hardening autosave: separados `isBodyEmpty` + `isMetaTrivial` — body vazio NUNCA vai pra Sanity, ponto |
+| `c86db33` | trocar idioma no /publish → categoryId vira órfão (Sanity categorias são language-scoped). Fix: useEffect detecta orphan + clear + toast warning |
+| `2afd44e` | publish 400 persistia: `publish/page.tsx` declarava `body: JSONContent` mas GET retorna Portable Text; PublishForm chamava `tiptapToPortable(portableTextArray)` que não reconhecia o shape e produzia `[]`. Fix: `body: PortableTextContent[]` direto, sem conversão. Logs de debug adicionados em use-publish + route + publish-form (temporários) |
+| `d013bfe` | UX adendo do c86db33: match por tagname antes de limpar (PT-BR/EN com mesma tagname auto-trocam sem perder seleção) |
+| `a698917` | body=Empty no Sanity Studio após publish (descoberto post-fix): `markdownToPortableText` emitia `poeCurrency/poePassive/poePrice/poeCta` como custom blocks standalone. Sanity blockContent schema só permite `block/image/code/table/poeItem` — outros tipos são silentemente DROPADOS no write. Fix: tokens `{{kind:value}}` ficam como span text literal dentro de `_type: 'block'`; resolver expande no render |
+
+## ⚠️ BUG ABERTO — body vazio no Sanity após publish
+
+**Sintoma**: operador clica Publicar no `/publish`, recebe toast de
+sucesso, mas ao abrir o post no Sanity Studio o campo `body` está
+**Empty**. Posts publicados antigos (de fora do hub) têm body normal.
+
+**O que confirmamos não ser causa** (pelos commits acima):
+- ✅ Body chega cheio ao client (console.log mostrou `body length: 107`).
+- ✅ `tiptapToPortable` não está sendo chamado em cima de PT (commit `2afd44e`).
+- ✅ Conversor markdown não emite mais custom blocks de tipo desconhecido (commit `a698917`).
+- ✅ `editorMetaToSanityPost` em `lib/sanity/transform.ts:80` passa `body` no shape.
+- ✅ `sanityPostSchema.parse` em `lib/sanity/publish.ts:65` valida o body com `min(1)` antes do `client.createOrReplace`.
+
+**Hipóteses ainda não testadas** (pra próxima session):
+1. **Conferir o Sanity Studio que o operador está olhando**: dataset configurado em `.env.local` é o mesmo que o Studio aponta? `SANITY_DATASET` vs Studio config.
+2. **Logar o sanityDoc completo antes do `createOrReplace`** (`lib/sanity/publish.ts:99`) — ver se body chega cheio ATÉ ESSE PONTO.
+3. **Logar o `result` do `createOrReplace`** — ver o que o Sanity retorna após o write (body vem cheio ou já vazio na resposta).
+4. **Fetch direto via Sanity client** com `client.getDocument(postId)` após publish — comparar com o que o Studio mostra.
+5. **Verificar diff entre body que escrevemos e shape que o Sanity espera**: blocks têm campos extras (`_key` em todos os children + spans? `markDefs` arrays mesmo vazios?). Schemas estritos do Studio podem rejeitar blocks com `_key` faltando.
+6. **Comparar com um post antigo funcional**: `client.getDocument('<post-publicado-antigo>')` e ver shape do body — bate com o que enviamos?
+
+**Logs temporários a remover** quando bug fechar:
+- `use-publish.ts` — `console.group('[publish] sending payload')` + error response.
+- `app/api/sanity/publish/route.ts` — `[publish] received payload:` + `[publish] transformed-doc schema failed:`.
+- `publish-form.tsx` — `[publish-form] sending`.
+
+**Drafts corrompidos** (body=0 no Sanity por causa do autosave race ou
+dropping): `Mf81yvIiu_BZinsMpcNis`, `HHm2kbZwXZekJ0UqQIF8C`, `oPYVweGj-wm791tLfD_2v`. Operador pode deletar via Sanity Studio.
+
 ## Carryover para session 11 (i18n dedicada)
 
 - `@sanity/document-internationalization` plugin programático.
