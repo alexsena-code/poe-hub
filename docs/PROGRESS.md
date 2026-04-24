@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 02 landed — 4 parallel refactors).
+Last updated: 2026-04-23 (session 03 landed — 3 more parallel god-file splits).
 
 ## Current status
 
@@ -30,9 +30,18 @@ Session 02 landed (4 parallel refactors):
   orchestrator + 10 sub-files em `components/modules/hardware/`.
 - **Wrap** — `/admin/design-preview` deletado, sidebar entry removida.
 
-Carryover para session 03: `/seo/research` rearquitetura (B4, spec
-needed), `store-prices-tab.tsx` (955L) e `deals-tab.tsx` (555L) split,
-Server Components audit.
+Session 03 landed (3 parallel god-file splits):
+- **S03.a** — `/seo/youtube` 2120L → 443L orchestrator + 12 sub-files em
+  `components/modules/seo/youtube/`.
+- **S03.b** — `/seo/reddit` 924L → 197L orchestrator + 11 sub-files em
+  `components/modules/seo/reddit/` + 16 testes novos (`helpers.test.ts`).
+- **S03.c** — `store-prices-tab.tsx` 955L → 210L orchestrator + 9
+  sub-files em `components/modules/hardware/store-prices/`.
+
+Carryover para session 04: `/seo/research` rearquitetura (1289L → 3 rotas
+reais, spec needed), Server Components audit (46 pages `'use client'`),
+design consistency sweep (inputs manuais, spinner custom, cores inline
+→ semantic tokens).
 
 ## Working agreement
 
@@ -56,6 +65,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [03](progress/session-03.md) | 2026-04-23 | **active** — carryover da session 02 (god files /seo/youtube, /seo/reddit, store-prices-tab) + /seo/research rearquitetura + RSC audit |
 | [02](progress/session-02.md) | 2026-04-23 | 4 parallel refactors: BriefingForm/simulation-comparison/hardware splits + Phase 2 style (PageHeader backfill + SEO accent) |
 | [01](progress/session-01.md) | 2026-04-23 | IA rework (5 domains) + admin/config fusion + engine-config split + style Phase 1 |
 
@@ -68,12 +78,12 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~373 | +32 sub-components (briefing/simulation-comparison/hardware), -1 simulation-comparison monolito, -1 design-preview |
-| Routes | 70 | -1 (/admin/design-preview deleted) |
-| `'use client'` pages | 147 (Server Components: 0) | unchanged — RSC migration carryover |
-| Vitest tests | ~382 | +9 novos (`stitch-notes.test.ts`) |
+| TS/TSX files | ~405 | +32 sub-components session 02 + 32 session 03 (seo/youtube, seo/reddit, hardware/store-prices), -1 store-prices-tab monolito |
+| Routes | 70 | stable (none added; session 03 só split components) |
+| `'use client'` pages | ~46 (app/) + ~104 (components/) | unchanged — RSC migration carryover session 04 |
+| Vitest tests | ~398 | +9 `stitch-notes.test.ts` (session 02) + 16 `reddit/helpers.test.ts` (session 03) |
 | Playwright E2E | 32 | unchanged |
-| God files >1000L | 2 (seo/youtube 2120, seo/research 1289) | was 4 — hardware 2403→360, hardware/builder 1346→529, simulation-comparison 1379→split |
+| God files >1000L | 1 (seo/research 1289) | was 4 pre-session-02 — session 02 resolveu hardware+simulation-comparison; session 03 resolveu seo/youtube |
 | God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DealsTab } from "@/components/modules/hardware/deals-tab";
 import { ManualPricesTab } from "@/components/modules/hardware/manual-prices-tab";
 import { ItemsTab } from "@/components/modules/hardware/items-tab";
-import { StorePricesTab } from "@/components/modules/hardware/store-prices-tab";
+import { StorePricesTab } from "@/components/modules/hardware/store-prices";
 import type {
   Deal,
   HardwareConfigItem,
