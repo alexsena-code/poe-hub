@@ -58,19 +58,20 @@ Session 04 landed (4 parallel workstreams):
 
 Session 05 landed (4 parallel workstreams):
 - **S05.a** — 5 pages RSC Tier 2 migradas (workspace/guides, workspace/people,
-  admin/config/proxy, seo/keybert, farm/simulations/annual). 2 pages
-  (/hardware/recent, /hardware/alerts) skipped — usam external API via
-  `NEXT_PUBLIC_*`, precisam proxy route primeiro.
+  admin/config/proxy, seo/keybert, farm/simulations/annual).
 - **S05.b** — `<StatusBadge>` primitive (6 variants semânticos) + migração
   de 11 arquivos (color maps URGENCY/EFFORT/STATUS/SOURCE/INTENT/VICE).
   Identidade visual preservada (subreddit/channel colors).
 - **S05.c** — pipelines-tab 700→40L + 6 sub-files. Eliminou um `any`.
 - **S05.d** — hardware/settings 801→59L + 8 sub-files.
+- **S05.e** — Proxy `/api/hardware/[...path]` (55L) + RSC migration das 2
+  pages pendentes (`/hardware/recent` 347→31L + 352L island; `/hardware/alerts`
+  374→36L + 378L island).
 
-Carryover para session 06: proxy hub → hardware API + RSC migration dos 2
-hardware pages; 7 god files médios restantes (workspace/templates 763L,
-simulation-editor 755L, admin/config/costs 727L, week-editor 718L,
+Carryover para session 06: 7 god files médios restantes (workspace/templates
+763L, simulation-editor 755L, admin/config/costs 727L, week-editor 718L,
 SectionEditor 676L, workspace/qa 663L, farm/simulations/annual/[id] 656L).
+Tier 3 ficaram locked (forms, charts, streaming) — RSC migration não aplicável.
 
 ## Working agreement
 
@@ -94,7 +95,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
-| [05](progress/session-05.md) | 2026-04-23 | **active** — RSC Tier 2 + god files médios (pipelines-tab, hardware/settings) + StatusBadge semantic tokens |
+| [05](progress/session-05.md) | 2026-04-23 | RSC Tier 2 (5 migradas + 2 via hardware proxy) + god files médios (pipelines-tab, hardware/settings) + StatusBadge semantic tokens |
 | [04](progress/session-04.md) | 2026-04-23 | Tier 1 RSC migrations + inputs sweep + ContentScorer UI + workspace/ideas split |
 | [03](progress/session-03.md) | 2026-04-23 | carryover da session 02 (god files /seo/youtube, /seo/reddit, store-prices-tab) + /seo/research rearquitetura + RSC audit |
 | [02](progress/session-02.md) | 2026-04-23 | 4 parallel refactors: BriefingForm/simulation-comparison/hardware splits + Phase 2 style (PageHeader backfill + SEO accent) |
@@ -111,13 +112,14 @@ new work lives in numbered sessions.
 |---|---:|---|
 | TS/TSX files | ~480 | session 05 adicionou 5 client islands (workspace/guides+people, admin/config/proxy, seo/keybert, farm/simulations/annual) + 6 sub-files pipelines + 8 sub-files hardware/settings + `components/ui/status-badge.tsx` |
 | Routes | 70 | stable |
-| `'use client'` pages | **19** (app/auth) | was 24 — 5 Tier 2 migradas pra RSC (S05.a); hardware/{recent,alerts} pendem proxy route |
+| `'use client'` pages | **17** (app/auth) | was 24 — 7 Tier 2 migradas pra RSC (S05.a: 5 + S05.e: 2 via hardware proxy) |
 | Vitest tests | ~398 | unchanged |
 | Playwright E2E | 32 | unchanged |
 | God files >1000L | **0** | stable — all eliminated pre-session-04 |
 | God files 500-1000L | 7 | was 9 — pipelines-tab + hardware/settings resolvidos |
 | Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge | +StatusBadge session 05 (6 variants semânticos) |
-| Server Components in app/(auth) | 9 pages RSC puras + 1 híbrida | was 4 pure + 1 híbrida (5 Tier 2 migradas) |
+| Server Components in app/(auth) | 11 pages RSC puras + 1 híbrida | was 4 pure + 1 híbrida (7 Tier 2 migradas) |
+| Proxy routes | 2 catch-all (`/api/engine/*`, `/api/hardware/*`) | +hardware session 05 S05.e |
 | God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

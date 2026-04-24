@@ -229,12 +229,43 @@ Validação integrada pós-Wave 1 (3 agents) + Wave 2 (1 agent):
 - `npx next build` — exit 0, 5.5s.
 - `npx vitest run` — 320 passed / 38 failed, baseline pré-existente intacto.
 
-## Carryover para session 06
+### S05.e — Hardware proxy route + RSC migration (2026-04-23)
 
-- **RSC Tier 2 hardware pendente** (`/hardware/recent` 347L, `/hardware/alerts`
-  374L) — precisam primeiro de proxy route `/api/hardware/*` que forward pro
-  external service, pra então RSC via `fetchEngine` ficar viável. Scope:
-  criar proxy + migrar as 2 pages.
+Criado `app/api/hardware/[...path]/route.ts` (55L) — proxy catch-all pro
+hardware service (Python FastAPI externo). Padrão similar ao
+`/api/engine/[...path]` mas sem API key e com prefix `/api/` auto
+(hub chama `/api/hardware/deals` → forward pra `${HARDWARE_API_URL}/api/deals`).
+
+Env: prefere `HARDWARE_API_URL` (server-only, novo) com fallback pra
+`NEXT_PUBLIC_HARDWARE_API_URL` (browser, legado). Localhost default.
+Auth via `getServerSession` — retorna 401 sem sessão.
+
+2 pages migradas pra RSC:
+
+| Page | Before | After |
+|---|---:|---:|
+| `/hardware/recent/page.tsx` | 347L `'use client'` | 31L RSC + 352L client island |
+| `/hardware/alerts/page.tsx` | 374L `'use client'` | 36L RSC + 378L client island |
+
+Client islands em `components/modules/hardware/{recent,alerts}/` com
+`initialDeals`/`initialItems`/`initialHours` como props; `skipInitial`
+flag evita double-fetch no mount (RSC já hidratou).
+
+Observações:
+- Discount color (`text-emerald-400`/`text-green-500`/`text-yellow-500`
+  /`text-orange-500`) migrado pra semantic tokens (`text-success`
+  strong/normal/`text-warning`/`text-muted-foreground`) — sweep
+  inline aproveitado.
+- Link colors (`text-blue-500 hover:text-blue-400`) → `text-info
+  hover:text-info/80` (semantic).
+
+### Final wrap (2026-04-23)
+
+Validação integrada pós todas as fases (4 Wave 1 + 1 Wave 2 + proxy):
+- `npx next build` — exit 0, 6.5s.
+- `npx vitest run` — 320 passed / 38 failed, baseline pré-existente intacto.
+
+## Carryover para session 06
 - **God files médios remanescentes** (7 files): `workspace/templates` (763L),
   `simulation-editor` (755L), `admin/config/costs` (727L), `week-editor` (718L),
   `SectionEditor` (676L), `workspace/qa` (663L), `farm/simulations/annual/[id]`
