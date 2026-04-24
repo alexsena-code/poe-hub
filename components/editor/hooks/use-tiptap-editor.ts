@@ -29,6 +29,8 @@ import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { Dropcursor } from '@tiptap/extension-dropcursor';
 import { BubbleMenu } from '@tiptap/extension-bubble-menu';
 import { FloatingMenu } from '@tiptap/extension-floating-menu';
+import TextAlign from '@tiptap/extension-text-align';
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import { createLowlight, common } from 'lowlight';
 import type { JSONContent } from '@tiptap/core';
 
@@ -135,6 +137,18 @@ export function buildEditorExtensions() {
         return ed.isEditable && ed.isEmpty;
       },
     }),
+
+    // TextAlign — applies to headings and paragraphs (left/center/right/justify).
+    // Must come after StarterKit so it can wrap the existing node definitions.
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+    }),
+
+    // Table + sub-nodes — resizable via ProseMirror table-resizing plugin.
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell,
 
     // PoE custom nodes — order matters for parseHTML precedence
     PoeItemNode,

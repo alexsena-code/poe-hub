@@ -12,10 +12,13 @@
  * Session 10 S10.b.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
-import { Loader2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { EmptyState } from "@/components/ui/empty-state";
 import { EditorShell } from "@/components/editor/editor-shell";
 import type { EditorMetaForm } from "@/components/editor/editor-meta-schema";
 import type { PortableTextContent } from "@/lib/sanity/types";
@@ -40,6 +43,13 @@ export default function EditBlogPostPage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
   const [state, setState] = useState<LoadState>({ status: "loading" });
+  // retryCount increments on "Tentar novamente" to re-trigger the effect
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleRetry = useCallback(() => {
+    setState({ status: "loading" });
+    setRetryCount((c) => c + 1);
+  }, []);
 
   useEffect(() => {
     if (!id) {
@@ -78,7 +88,7 @@ export default function EditBlogPostPage() {
 
     fetchDraft();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, retryCount]);
 
   if (state.status === "not-found") {
     notFound();
@@ -87,18 +97,25 @@ export default function EditBlogPostPage() {
 
   if (state.status === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center gap-3 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        Carregando rascunho…
+      <div className="flex h-screen items-center justify-center">
+        <Spinner size="lg" ariaLabel="Carregando rascunho…" />
       </div>
     );
   }
 
   if (state.status === "error") {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3">
-        <AlertCircle className="h-8 w-8 text-destructive" />
-        <p className="text-destructive text-sm">Falha ao carregar: {state.message}</p>
+      <div className="flex h-screen items-center justify-center p-8">
+        <EmptyState
+          icon={AlertCircle}
+          title="Falha ao carregar"
+          description={state.message}
+          action={
+            <Button variant="outline" size="sm" onClick={handleRetry}>
+              Tentar novamente
+            </Button>
+          }
+        />
       </div>
     );
   }

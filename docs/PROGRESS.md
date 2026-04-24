@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 09 landed — carryover cleanup: chip paridade iconUrl + vitest e2e exclude + migration retroativa zera 38 baseline failures + tracker hygiene).
+Last updated: 2026-04-24 (session 10 landed — wizard Edit→Publish, right rail de tools, fix publish (transform IDs→refs + slug collision), importar guide LLM PT-BR+EN do engine para drafts Sanity, toolbar completa + UI/UX polish; 648 tests / 0 falhas).
 
 ## Current status
 
@@ -13,9 +13,8 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(**539 passing, 0 falhos** após session 09 migration retroativa cobrir
-4 commits com drift) + Playwright (32 E2E, rodando agora fora do
-Vitest glob).
+(**648 passing, 0 falhos** pós session 10) + Playwright (32 E2E, rodando
+fora do Vitest glob).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
 engine-config split (1944L → 182L + 9 tabs), style Phase 1 (neutral +
@@ -123,6 +122,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [10](progress/session-10.md) | 2026-04-24 | editor UI/UX overhaul — wizard Edit→Publish (rota /publish nova) + right rail de 5 widgets (Score/Slang/Q&A/Assets/Slang Lookup) + fix publish blocker (transform IDs→refs + slug collision per language) + importar guide LLM (markdown→Portable Text, 2 drafts PT-BR+EN automáticos) + toolbar completa (Undo/Redo, alignment, HR, table) + Spinner/EmptyState polish |
 | [09](progress/session-09.md) | 2026-04-24 | carryover cleanup da session 08 (chip currency paridade iconUrl + vitest e2e exclude + migration retroativa 4 commits drift + tracker hygiene) |
 | [08](progress/session-08.md) | 2026-04-23 | editor profissional (Tiptap) + publish direto no Sanity + drag-drop currencies + Q&A inline + preview render fiel do poetrade-dev |
 | [07](progress/session-07.md) | 2026-04-23 | zerar carryover (6 god files médios splits + editor inline score + sidebar regroup) pré-editor-rewrite |
@@ -142,17 +142,19 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~600 | session 08 adicionou ~45 arquivos novos em `components/editor/` + `lib/sanity/` + routes blog (editor completo ~2 god-files substituídos) |
-| Routes | **75** | +3 (blog list, blog new, blog edit) -0 (legacy workspace/new e workspace/editor viraram redirects) |
-| `'use client'` pages | **19** (app/auth) | +1 (blog edit é client wrapper) |
-| Vitest tests | **539 passed / 0 failed** | session 09 zerou os 38 baseline failures (migration retroativa) + adicionou 7 novos (resolve-currency-icon 6 + 1 case engine-off em side-panel-assets) |
-| Playwright E2E | 32 | excluído do Vitest via `configDefaults.exclude + e2e/**` (S09.b) — rodam só via `npx playwright test` |
+| TS/TSX files | ~640 | session 10 adicionou ~25 arquivos novos em `components/editor/widgets/`, `components/editor/publish/`, `lib/converters/`, `app/api/sanity/draft-from-guide/` |
+| Routes | **76** | +1 (`/workspace/blog/[id]/publish` — wizard) |
+| `'use client'` pages | **20** (app/auth) | +1 (publish é client wrapper) |
+| Vitest tests | **648 passed / 0 failed** | +109 vs session 09 (Wave 1: 47, Wave 2: 46, Wave 3: 16) |
+| Playwright E2E | 32 | stable |
 | God files >1000L | **0** | stable |
-| God files 500-1000L | **0** | SectionEditor 676L deletado pela session 08 |
-| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge, Tiptap editor, Sanity client | incremental |
+| God files 500-1000L | **0** | session 10 deletou `editor-sidebar.tsx` 487L |
+| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge, Tiptap editor (+ TextAlign + Table extensions), Sanity client + transform | incremental |
 | Server Components in app/(auth) | 12 pages RSC puras + 1 híbrida | stable |
 | Proxy routes | 2 catch-all | stable |
-| Engine Fase C consumers | 4/4 + editor inline | S07.g adicionou display inline no EditorShell |
+| Engine Fase C consumers | 4/4 + editor inline + right rail widgets | S10.a portou content-score + slang-report cards pra widgets |
+| Editor body format | Portable Text canonical (autosave converte Tiptap→PT antes do PUT; mount converte PT→Tiptap) | S10 fix |
+| Editor layout | Body + Right Rail (5 widgets) + toolbar leve com "Prosseguir →" | was Body + Side Panels esquerda + Sidebar direita meta form |
 | Sidebar Admin | 3 sub-grupos (Operações/SEO Tools/Config) | was 11 flat entries |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

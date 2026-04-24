@@ -283,3 +283,100 @@ Validação: 174/174 editor tests verdes; full suite **632 passed** (era
 `npx vitest run` — 46 files, **632 tests**, 0 falhas (32.8s).
 `npx tsc --noEmit` — 0 erros novos nos arquivos da Wave 2 (pre-existing
 unchanged).
+
+### S10.d — UI/UX polish (2026-04-24)
+
+Loading/error visuais consistentes, list page com filter por idioma,
+toolbar gaps fechados (Undo/Redo + alignment + HR + table), color audit.
+
+Arquivos editados (5):
+- `app/(auth)/workspace/blog/[id]/edit/page.tsx` — Loading vira
+  `<Spinner size="lg" ariaLabel="Carregando rascunho…" />`. Error vira
+  `<EmptyState icon={AlertCircle} title="Falha ao carregar"
+  description={state.message} action={<Button onClick={handleRetry}>}>`.
+  `retryCount` state re-dispara o `useEffect` no clique de Tentar
+  novamente.
+- `app/(auth)/workspace/blog/[id]/publish/page.tsx` — mesmo tratamento;
+  error mantém também o link "Voltar ao editor" ao lado do retry.
+- `app/(auth)/workspace/blog/page.tsx` — `searchParams: Promise<{lang?}>`
+  (Next 16 convenção). Helpers `parseLangFilter`, `applyLangFilter`,
+  componente `LangFilterBar` (3 Link pills `?lang=pt-br|en|all`).
+  `<PageHeader>` actions slot recebe filter bar antes do botão
+  "Novo post". Counts e rows usam `visibleDrafts`/`visiblePublished`.
+  `EmptyState` local renomeado pra `EmptyRow` pra não shadowar o
+  primitive shared.
+- `components/editor/editor-toolbar.tsx` — adiciona Undo/Redo group
+  (`Undo2`/`Redo2` lucide com `disabled={!editor.can().undo/redo()}`),
+  Alignment group 4 botões (`AlignLeft`/`AlignCenter`/`AlignRight`/
+  `AlignJustify` + `editor.commands.setTextAlign`), HR (`Minus` icon),
+  Table dropdown (`TableInsertMenu` component com 2x2, 3x3, custom prompt
+  via `window.prompt`). Tudo behind `{!isPreview}`. `text-red-400` →
+  `text-destructive` e `text-green-500` → `text-success` no autosave
+  indicator.
+- `components/editor/hooks/use-tiptap-editor.ts` — adiciona `TextAlign`
+  (`types: ['heading', 'paragraph']`) + `Table.configure({ resizable:
+  true })`/`TableRow`/`TableHeader`/`TableCell` no `buildEditorExtensions`.
+
+Arquivos novos (2):
+- `components/editor/__tests__/editor-toolbar.test.tsx` — 7 cases
+  novos: Undo/Redo render, chain dispatch, 4 alignment buttons, HR
+  dispatch, Table trigger.
+- `app/(auth)/workspace/blog/__tests__/page.test.ts` — 9 cases pros
+  helpers `parseLangFilter` + `applyLangFilter` (all/pt-br/en/edge).
+
+Deps adicionadas: `@tiptap/extension-text-align@^3.x` +
+`@tiptap/extension-table@^3.x` (~30kb cada).
+
+Color audit: cores PoE em `poe-cta-node.tsx`, `poe-currency-node.tsx`,
+`mention-at-menu.tsx` (yellow currencies) e `poe-item-card.tsx` (red
+"Corrupted") preservadas — visual identity, não estado UI semântico.
+
+### Wave 3 wrap (2026-04-24)
+
+`npx vitest run` — **648 tests** passed, 0 falhas (era 632 baseline pós
+Wave 2, +16 novos).
+`npx tsc --noEmit` — 0 erros novos.
+`npx next build` — exit 0.
+
+## Final wrap (2026-04-24)
+
+Todos 5 chunks concluídos (4 originais + S10.e adicionado pós-aprovação
+do plano).
+
+**Operação:**
+- Editor blog com layout 2 colunas leve (body + right rail), wizard
+  separado pra publicação.
+- 5 widgets do right rail: Q&A, Score, Slang Report, Assets, Slang Lookup.
+- Botão "Editar no Blog" no `/workspace/guides/[slug]` cria 2 drafts
+  Sanity (PT-BR + EN) automaticamente, abre o PT-BR.
+- Publish funcionando ponta a ponta: transform IDs → references, slug
+  collision check per language, draft parcial tolerado.
+- Toolbar completa: formatting + Undo/Redo + alignment + HR + table.
+- Loading/error com Spinner + EmptyState consistentes.
+
+**Métricas:**
+- Vitest: 539 (baseline session 09) → **648 passed** (+109).
+- TS errors novos: 0.
+- God files >500L: 0 (editor-sidebar 487L deletado pelo S10.b).
+- Routes novas: `/workspace/blog/[id]/publish`, `/api/sanity/draft-from-guide`.
+
+**Validação integrada:** vitest 49 files / 648 tests / 0 falhas;
+tsc 0 erros novos; next build exit 0.
+
+## Carryover para session 11 (i18n dedicada)
+
+- `@sanity/document-internationalization` plugin programático.
+- Botão "Criar versão EN/PT-BR" (clone doc com refs) — hoje os 2 drafts
+  do importador são INDEPENDENTES (sem refs entre si).
+- Side-by-side editor PT-BR/EN ou switcher inline.
+- Language switcher no editor toolbar que carrega versão sibling.
+
+Carryover técnico (mantido):
+- Side panel Items/Gems/Passives — engine `/api/items/*` deps.
+- Diff versioning + locked parts com span IDs fuzzy.
+- Section workflow híbrido via slash `/section` (opcional).
+- Smoke E2E com `SANITY_API_WRITE_TOKEN` real.
+- Ressuscitar `BriefingForm` se workflow briefing+outline retornar.
+- TypeScript errors pré-existentes em `lib/simulation-diff.test.ts` e
+  `tests/factories/monitor.factory.ts` (limpeza opcional).
+- Warning Vitest `vi.mock("sonner")` em `image-upload.test.ts` não-top-level.

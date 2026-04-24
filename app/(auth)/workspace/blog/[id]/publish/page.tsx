@@ -14,11 +14,13 @@
  * Session 10.b.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { JSONContent } from '@tiptap/core';
 import type { EditorMetaForm } from '@/components/editor/editor-meta-schema';
 import { PublishForm } from '@/components/editor/publish/publish-form';
@@ -42,6 +44,13 @@ export default function PublishBlogPostPage() {
   const params = useParams();
   const id = typeof params.id === 'string' ? params.id : '';
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  // retryCount triggers effect re-run without changing id
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleRetry = useCallback(() => {
+    setState({ status: 'loading' });
+    setRetryCount((c) => c + 1);
+  }, []);
 
   useEffect(() => {
     if (!id) {
@@ -79,7 +88,7 @@ export default function PublishBlogPostPage() {
 
     fetchDraft();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, retryCount]);
 
   const editHref = `/workspace/blog/${id}/edit`;
 
@@ -87,9 +96,8 @@ export default function PublishBlogPostPage() {
 
   if (state.status === 'loading') {
     return (
-      <div className="flex h-screen items-center justify-center gap-3 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        Carregando rascunho…
+      <div className="flex h-screen items-center justify-center">
+        <Spinner size="lg" ariaLabel="Carregando rascunho…" />
       </div>
     );
   }
@@ -98,15 +106,25 @@ export default function PublishBlogPostPage() {
 
   if (state.status === 'error') {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4">
-        <AlertCircle className="h-8 w-8 text-destructive" />
-        <p className="text-sm text-destructive">{state.message}</p>
-        <Button variant="outline" size="sm" asChild>
-          <Link href={editHref}>
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Voltar ao editor
-          </Link>
-        </Button>
+      <div className="flex h-screen items-center justify-center p-8">
+        <EmptyState
+          icon={AlertCircle}
+          title="Falha ao carregar"
+          description={state.message}
+          action={
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleRetry}>
+                Tentar novamente
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href={editHref}>
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />
+                  Voltar ao editor
+                </Link>
+              </Button>
+            </div>
+          }
+        />
       </div>
     );
   }

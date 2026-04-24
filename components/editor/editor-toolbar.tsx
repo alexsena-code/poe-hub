@@ -21,12 +21,21 @@ import {
   Bold, Italic, Link2, Quote, List, ListOrdered,
   Code2, Heading1, Heading2, Heading3,
   Eye, EyeOff, CheckCircle2, Loader2, AlertCircle,
-  ArrowRight,
+  ArrowRight, Undo2, Redo2, AlignLeft, AlignCenter,
+  AlignRight, AlignJustify, Minus, Table,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useEditorContext } from './editor-context';
 import type { EditorPhase } from './types';
 import type { AutosaveStatus } from './hooks/use-autosave';
@@ -59,7 +68,8 @@ function AutosaveIndicator({
   }
   if (status === 'error') {
     return (
-      <span className="flex items-center gap-1 text-xs text-red-400">
+      // text-destructive maps to --destructive in the design system
+      <span className="flex items-center gap-1 text-xs text-destructive">
         <AlertCircle className="h-3 w-3" />
         Erro ao salvar
       </span>
@@ -68,8 +78,9 @@ function AutosaveIndicator({
   if (status === 'saved' && lastSavedAt) {
     const secsAgo = Math.round((Date.now() - lastSavedAt.getTime()) / 1000);
     return (
-      <span className="flex items-center gap-1 text-xs text-zinc-500">
-        <CheckCircle2 className="h-3 w-3 text-green-500" />
+      // text-success maps to --color-success in globals.css
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        <CheckCircle2 className="h-3 w-3 text-success" />
         Salvo há {secsAgo}s
       </span>
     );
@@ -102,6 +113,57 @@ function FmtButton({ label, active, onClick, children }: FmtButtonProps) {
         </Button>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+// ─── Table insert dropdown ────────────────────────────────────────────────────
+
+/**
+ * Dropdown for inserting tables. Offers 2x2, 3x3, and a prompt-based custom
+ * size. Separated from FmtButton because it needs its own DropdownMenu state
+ * and cannot be wrapped in a single <Button>.
+ */
+function TableInsertMenu({ editor }: { editor: import('@tiptap/core').Editor | null }) {
+  function insertTable(rows: number, cols: number) {
+    editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+  }
+
+  function handleCustomTable() {
+    const rowsStr = window.prompt('Número de linhas:', '3');
+    const colsStr = window.prompt('Número de colunas:', '3');
+    const rows = parseInt(rowsStr ?? '', 10);
+    const cols = parseInt(colsStr ?? '', 10);
+    if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1) return;
+    insertTable(rows, cols);
+  }
+
+  return (
+    <Tooltip>
+      <DropdownMenu>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" type="button" aria-label="Inserir tabela">
+              <Table className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Inserir tabela</TooltipContent>
+        <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuLabel className="text-xs">Inserir tabela</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => insertTable(2, 2)}>
+            2 × 2 (simples)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => insertTable(3, 3)}>
+            3 × 3 (padrão)
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleCustomTable}>
+            Personalizado…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </Tooltip>
   );
 }
@@ -216,6 +278,67 @@ export function EditorToolbar({
               >
                 <Code2 className="h-3.5 w-3.5" />
               </FmtButton>
+
+              <Separator orientation="vertical" className="h-5 mx-0.5 bg-zinc-700" />
+
+              {/* Undo / Redo */}
+              <FmtButton
+                label="Desfazer (Ctrl+Z)"
+                onClick={() => editor?.chain().focus().undo().run()}
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </FmtButton>
+              <FmtButton
+                label="Refazer (Ctrl+Shift+Z)"
+                onClick={() => editor?.chain().focus().redo().run()}
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </FmtButton>
+
+              <Separator orientation="vertical" className="h-5 mx-0.5 bg-zinc-700" />
+
+              {/* Alignment */}
+              <FmtButton
+                label="Alinhar à esquerda"
+                active={editor?.isActive({ textAlign: 'left' })}
+                onClick={() => cmd(() => editor?.chain().focus().setTextAlign('left').run() ?? false)}
+              >
+                <AlignLeft className="h-3.5 w-3.5" />
+              </FmtButton>
+              <FmtButton
+                label="Centralizar"
+                active={editor?.isActive({ textAlign: 'center' })}
+                onClick={() => cmd(() => editor?.chain().focus().setTextAlign('center').run() ?? false)}
+              >
+                <AlignCenter className="h-3.5 w-3.5" />
+              </FmtButton>
+              <FmtButton
+                label="Alinhar à direita"
+                active={editor?.isActive({ textAlign: 'right' })}
+                onClick={() => cmd(() => editor?.chain().focus().setTextAlign('right').run() ?? false)}
+              >
+                <AlignRight className="h-3.5 w-3.5" />
+              </FmtButton>
+              <FmtButton
+                label="Justificar"
+                active={editor?.isActive({ textAlign: 'justify' })}
+                onClick={() => cmd(() => editor?.chain().focus().setTextAlign('justify').run() ?? false)}
+              >
+                <AlignJustify className="h-3.5 w-3.5" />
+              </FmtButton>
+
+              <Separator orientation="vertical" className="h-5 mx-0.5 bg-zinc-700" />
+
+              {/* Horizontal rule */}
+              <FmtButton
+                label="Linha horizontal"
+                onClick={() => cmd(() => editor?.chain().focus().setHorizontalRule().run() ?? false)}
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </FmtButton>
+
+              {/* Table insert dropdown */}
+              <TableInsertMenu editor={editor ?? null} />
             </>
           )}
         </div>
