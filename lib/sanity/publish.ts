@@ -76,32 +76,57 @@ function validatePost(post: unknown): SanityPostInput {
 // ─── Operations ────────────────────────────────────────────────────────────────
 
 /**
- * Publishes a post to Sanity (no `drafts.` prefix).
- * Uses `createOrReplace` so it works for both new posts and updates.
- * Validates the post shape before writing.
+ * Publishes a post to Sanity (no `drafts.` prefix) atomically with draft cleanup.
  *
- * The `_id` on the returned doc will not have the `drafts.` prefix —
- * callers should update their local state accordingly.
+ * Session 10 bug fix (2026-04-24): uses a Sanity transaction to createOrReplace
+ * the published doc AND delete `drafts.<baseId>` in the same commit. Previously
+ * the published write was isolated and the client fired a best-effort DELETE
+ * after — if that failed (network, navigation, race with autosave), the draft
+ * lingered. Sanity Studio renders `drafts.*` on top of the published doc, so
+ * the operator would see body=Empty when in fact the published doc was fine,
+ * they were looking at the zombie draft. Transaction makes publish+cleanup
+ * atomic.
+ *
+ * Read-back via getDocument so the caller receives server-assigned `_rev` and
+ * `_updatedAt`.
  */
 export async function publishPost(post: unknown): Promise<SanityPost> {
   const validated = validatePost(post);
   const client = getSanityClient();
 
-  // Ensure the _id never has a drafts. prefix when publishing.
   const baseId = (validated._id ?? "").replace(/^drafts\./, "");
+  if (!baseId) {
+    throw new Error(
+      `[sanity.publish] missing _id for publish (required so drafts.<id> can be deleted atomically): ${JSON.stringify(validated._id)}`,
+    );
+  }
   const doc = {
     ...validated,
-    _id: baseId || undefined,
+    _id: baseId,
     _type: "post" as const,
   };
+  const draftId = `drafts.${baseId}`;
 
   try {
-    const result = await client.createOrReplace(doc as Parameters<typeof client.createOrReplace>[0]);
-    return result as unknown as SanityPost;
+    await client
+      .transaction()
+      .createOrReplace(doc as Parameters<typeof client.createOrReplace>[0])
+      .delete(draftId)
+      .commit();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`[sanity.publish] createOrReplace failed for "${validated.title}": ${message}`);
+    throw new Error(
+      `[sanity.publish] transaction commit failed for "${validated.title}" (baseId="${baseId}"): ${message}`,
+    );
   }
+
+  const published = await client.getDocument(baseId);
+  if (!published) {
+    throw new Error(
+      `[sanity.publish] read-back failed for "${baseId}" — document missing after commit`,
+    );
+  }
+  return published as unknown as SanityPost;
 }
 
 /**
@@ -166,11 +191,11 @@ export async function deleteDraft(id: string): Promise<void> {
 /**
  * Publishes a draft to production:
  * 1. Fetches the draft document by ID.
- * 2. Validates it against the full schema.
- * 3. Creates/replaces the published doc (bare ID, no `drafts.` prefix).
- * 4. Deletes the draft.
+ * 2. Validates it and atomically publishes + deletes the draft via publishPost.
  *
- * Returns the published document.
+ * Draft deletion is atomic with the published write (transaction), so there's
+ * no need for a separate delete step — see publishPost's JSDoc for the
+ * session 10 bug that motivated this change.
  */
 export async function publishDraft(id: string): Promise<SanityPost> {
   const client = getSanityClient();
@@ -190,19 +215,5 @@ export async function publishDraft(id: string): Promise<SanityPost> {
     throw new Error(`[sanity.publish] draft not found: "${draftId}"`);
   }
 
-  // publishPost validates + strips the drafts. prefix from _id
-  const published = await publishPost({ ...draft, _id: baseId });
-
-  // Delete draft after successful publish — if this fails, we log but don't
-  // undo the publish (published state is preferred over draft state).
-  try {
-    await client.delete(draftId);
-  } catch (err) {
-    console.error(
-      `[sanity.publish] warning: published "${baseId}" but failed to delete draft "${draftId}":`,
-      err instanceof Error ? err.message : err
-    );
-  }
-
-  return published;
+  return publishPost({ ...draft, _id: baseId });
 }

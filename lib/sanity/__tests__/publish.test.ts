@@ -16,12 +16,28 @@ const mockCreate = vi.fn();
 const mockDelete = vi.fn();
 const mockGetDocument = vi.fn();
 
+// Transaction chain mock: each method returns the chain itself so the caller
+// can do `.createOrReplace(...).delete(...).commit()`. `.commit()` resolves
+// to a mutation result (caller ignores body — publishPost reads back via
+// getDocument).
+const mockTxCreateOrReplace = vi.fn();
+const mockTxDelete = vi.fn();
+const mockTxCommit = vi.fn();
+const mockTx = {
+  createOrReplace: mockTxCreateOrReplace,
+  delete: mockTxDelete,
+  commit: mockTxCommit,
+};
+mockTxCreateOrReplace.mockReturnValue(mockTx);
+mockTxDelete.mockReturnValue(mockTx);
+
 vi.mock("../client", () => ({
   getSanityClient: () => ({
     createOrReplace: mockCreateOrReplace,
     create: mockCreate,
     delete: mockDelete,
     getDocument: mockGetDocument,
+    transaction: () => mockTx,
   }),
 }));
 
@@ -58,31 +74,48 @@ function makeValidPost(overrides: Partial<SanityPost> = {}): SanityPost {
 describe("publishPost", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCreateOrReplace.mockResolvedValue(makeValidPost({ _id: "post-abc123" }));
+    // Re-arm the chain returns after clearAllMocks wiped them.
+    mockTxCreateOrReplace.mockReturnValue(mockTx);
+    mockTxDelete.mockReturnValue(mockTx);
+    mockTxCommit.mockResolvedValue({ transactionId: "tx-1", results: [] });
+    mockGetDocument.mockResolvedValue(makeValidPost({ _id: "post-abc123" }));
   });
 
-  it("should call createOrReplace with bare ID (no drafts. prefix)", async () => {
+  it("should call transaction.createOrReplace with bare ID (no drafts. prefix)", async () => {
     const post = makeValidPost({ _id: "post-abc123" });
     await publishPost(post);
 
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+    const arg = mockTxCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
     expect(arg._id).toBe("post-abc123");
     expect(typeof arg._id === "string" && arg._id.startsWith("drafts.")).toBe(false);
+  });
+
+  it("should call transaction.delete with drafts. prefixed id (atomic cleanup)", async () => {
+    await publishPost(makeValidPost({ _id: "post-abc123" }));
+    expect(mockTxDelete).toHaveBeenCalledWith("drafts.post-abc123");
+  });
+
+  it("should commit the transaction exactly once", async () => {
+    await publishPost(makeValidPost({ _id: "post-abc123" }));
+    expect(mockTxCommit).toHaveBeenCalledOnce();
   });
 
   it("should strip drafts. prefix from _id before writing", async () => {
     const post = makeValidPost({ _id: "drafts.post-abc123" });
     await publishPost(post);
 
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+    const arg = mockTxCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
     expect(arg._id).toBe("post-abc123");
+    // And delete should still target the drafts. prefix
+    expect(mockTxDelete).toHaveBeenCalledWith("drafts.post-abc123");
   });
 
-  it("should return the result from createOrReplace", async () => {
+  it("should return the doc read back via getDocument after commit", async () => {
     const expected = makeValidPost({ _id: "post-abc123" });
-    mockCreateOrReplace.mockResolvedValue(expected);
+    mockGetDocument.mockResolvedValue(expected);
 
     const result = await publishPost(makeValidPost());
+    expect(mockGetDocument).toHaveBeenCalledWith("post-abc123");
     expect(result._id).toBe("post-abc123");
     expect(result.title).toBe("Guia completo de Divine Orbs");
   });
@@ -124,10 +157,24 @@ describe("publishPost", () => {
     await expect(publishPost(post)).rejects.toThrow("validation failed");
   });
 
-  it("should throw when createOrReplace fails", async () => {
-    mockCreateOrReplace.mockRejectedValue(new Error("Sanity API error"));
+  it("should throw when transaction commit fails", async () => {
+    mockTxCommit.mockRejectedValue(new Error("Sanity API error"));
     await expect(publishPost(makeValidPost())).rejects.toThrow(
-      "[sanity.publish] createOrReplace failed"
+      "[sanity.publish] transaction commit failed"
+    );
+  });
+
+  it("should throw when getDocument read-back returns null", async () => {
+    mockGetDocument.mockResolvedValue(null);
+    await expect(publishPost(makeValidPost())).rejects.toThrow(
+      "[sanity.publish] read-back failed"
+    );
+  });
+
+  it("should throw when _id is missing (required for atomic draft cleanup)", async () => {
+    const post = { ...makeValidPost(), _id: "" };
+    await expect(publishPost(post)).rejects.toThrow(
+      "[sanity.publish] missing _id for publish"
     );
   });
 
@@ -236,20 +283,27 @@ describe("publishDraft", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetDocument.mockResolvedValue(draftDoc);
-    mockCreateOrReplace.mockResolvedValue(publishedDoc);
-    mockDelete.mockResolvedValue({});
+    // Re-arm transaction chain after clearAllMocks.
+    mockTxCreateOrReplace.mockReturnValue(mockTx);
+    mockTxDelete.mockReturnValue(mockTx);
+    mockTxCommit.mockResolvedValue({ transactionId: "tx-1", results: [] });
+    // getDocument is called twice: once for the initial draft fetch (prefixed
+    // id) and once for the publishPost read-back (bare id).
+    mockGetDocument.mockImplementation(async (id: string) =>
+      id === "drafts.post-abc123" ? draftDoc : publishedDoc,
+    );
   });
 
-  it("should fetch draft, publish it, then delete the draft", async () => {
+  it("should fetch draft then publish via transaction (atomic publish+delete)", async () => {
     await publishDraft("post-abc123");
 
     expect(mockGetDocument).toHaveBeenCalledWith("drafts.post-abc123");
-    expect(mockCreateOrReplace).toHaveBeenCalledOnce();
-    expect(mockDelete).toHaveBeenCalledWith("drafts.post-abc123");
+    expect(mockTxCreateOrReplace).toHaveBeenCalledOnce();
+    expect(mockTxDelete).toHaveBeenCalledWith("drafts.post-abc123");
+    expect(mockTxCommit).toHaveBeenCalledOnce();
   });
 
-  it("should return the published document", async () => {
+  it("should return the published document (read back via getDocument)", async () => {
     const result = await publishDraft("post-abc123");
     expect(result._id).toBe("post-abc123");
     expect(result.title).toBe("Guia completo de Divine Orbs");
@@ -271,27 +325,12 @@ describe("publishDraft", () => {
     );
   });
 
-  it("should still return published doc even if draft delete fails (warn only)", async () => {
-    mockDelete.mockRejectedValue(new Error("delete failed"));
-
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = await publishDraft("post-abc123");
-
-    expect(result._id).toBe("post-abc123");
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("failed to delete draft"),
-      expect.any(String)
-    );
-
-    consoleErrorSpy.mockRestore();
-  });
-
   it("should handle drafts. prefix in id argument gracefully", async () => {
     await publishDraft("drafts.post-abc123");
 
     expect(mockGetDocument).toHaveBeenCalledWith("drafts.post-abc123");
     // Published ID should have no prefix
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+    const arg = mockTxCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
     expect(arg._id).toBe("post-abc123");
   });
 });

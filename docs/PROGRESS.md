@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 10 + 11 hotfixes landed — Wave 1-3 ok, mas smoke ao vivo expôs cadeia de 11 bugs no flow guide-import → publish. Bug ABERTO: body=Empty no Sanity após publish mesmo com body=107 no client; ver session-10.md "Hipóteses ainda não testadas").
+Last updated: 2026-04-24 (session 10 + 12 hotfixes — Wave 1-3 ok, 11 hotfixes de smoke + 1 fix final do bug body=Empty. Root cause: draft zumbi renderizado pelo Studio em cima do published saudável. Fix: `publishPost` agora usa transação atômica `createOrReplace + delete(drafts.id)`. 648 tests verdes. Ver session-10.md "BUG RESOLVIDO").
 
 ## Current status
 

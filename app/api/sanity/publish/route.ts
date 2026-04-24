@@ -81,24 +81,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // DEBUG: dump shape of received payload so we can see which field is empty
-  // when validation fails. Remove once publish flow is stable.
-  const rawShape = rawBody as Record<string, unknown>;
-  const metaShape = (rawShape?.meta ?? {}) as Record<string, unknown>;
-  const bodyArr = (rawShape?.body ?? []) as unknown[];
-  console.log("[publish] received payload:", {
-    draftId: rawShape?.draftId,
-    metaKeys: Object.keys(metaShape),
-    metaValues: Object.fromEntries(
-      Object.entries(metaShape).map(([k, v]) => [
-        k,
-        typeof v === "string" ? `"${v.slice(0, 60)}"` : Array.isArray(v) ? `[len=${v.length}]` : v,
-      ]),
-    ),
-    bodyLen: Array.isArray(bodyArr) ? bodyArr.length : "not-array",
-    firstBlock: Array.isArray(bodyArr) ? bodyArr[0] : null,
-  });
-
   const parsed = publishRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
     console.error("[publish] validation failed:", parsed.error.issues);
@@ -128,12 +110,7 @@ export async function POST(request: NextRequest) {
   // Defense-in-depth: validate the transformed doc before writing.
   const docParsed = sanityPostSchema.safeParse(sanityDoc);
   if (!docParsed.success) {
-    console.error("[publish] transformed-doc schema failed:", docParsed.error.issues);
-    console.error("[publish] sanityDoc shape:", {
-      keys: Object.keys(sanityDoc as Record<string, unknown>),
-      _type: (sanityDoc as Record<string, unknown>)._type,
-      _id: (sanityDoc as Record<string, unknown>)._id,
-    });
+    console.error("[sanity.publish] transformed-doc schema failed:", docParsed.error.issues);
     return NextResponse.json(
       { error: "Transformed document failed schema validation", details: docParsed.error.issues },
       { status: 400 },

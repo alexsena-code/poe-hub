@@ -382,34 +382,103 @@ Smoke test ao vivo via Playwright revelou cadeia de bugs no flow
 | `d013bfe` | UX adendo do c86db33: match por tagname antes de limpar (PT-BR/EN com mesma tagname auto-trocam sem perder seleção) |
 | `a698917` | body=Empty no Sanity Studio após publish (descoberto post-fix): `markdownToPortableText` emitia `poeCurrency/poePassive/poePrice/poeCta` como custom blocks standalone. Sanity blockContent schema só permite `block/image/code/table/poeItem` — outros tipos são silentemente DROPADOS no write. Fix: tokens `{{kind:value}}` ficam como span text literal dentro de `_type: 'block'`; resolver expande no render |
 
-## ⚠️ BUG ABERTO — body vazio no Sanity após publish
+## ✅ BUG RESOLVIDO — body=Empty era draft zumbi ofuscando published
 
-**Sintoma**: operador clica Publicar no `/publish`, recebe toast de
-sucesso, mas ao abrir o post no Sanity Studio o campo `body` está
-**Empty**. Posts publicados antigos (de fora do hub) têm body normal.
+**Resolução (2026-04-24)**: root cause era **draft zumbi no Sanity**, não
+body dropado no write. Sanity Studio por padrão renderiza `drafts.<id>`
+em cima do published `<id>`. O fluxo antigo:
 
-**O que confirmamos não ser causa** (pelos commits acima):
-- ✅ Body chega cheio ao client (console.log mostrou `body length: 107`).
-- ✅ `tiptapToPortable` não está sendo chamado em cima de PT (commit `2afd44e`).
-- ✅ Conversor markdown não emite mais custom blocks de tipo desconhecido (commit `a698917`).
-- ✅ `editorMetaToSanityPost` em `lib/sanity/transform.ts:80` passa `body` no shape.
-- ✅ `sanityPostSchema.parse` em `lib/sanity/publish.ts:65` valida o body com `min(1)` antes do `client.createOrReplace`.
+1. `publishPost` escrevia o published `<id>` com body correto.
+2. Cliente fazia DELETE fire-and-forget em `drafts.<id>` (`use-publish.ts`).
+3. Se o DELETE falhasse (network, navegação cancelava o fetch, race com
+   autosave), draft ficava pra trás.
+4. Operador abria Studio → Studio renderizava o **draft** (com body pobre
+   de algum autosave anterior) em cima do published saudável.
 
-**Hipóteses ainda não testadas** (pra próxima session):
-1. **Conferir o Sanity Studio que o operador está olhando**: dataset configurado em `.env.local` é o mesmo que o Studio aponta? `SANITY_DATASET` vs Studio config.
-2. **Logar o sanityDoc completo antes do `createOrReplace`** (`lib/sanity/publish.ts:99`) — ver se body chega cheio ATÉ ESSE PONTO.
-3. **Logar o `result` do `createOrReplace`** — ver o que o Sanity retorna após o write (body vem cheio ou já vazio na resposta).
-4. **Fetch direto via Sanity client** com `client.getDocument(postId)` após publish — comparar com o que o Studio mostra.
-5. **Verificar diff entre body que escrevemos e shape que o Sanity espera**: blocks têm campos extras (`_key` em todos os children + spans? `markDefs` arrays mesmo vazios?). Schemas estritos do Studio podem rejeitar blocks com `_key` faltando.
-6. **Comparar com um post antigo funcional**: `client.getDocument('<post-publicado-antigo>')` e ver shape do body — bate com o que enviamos?
+O sintoma era confuso porque o published estava OK o tempo todo. A
+evidência conclusiva veio do script descartável
+`scripts/debug-publish-state.ts` (já removido):
 
-**Logs temporários a remover** quando bug fechar:
-- `use-publish.ts` — `console.group('[publish] sending payload')` + error response.
-- `app/api/sanity/publish/route.ts` — `[publish] received payload:` + `[publish] transformed-doc schema failed:`.
-- `publish-form.tsx` — `[publish-form] sending`.
+```
+PUBLISHED: { bodyLen: 107, firstBlockType: "block", bodyTypesHistogram: { block: 107 } }
+DRAFT:     { bodyLen: "NOT-ARRAY" }   ← renderizado pelo Studio
+```
 
-**Drafts corrompidos** (body=0 no Sanity por causa do autosave race ou
-dropping): `Mf81yvIiu_BZinsMpcNis`, `HHm2kbZwXZekJ0UqQIF8C`, `oPYVweGj-wm791tLfD_2v`. Operador pode deletar via Sanity Studio.
+**Fix aplicado**: `publishPost` (`lib/sanity/publish.ts:86`) agora usa
+transação Sanity atômica:
+
+```ts
+await client
+  .transaction()
+  .createOrReplace(doc)         // write published <baseId>
+  .delete(`drafts.${baseId}`)   // delete draft IN THE SAME COMMIT
+  .commit();
+```
+
+Publish + cleanup são indivisíveis: ou ambos persistem, ou nenhum. O
+DELETE fire-and-forget do cliente foi removido (`use-publish.ts`
+perdeu helper `deleteDraft` + chamada). `publishDraft` foi simplificado
+— não precisa mais do delete redundante.
+
+**Diagnóstico**: seguiu o plano `.claude/plans/vamos-ler-a-session-curious-candle.md`.
+O Plan agent sugeriu diagnóstico cheap-first via script one-off antes
+de instrumentar `publishPost` com logs — decisão certa (10 min em vez
+de 30+ min de logs speculativos). Scripts descartáveis usados
+(`debug-publish-state.ts`, `delete-zombie-drafts.ts`, `scan-zombie-drafts.ts`)
+já deletados.
+
+**Confirmações**:
+- poe-hub e Studio (em `poetrade-dev`) apontam pro mesmo dataset
+  (`rrv9tvop/production`) — hipótese de mismatch descartada.
+- Schema do Studio (`poetrade-dev/sanity/schemas/blockContent.ts`) aceita
+  só `block/image/code/table/poeItem`. Body publicado tinha 107 blocks,
+  todos tipo `block` — histograma limpo, sem tipos custom escapando.
+- `scan-zombie-drafts.ts` rodou após fix: 0 zumbis restantes no dataset.
+- `drafts.rfOqpUDvQsmnKUvUN2ihc` era o único zumbi ativo — deletado.
+
+**Arquivos editados**:
+- `lib/sanity/publish.ts` — `publishPost` agora usa transaction +
+  read-back via `getDocument`; `publishDraft` simplificado.
+- `components/editor/hooks/use-publish.ts` — removeu helper `deleteDraft`
+  e chamada fire-and-forget.
+- `lib/sanity/__tests__/publish.test.ts` — mocks migrados de
+  `mockCreateOrReplace` direto pra `mockTx` chain; novos tests:
+  `delete(drafts.id)` no commit + throw on missing `_id` + throw on
+  read-back null. 14 → 13 tests (removido "warn only" obsoleto), +4
+  novos. **53/53 verdes**.
+- `app/api/sanity/__tests__/publish.test.ts` — mock da rota migrado
+  pra `transaction()` chain. **+1 test novo** (delete atomic).
+
+**Logs temporários removidos** (prefixo `[publish]`/`[publish-form]`):
+- `components/editor/hooks/use-publish.ts` — `console.group('[publish] sending payload')` + error response dump.
+- `app/api/sanity/publish/route.ts` — `[publish] received payload:` + shape dump.
+- `components/editor/publish/publish-form.tsx` — `[publish-form] sending`.
+
+**Validação**: `npx vitest run` — **648 tests** verdes (baseline session
+10 mantida). `npx tsc --noEmit` — 0 erros novos (erros pré-existentes em
+`lib/simulation-diff.test.ts` + `tests/factories/monitor.factory.ts`
+permanecem, já no carryover).
+
+**Drafts antigos corrompidos** (session 10 os listou como suspeitos):
+`Mf81yvIiu_BZinsMpcNis`, `HHm2kbZwXZekJ0UqQIF8C` são drafts órfãos sem
+published correspondente — não são zumbis, são drafts que o operador
+abandonou. `oPYVweGj-wm791tLfD_2v` tem draft com `_updatedAt` posterior
+ao published — autosave legítimo pós-publish. Podem ser deletados
+manualmente pelo operador se quiser organizar, mas não são bug.
+
+## Carryover técnico (pra próxima session)
+
+- **Validação zod estrita de shape do body** em `lib/sanity/publish.ts`:
+  `sanityPostSchema.body` hoje é `z.array(z.unknown()).min(1)` — só
+  checa tamanho. Um schema estrito (union discriminado por `_type`
+  aceitando só `block/image/code/table/poeItem`, exigindo `_key` +
+  `children` + `markDefs` em blocks) evitaria silent drops futuros.
+  Risco de quebra zero hoje (body publicado é canônico), mas pode
+  revelar edge cases em drafts importados via `markdown-to-portable.ts`.
+- **Migrar converter Markdown do hub pra `@sanity/block-tools`**
+  (padrão funcional do poetrade-dev/scripts/sync-wiki-to-sanity.ts). A
+  abordagem atual (`unified`+`remark-parse`) é direta mas divergente do
+  canonical path do Sanity.
 
 ## Carryover para session 11 (i18n dedicada)
 

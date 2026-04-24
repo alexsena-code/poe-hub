@@ -24,12 +24,24 @@ const mockGetServerSession = vi.mocked(getServerSession);
 // ─── Sanity client mock ───────────────────────────────────────────────────────
 
 const mockFetch = vi.fn();
-const mockCreateOrReplace = vi.fn();
+const mockGetDocument = vi.fn();
+// Transaction chain (publishPost now writes atomically via transaction).
+const mockTxCreateOrReplace = vi.fn();
+const mockTxDelete = vi.fn();
+const mockTxCommit = vi.fn();
+const mockTx = {
+  createOrReplace: mockTxCreateOrReplace,
+  delete: mockTxDelete,
+  commit: mockTxCommit,
+};
+mockTxCreateOrReplace.mockReturnValue(mockTx);
+mockTxDelete.mockReturnValue(mockTx);
 
 vi.mock("@/lib/sanity/client", () => ({
   getSanityClient: () => ({
     fetch: mockFetch,
-    createOrReplace: mockCreateOrReplace,
+    getDocument: mockGetDocument,
+    transaction: () => mockTx,
   }),
 }));
 
@@ -72,8 +84,12 @@ beforeEach(() => {
   mockGetServerSession.mockResolvedValue({ user: { email: "test@test.com" } });
   // Default: no slug collision
   mockFetch.mockResolvedValue(null);
-  // Default: createOrReplace succeeds
-  mockCreateOrReplace.mockResolvedValue({
+  // Re-arm transaction chain after clearAllMocks wiped return values.
+  mockTxCreateOrReplace.mockReturnValue(mockTx);
+  mockTxDelete.mockReturnValue(mockTx);
+  mockTxCommit.mockResolvedValue({ transactionId: "tx-1", results: [] });
+  // publishPost reads back via getDocument(baseId) after commit.
+  mockGetDocument.mockResolvedValue({
     _id: "post-abc123",
     _type: "post",
     language: "pt-br",
@@ -198,13 +214,13 @@ describe("POST /api/sanity/publish — success", () => {
     expect(data.language).toBe("pt-br");
   });
 
-  it("calls createOrReplace with Sanity reference shapes (not bare IDs)", async () => {
+  it("calls transaction.createOrReplace with Sanity reference shapes (not bare IDs)", async () => {
     await POST(
       buildRequest({ meta: validMeta, body: validBody, draftId: "post-abc123" }),
     );
 
-    expect(mockCreateOrReplace).toHaveBeenCalledOnce();
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+    expect(mockTxCreateOrReplace).toHaveBeenCalledOnce();
+    const arg = mockTxCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
 
     // category and author must be references, not bare strings
     expect(arg.category).toEqual({ _type: "reference", _ref: "cat-001" });
@@ -213,5 +229,14 @@ describe("POST /api/sanity/publish — success", () => {
     expect(arg.slug).toEqual({ _type: "slug", current: "guia-currency-trading" });
     // _id must be bare (no drafts. prefix) for publish
     expect(arg._id).toBe("post-abc123");
+  });
+
+  it("deletes drafts.<id> atomically in the same transaction", async () => {
+    await POST(
+      buildRequest({ meta: validMeta, body: validBody, draftId: "post-abc123" }),
+    );
+
+    expect(mockTxDelete).toHaveBeenCalledWith("drafts.post-abc123");
+    expect(mockTxCommit).toHaveBeenCalledOnce();
   });
 });

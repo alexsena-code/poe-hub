@@ -125,11 +125,6 @@ export function PublishForm({ initialMeta, body, draftId }: PublishFormProps) {
 
   const handlePublish = methods.handleSubmit((meta) => {
     startTransition(async () => {
-      // body is already Portable Text from the API — pass through.
-      console.group('[publish-form] sending');
-      console.log('draftId:', draftId);
-      console.log('body length:', body?.length, 'first block:', body?.[0]);
-      console.groupEnd();
       try {
         const res = await fetch('/api/sanity/publish', {
           method: 'POST',

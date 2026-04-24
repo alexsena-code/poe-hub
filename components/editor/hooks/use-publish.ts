@@ -54,37 +54,15 @@ export function usePublish(): UsePublishReturn {
       setPublishing(true);
       setPublishError(null);
 
-      // DEBUG: log full payload pre-flight so the operator can copy it into a
-      // bug report. Remove once the publish 400 root cause is settled.
-      console.group('[publish] sending payload');
-      console.log('draftId:', draftId);
-      console.log('meta:', meta);
-      console.log('body length:', body?.length, 'first block:', body?.[0]);
-      console.log('full body sample:', JSON.stringify(body).slice(0, 500));
-      console.groupEnd();
-
       try {
         const res = await fetch('/api/sanity/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          // draftId is required by the new publishRequestSchema (session 10.c).
           body: JSON.stringify({ meta, body, draftId }),
         });
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({ error: res.statusText }));
-          // DEBUG: dump full server response (includes zod issues with paths)
-          console.group('[publish] server error response');
-          console.error('status:', res.status, res.statusText);
-          console.error('body:', data);
-          if (Array.isArray(data?.details)) {
-            console.table(data.details.map((d: { path?: unknown[]; message?: string; code?: string }) => ({
-              path: Array.isArray(d.path) ? d.path.join('.') : '',
-              code: d.code,
-              message: d.message,
-            })));
-          }
-          console.groupEnd();
           const msg = `Falha ao publicar: ${data.error ?? res.statusText}`;
           setPublishError(msg);
           toast.error('Erro ao publicar', {
@@ -97,8 +75,8 @@ export function usePublish(): UsePublishReturn {
 
         const result = (await res.json()) as PublishResult;
 
-        // After successful publish, delete the draft to keep Sanity clean.
-        await deleteDraft(draftId);
+        // Draft cleanup is handled atomically server-side by the publish
+        // transaction (lib/sanity/publish.ts) since the session 10 fix.
 
         toast.success('Post publicado!', {
           description: `/${result.slug} está no ar.`,
@@ -124,18 +102,4 @@ export function usePublish(): UsePublishReturn {
   );
 
   return { publish, publishing, publishError };
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Fire-and-forget draft deletion — log but don't surface errors to operator. */
-async function deleteDraft(draftId: string): Promise<void> {
-  try {
-    const res = await fetch(`/api/sanity/draft/${draftId}`, { method: 'DELETE' });
-    if (!res.ok) {
-      console.warn(`[use-publish] draft DELETE failed: ${res.status} for ${draftId}`);
-    }
-  } catch (err: unknown) {
-    console.warn('[use-publish] draft DELETE threw:', err instanceof Error ? err.message : err);
-  }
 }
