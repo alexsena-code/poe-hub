@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 05 landed — RSC Tier 2 + god files médios + StatusBadge).
+Last updated: 2026-04-23 (session 06 landed — engine Fase C consumers).
 
 ## Current status
 
@@ -68,10 +68,23 @@ Session 05 landed (4 parallel workstreams):
   pages pendentes (`/hardware/recent` 347→31L + 352L island; `/hardware/alerts`
   374→36L + 378L island).
 
-Carryover para session 06: 7 god files médios restantes (workspace/templates
-763L, simulation-editor 755L, admin/config/costs 727L, week-editor 718L,
-SectionEditor 676L, workspace/qa 663L, farm/simulations/annual/[id] 656L).
-Tier 3 ficaram locked (forms, charts, streaming) — RSC migration não aplicável.
+Session 06 landed (4 parallel workstreams — engine session 21 Fase C consumers):
+- **S06.a** — `GeneratedPost.contentScore` + `slangReport` display: 2 RSC
+  cards (content-score-card + slang-report-card) integrados em
+  `guide-content.tsx`. Types centralizados em `lib/engine-types.ts`.
+- **S06.b** — `/admin/gsc` page: RSC shell + client island (configured/
+  siteUrl/info + sync trigger + error toast surfacing). Sidebar entry.
+- **S06.c** — Slang bulk approve: `/workspace/slang` 478→366L + 3 sub-files
+  (slang-card, bulk-action-bar, ingest-sidia-button). Ingest sidia button +
+  checkboxes + sticky action bar + contextual approve-all por source/category.
+- **S06.d** — `/admin/benchmark` page: 3 tabs (QA/Ideation/Content Gen)
+  com forms + response panel (LLM/Qdrant events colapsáveis). 8 files em
+  `components/modules/admin/benchmark/` + `lib/benchmark-types.ts`. Sidebar
+  entry. Listing endpoint TBD (não existe no engine).
+
+Carryover para session 07: listing endpoint de benchmark no engine, editor
+preview com contentScore/slangReport, sub-agrupar Admin sidebar (11 entries),
+god files médios remanescentes (7 files 500-1000L).
 
 ## Working agreement
 
@@ -95,6 +108,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [06](progress/session-06.md) | 2026-04-23 | **active** — engine session 21 Fase C consumers (post preview contentScore/slangReport, /admin/gsc, slang bulk approve, /admin/benchmark) |
 | [05](progress/session-05.md) | 2026-04-23 | RSC Tier 2 (5 migradas + 2 via hardware proxy) + god files médios (pipelines-tab, hardware/settings) + StatusBadge semantic tokens |
 | [04](progress/session-04.md) | 2026-04-23 | Tier 1 RSC migrations + inputs sweep + ContentScorer UI + workspace/ideas split |
 | [03](progress/session-03.md) | 2026-04-23 | carryover da session 02 (god files /seo/youtube, /seo/reddit, store-prices-tab) + /seo/research rearquitetura + RSC audit |
@@ -110,16 +124,17 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~480 | session 05 adicionou 5 client islands (workspace/guides+people, admin/config/proxy, seo/keybert, farm/simulations/annual) + 6 sub-files pipelines + 8 sub-files hardware/settings + `components/ui/status-badge.tsx` |
-| Routes | 70 | stable |
-| `'use client'` pages | **17** (app/auth) | was 24 — 7 Tier 2 migradas pra RSC (S05.a: 5 + S05.e: 2 via hardware proxy) |
+| TS/TSX files | ~500 | session 06 adicionou 2 cards guides + gsc (2) + slang sub-files (3) + benchmark (8) + benchmark-types + benchmark page + gsc page |
+| Routes | **72** | +2 new: `/admin/gsc`, `/admin/benchmark` |
+| `'use client'` pages | **18** (app/auth) | was 17 — `/admin/benchmark` nova é client (forms interativos) |
 | Vitest tests | ~398 | unchanged |
 | Playwright E2E | 32 | unchanged |
-| God files >1000L | **0** | stable — all eliminated pre-session-04 |
-| God files 500-1000L | 7 | was 9 — pipelines-tab + hardware/settings resolvidos |
-| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge | +StatusBadge session 05 (6 variants semânticos) |
-| Server Components in app/(auth) | 11 pages RSC puras + 1 híbrida | was 4 pure + 1 híbrida (7 Tier 2 migradas) |
-| Proxy routes | 2 catch-all (`/api/engine/*`, `/api/hardware/*`) | +hardware session 05 S05.e |
+| God files >1000L | **0** | stable |
+| God files 500-1000L | 8 | was 7 — `guide-content.tsx` 573L flagged (era 560 pré-session, +13L com cards — dentro do limite ±10%) |
+| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge | stable |
+| Server Components in app/(auth) | 12 pages RSC puras + 1 híbrida | +/admin/gsc RSC shell |
+| Proxy routes | 2 catch-all (`/api/engine/*`, `/api/hardware/*`) | stable |
+| Engine Fase C consumers | 4/4 | contentScore+slangReport (guides), gsc admin, slang bulk approve, benchmark page |
 | God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |

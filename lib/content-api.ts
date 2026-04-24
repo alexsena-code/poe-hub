@@ -1,5 +1,6 @@
 import type {
   Briefing,
+  ContentScoreReport,
   CritiqueIssue,
   GeneratedSection,
   ProposedOutline,
@@ -7,6 +8,7 @@ import type {
   PostTrace,
   PostTraceSummary,
   PobSummary,
+  SlangReport,
 } from './engine-types';
 
 const isServer = typeof window === 'undefined';
@@ -29,6 +31,9 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
 // ---------------------------------------------------------------------------
 // Types (poe-hub originals)
 // ---------------------------------------------------------------------------
+
+// Re-export quality report types so component files can import from one place.
+export type { ContentScoreReport, SlangReport } from './engine-types';
 
 export interface PostSummary {
   slug: string;
@@ -67,6 +72,10 @@ export interface PostDetail {
   generatedAt: string;
   sections: PostSection[];
   meta: PostMeta;
+  // Engine session 21 Fase C — content quality reports (optional; absent on
+  // posts generated before the feature shipped).
+  contentScore?: ContentScoreReport;
+  slangReport?: SlangReport;
 }
 
 // ---------------------------------------------------------------------------

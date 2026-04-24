@@ -6,6 +6,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { PostDetail, PostSection } from "@/lib/content-api";
 import { updatePost } from "@/lib/content-api";
+import { ContentScoreCard } from "@/components/modules/workspace/guides/content-score-card";
+import { SlangReportCard } from "@/components/modules/workspace/guides/slang-report-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -455,6 +457,18 @@ export function GuideContent({ post }: { post: PostDetail }) {
             </p>
           )}
         </div>
+
+        {/* Quality reports (engine session 21 Fase C) — only when present */}
+        {(post.contentScore || post.slangReport) && (
+          <div className="mb-8 space-y-3">
+            {post.contentScore && (
+              <ContentScoreCard score={post.contentScore} />
+            )}
+            {post.slangReport && (
+              <SlangReportCard report={post.slangReport} />
+            )}
+          </div>
+        )}
 
         {/* Table of Contents */}
         {sortedSections.length > 1 && (

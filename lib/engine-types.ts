@@ -1,3 +1,29 @@
+// ---------------------------------------------------------------------------
+// Content quality reports (engine session 21 Fase C)
+// ---------------------------------------------------------------------------
+
+export interface ContentScoreReport {
+  scoreBefore: number;
+  scoreAfter: number | null;
+  threshold: number;
+  filled: boolean;
+  missingEntities: string[];
+  missingHeadings: string[];
+  analysisId: string;
+  analysisStaleDays: number;
+  gapFillCostUsd: number;
+}
+
+export interface SlangReport {
+  injected: boolean;
+  termsAvailable: number;
+  termsInjected: string[];
+  densityBefore: number;
+  densityAfter: number | null;
+  densityThreshold: number;
+  injectionCostUsd: number;
+}
+
 export interface Briefing {
   skill: string;
   ascendancy: string;

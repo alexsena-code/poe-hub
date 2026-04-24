@@ -120,7 +120,10 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         children: [
           { title: "Observability", href: "/admin/observability", icon: Activity },
           { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
+          // Session 06 S06.d — benchmark page for QA/Ideation/ContentGen runs
+          { title: "Benchmark", href: "/admin/benchmark", icon: Activity },
           { title: "Engine Config", href: "/admin/config/engine", icon: Wrench },
+          { title: "GSC", href: "/admin/gsc", icon: BarChart3 },
           { title: "Custos", href: "/admin/config/costs", icon: DollarSign },
           { title: "Proxy", href: "/admin/config/proxy", icon: Wrench },
           { title: "Ligas", href: "/admin/config/leagues", icon: ListTodo },
