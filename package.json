@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "seed:benchmarks": "tsx scripts/seed-benchmark-presets.ts"
   },
   "dependencies": {
     "@google/genai": "^1.47.0",
@@ -63,6 +64,7 @@
     "swr": "^2.4.1",
     "tailwind-merge": "^3.5.0",
     "ws": "^8.20.0",
+    "yaml": "^2.8.3",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
