@@ -162,8 +162,30 @@ export async function fetchPrices(
 // ---------------------------------------------------------------------------
 
 /**
+ * Rewrites passive-icon URLs whose host is `pathoftrade.net` to a path
+ * relative to the hub's own origin. The engine returns absolute URLs pointing
+ * at pathoftrade.net but the production site sits behind a Cloudflare bot
+ * challenge — server-to-server image optimisation AND browser <img> loads
+ * both 403 without the challenge cookie. The hub bundles all passive WebPs
+ * locally in public/images/passives/ (1590 files, ~11MB, copied from the
+ * poetrade-dev sibling repo) so the same-origin path always serves.
+ *
+ * Non-pathoftrade URLs and non-passive paths are returned unchanged.
+ * Mirrors poetrade-dev/lib/placeholders/fetch-passive.ts:rewriteLocalPassiveIcon.
+ */
+function rewriteLocalPassiveIcon(raw: string | null): string | null {
+  if (!raw) return raw;
+  const m = raw.match(
+    /^https?:\/\/(?:www\.)?pathoftrade\.net(\/images\/passives\/[^?#]+)$/i,
+  );
+  if (!m) return raw;
+  return m[1];
+}
+
+/**
  * Fetch raw passive skill node data from the engine via proxy.
  * Returns null when the engine doesn't know the passive name.
+ * Rewrites pathoftrade.net icon URLs to local same-origin paths.
  */
 export async function fetchPassiveRaw(name: string): Promise<PassiveData | null> {
   const trimmed = name?.trim();
@@ -182,7 +204,7 @@ export async function fetchPassiveRaw(name: string): Promise<PassiveData | null>
     }
     const data = (await res.json()) as PassiveData;
     if (!data?.rawText) return null;
-    return data;
+    return { ...data, iconUrl: rewriteLocalPassiveIcon(data.iconUrl) };
   } catch (err) {
     if ((err as Error)?.name !== "AbortError") {
       console.warn(`[preview] fetchPassiveRaw "${trimmed}" error: ${(err as Error).message}`);

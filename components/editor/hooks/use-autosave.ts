@@ -47,15 +47,24 @@ const DEBOUNCE_MS = 5_000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Returns true if the content is too empty to be worth saving. */
-function isContentEmpty(bodyJson: JSONContent, meta: EditorMetaForm): boolean {
-  const hasTitle = meta.title.trim().length > 0;
-  const hasBody = (bodyJson.content?.length ?? 0) > 0;
-  // At least one non-empty block required
-  const hasNonEmptyBlock = bodyJson.content?.some(
-    (node) => (node.content?.length ?? 0) > 0,
-  ) ?? false;
-  return !hasTitle && (!hasBody || !hasNonEmptyBlock);
+/**
+ * Returns true if the body is the empty default Tiptap doc.
+ *
+ * Empty body MUST never be persisted: it would overwrite the importer's
+ * markdown→PortableText payload (or any other previously-saved body) with
+ * nothing, causing publish to fail with "body must contain at least one
+ * block". The only legitimate way to clear body is operator deletion AFTER
+ * non-empty content was loaded — and even then, the editor still has a
+ * placeholder, never a truly empty doc. Better to skip than to corrupt.
+ */
+function isBodyEmpty(bodyJson: JSONContent): boolean {
+  if ((bodyJson.content?.length ?? 0) === 0) return true;
+  return !bodyJson.content?.some((node) => (node.content?.length ?? 0) > 0);
+}
+
+/** Returns true if the meta has nothing worth persisting. */
+function isMetaTrivial(meta: EditorMetaForm): boolean {
+  return meta.title.trim().length === 0;
 }
 
 /**
@@ -113,7 +122,11 @@ export function useAutosave({
 
   const performSave = useCallback(async () => {
     if (!enabled) return;
-    if (isContentEmpty(bodyJson, meta)) return;
+    // Two independent guards: empty body OR trivial meta. Either alone is
+    // enough to skip — never persist an empty body even if the operator
+    // already typed a title, because that would wipe the loaded markdown.
+    if (isBodyEmpty(bodyJson)) return;
+    if (isMetaTrivial(meta)) return;
 
     // Cancel any previous in-flight request before starting a new one.
     abortRef.current?.abort('new-save-requested');
