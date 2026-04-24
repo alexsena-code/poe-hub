@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 11 — dívida técnica S10 liquidada. S11.a: schema zod estrito pro body do SanityPost (discriminated union dos 5 tipos aceitos pelo Sanity, backstop contra silent drops). S11.b: converter Markdown migrado pra path canônico `@portabletext/block-tools` + schema compilado. Dupla defesa contra regressão body=Empty. **684 tests verdes** (+36 vs S10).).
+Last updated: 2026-04-24 (session 12 — carryovers da session 11 liquidados. 4 implementados (TS fix + vi.mock fix + smoke Sanity opt-in + side panel Items/Gems/Passives com engine `/api/items/list` novo + 6º widget no right rail), 3 arquivados com justification (BriefingForm no-op, diff versioning sem spec, section workflow tied-to-retired-pipeline). **696 tests verdes** (+12 vs S11). Engine: 40 Jest tests em item-raw-text (+9).).
 
 ## Current status
 
@@ -13,8 +13,8 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(**684 passing, 0 falhos** pós session 11) + Playwright (32 E2E, rodando
-fora do Vitest glob).
+(**696 passing, 0 falhos**, 1 skipped smoke Sanity) + Playwright (32 E2E,
+rodando fora do Vitest glob).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
 engine-config split (1944L → 182L + 9 tabs), style Phase 1 (neutral +
@@ -122,6 +122,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [12](progress/session-12.md) | 2026-04-24 | carryovers da S11 liquidados — TS fix simulation-diff + monitor.factory, vi.mock sonner dedup, smoke E2E Sanity opt-in (`SMOKE_SANITY=1`), side panel Items/Gems/Passives com novo `/api/items/list` no engine (+ 6º widget no right rail), arquival justificado de BriefingForm/diff-versioning/section-workflow |
 | [11](progress/session-11.md) | 2026-04-24 | dívida técnica S10 liquidada — schema zod estrito pro body (discriminated union dos 5 tipos Sanity) + converter Markdown via `@portabletext/block-tools` canônico (marked + jsdom + schema compilado). Dupla defesa contra silent drops tipo body=Empty |
 | [10](progress/session-10.md) | 2026-04-24 | editor UI/UX overhaul — wizard Edit→Publish (rota /publish nova) + right rail de 5 widgets (Score/Slang/Q&A/Assets/Slang Lookup) + fix publish blocker (transform IDs→refs + slug collision per language) + importar guide LLM (markdown→Portable Text, 2 drafts PT-BR+EN automáticos) + toolbar completa (Undo/Redo, alignment, HR, table) + Spinner/EmptyState polish |
 | [09](progress/session-09.md) | 2026-04-24 | carryover cleanup da session 08 (chip currency paridade iconUrl + vitest e2e exclude + migration retroativa 4 commits drift + tracker hygiene) |
@@ -143,10 +144,10 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~640 | session 10 adicionou ~25 arquivos novos em `components/editor/widgets/`, `components/editor/publish/`, `lib/converters/`, `app/api/sanity/draft-from-guide/` |
-| Routes | **76** | +1 (`/workspace/blog/[id]/publish` — wizard) |
-| `'use client'` pages | **20** (app/auth) | +1 (publish é client wrapper) |
-| Vitest tests | **684 passed / 0 failed** | +36 session 11 (S11.a: +10 schema estrito, S11.b: +15 net converter, S10 baseline 648) |
+| TS/TSX files | ~645 | session 12 +3 (use-items-catalog, use-passives-catalog, assets-lookup-widget) + 3 novos tests |
+| Routes | **76** | stable |
+| `'use client'` pages | **20** (app/auth) | stable |
+| Vitest tests | **696 passed / 0 failed / 1 skipped** | +12 session 12 (S12.a TS fixes, S12.f side panel: +5 filter tests + 7 widget tests); 1 skipped é o smoke Sanity opt-in (`SMOKE_SANITY=1`). Engine: +9 Jest tests em item-raw-text.list-items.spec (31 → 40) |
 | Playwright E2E | 32 | stable |
 | God files >1000L | **0** | stable |
 | God files 500-1000L | **0** | session 10 deletou `editor-sidebar.tsx` 487L |
@@ -155,7 +156,8 @@ new work lives in numbered sessions.
 | Proxy routes | 2 catch-all | stable |
 | Engine Fase C consumers | 4/4 + editor inline + right rail widgets | S10.a portou content-score + slang-report cards pra widgets |
 | Editor body format | Portable Text canonical (autosave converte Tiptap→PT antes do PUT; mount converte PT→Tiptap) | S10 fix |
-| Editor layout | Body + Right Rail (5 widgets) + toolbar leve com "Prosseguir →" | was Body + Side Panels esquerda + Sidebar direita meta form |
+| Editor layout | Body + Right Rail (**6 widgets**) + toolbar leve com "Prosseguir →" | S12.f adicionou AssetsLookupWidget (Items/Gems/Passives tabs) entre Assets e SlangLookup |
+| Engine endpoints consumidos pelo hub editor | `/api/items/list` (S12.f novo), `/api/items/currencies`, `/api/items/:name/raw`, `/api/tools/passives/*`, `/api/engine/knowledge/answer`, `/api/engine/slang?status=approved` | S12.f abriu o primeiro endpoint de listagem navegável de items |
 | Sidebar Admin | 3 sub-grupos (Operações/SEO Tools/Config) | was 11 flat entries |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |
@@ -170,17 +172,6 @@ new work lives in numbered sessions.
   whose HTTP API this hub consumes. When planning new hub features that
   need backend support, check engine's `docs/PROGRESS.md` for the
   matching module status.
-
-## Carryover (cross-session TODOs)
-
-- [ ] Reconcile Briefing type between engine and hub (divergent shape —
-      flagged in engine session 21 pre-work audit).
-- [ ] Centralize shared types (engine DTOs ↔ hub consumers) — planned
-      shared-types package or generated client from OpenAPI.
-- [ ] Server Components migration audit — the 147 `'use client'` count
-      is a baseline; target is ≤50 after IA rework lands.
-- [ ] shadcn/ui audit — inconsistent usage across modules, several
-      primitives are under-used (Tabs, Accordion, Chart).
 
 ## Release 1.0 pending
 

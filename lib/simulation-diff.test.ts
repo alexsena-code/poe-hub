@@ -1,15 +1,35 @@
 import { describe, it, expect } from "vitest";
 import { diffSimulations, ParamChange } from "./simulation-diff";
 
+interface TestWeek {
+  weekNumber: number;
+  label: string | null;
+  defaultActiveBots: number;
+  defaultDivinePerHour: number;
+  defaultHoursPerDay: number;
+  defaultDivinePriceUsd: number | null;
+  defaultDivinePriceBrl: number | null;
+}
+
+interface TestSim {
+  name: string;
+  league: string;
+  durationWeeks: number;
+  startDayOffset: number;
+  costConfigName: string | null;
+  proxyCostPerBotMonthly: number | null;
+  levelingCostPerBot: number | null;
+  stashPackCostPerBot: number | null;
+  expluginsKeyCostDaily: number | null;
+  dpbKeyCostDaily: number | null;
+  weeks: TestWeek[];
+}
+
 // -----------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------
 
-function makeWeek(overrides: Partial<ReturnType<typeof baseWeek>> = {}) {
-  return { ...baseWeek(), ...overrides };
-}
-
-function baseWeek(weekNumber = 1) {
+function baseWeek(weekNumber = 1): TestWeek {
   return {
     weekNumber,
     label: `Semana ${weekNumber}`,
@@ -21,10 +41,14 @@ function baseWeek(weekNumber = 1) {
   };
 }
 
+function makeWeek(weekNumber = 1, overrides: Partial<TestWeek> = {}): TestWeek {
+  return { ...baseWeek(weekNumber), ...overrides };
+}
+
 function makeSim(
-  overrides: Record<string, unknown> = {},
-  weeks: ReturnType<typeof makeWeek>[] = [makeWeek(1)]
-) {
+  overrides: Partial<TestSim> = {},
+  weeks: TestWeek[] = [makeWeek(1)]
+): TestSim {
   return {
     name: "Sim A",
     league: "Settlers",

@@ -4,7 +4,9 @@ import type { BotAlertType, BotAlertSeverity } from "@prisma/client";
 let instanceCounter = 0;
 let alertCounter = 0;
 
-export function buildInstanceInput(overrides: Record<string, unknown> = {}) {
+export function buildInstanceInput(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
   instanceCounter++;
   return {
     pcName: `PC-${instanceCounter}`,

@@ -157,7 +157,6 @@ describe('uploadImageFile', () => {
 
 describe('buildImageUploadExtension', () => {
   it('returns an array with the imageUpload extension', async () => {
-    vi.mock('sonner', () => ({ toast: vi.fn() }));
     const { buildImageUploadExtension } = await import('../image-upload');
     const exts = buildImageUploadExtension();
     expect(Array.isArray(exts)).toBe(true);
