@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 13 — benchmark infra (presets + history + compare + LLM-as-judge). 3 waves paralelizadas com 10 agents: engine ganhou `modelOverrides: Record<string, string>` per-node (scalar legado continua válido); hub ganhou Prisma `BenchmarkPreset/Run/Evaluation`, 7 rotas API, 2 páginas (/admin/benchmark/history + /compare), preset bar + writer-node override + live OpenRouter pricing card nos 3 forms, Sonnet 4.6 como juiz default. **826 tests hub** (+120 vs S12) + **40 engine benchmark tests** (+12).).
+Last updated: 2026-04-24 (session 14 — bug fixes + UX polish pós S13. 5 commits hub + 1 engine: fix do `[a]` slug conflict que travava 504 universal, ModelCombobox autocomplete com pricing live OpenRouter, output final renderizado por seções, preset shape normalization (nested ↔ flat), pobUrl field + skill/ascendancy opcionais, AwaitingHumanBanner global removido, engine prefix-match no override per-node (`write` cobre `write_*`). **836 tests hub** (+10) + **17 engine benchmark tests** (+5).).
 
 ## Current status
 
@@ -13,7 +13,7 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(**826 passing, 0 falhos**, 1 skipped smoke Sanity) + Playwright (32 E2E,
+(**836 passing, 0 falhos**, 1 skipped smoke Sanity) + Playwright (32 E2E,
 rodando fora do Vitest glob).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
@@ -122,6 +122,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [14](progress/session-14.md) | 2026-04-24 | bug fixes + UX polish do benchmark — fix do `[a]` slug conflict que causava 504 universal, ModelCombobox autocomplete com pricing OpenRouter, output final renderizado, preset shape normalization, pobUrl + skill opcional, banner global removido, engine prefix-match per-node override |
 | [13](progress/session-13.md) | 2026-04-24 | benchmark infra — engine `modelOverrides` per-node + hub Prisma (Preset/Run/Evaluation) + 7 rotas API + OpenRouter live pricing + preset bar nos 3 forms + /history + /compare + Sonnet 4.6 judge (5 dimensions). 3 waves paralelizadas com 10 agents. +120 tests hub, +12 engine |
 | [12](progress/session-12.md) | 2026-04-24 | carryovers da S11 liquidados — TS fix simulation-diff + monitor.factory, vi.mock sonner dedup, smoke E2E Sanity opt-in (`SMOKE_SANITY=1`), side panel Items/Gems/Passives com novo `/api/items/list` no engine (+ 6º widget no right rail), arquival justificado de BriefingForm/diff-versioning/section-workflow |
 | [11](progress/session-11.md) | 2026-04-24 | dívida técnica S10 liquidada — schema zod estrito pro body (discriminated union dos 5 tipos Sanity) + converter Markdown via `@portabletext/block-tools` canônico (marked + jsdom + schema compilado). Dupla defesa contra silent drops tipo body=Empty |
@@ -148,7 +149,7 @@ new work lives in numbered sessions.
 | TS/TSX files | ~645 | session 12 +3 (use-items-catalog, use-passives-catalog, assets-lookup-widget) + 3 novos tests |
 | Routes | **76** | stable |
 | `'use client'` pages | **20** (app/auth) | stable |
-| Vitest tests | **696 passed / 0 failed / 1 skipped** | +12 session 12 (S12.a TS fixes, S12.f side panel: +5 filter tests + 7 widget tests); 1 skipped é o smoke Sanity opt-in (`SMOKE_SANITY=1`). Engine: +9 Jest tests em item-raw-text.list-items.spec (31 → 40) |
+| Vitest tests | **836 passed / 0 failed / 1 skipped** | session 13 +120 (benchmark presets + runs + evaluate + UI), session 14 +10 (model-combobox). Engine benchmark: 12 → **17 passed** pós S14 prefix-match (+5) |
 | Playwright E2E | 32 | stable |
 | God files >1000L | **0** | stable |
 | God files 500-1000L | **0** | session 10 deletou `editor-sidebar.tsx` 487L |
