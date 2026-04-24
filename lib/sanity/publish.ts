@@ -20,6 +20,100 @@ const sanitySlugSchema = z.object({
 const gameVersionSchema = z.enum(["path-of-exile-1", "path-of-exile-2"]);
 const languageSchema = z.enum(["pt-br", "en"]);
 
+// ─── Portable Text block sub-schemas ──────────────────────────────────────────
+// These mirror the 5 accepted types in poetrade-dev/sanity/schemas/blockContent.ts.
+// Any _type outside this set is silently dropped by Sanity Studio — zod catches
+// it here client-side first. (Session 10 regression: poeCurrency et al. caused
+// silent body drops because they were not in this allowed set.)
+
+const portableTextSpanSchema = z.object({
+  _type: z.literal("span"),
+  _key: z.string().min(1, "span._key must not be empty"),
+  text: z.string(),
+  marks: z.array(z.string()),
+});
+
+const portableTextLinkMarkSchema = z.object({
+  _type: z.literal("link"),
+  _key: z.string().min(1, "link markDef._key must not be empty"),
+  href: z.string().min(1, "link markDef.href must not be empty"),
+  blank: z.boolean().optional(),
+});
+
+const portableTextPoeItemMarkSchema = z.object({
+  _type: z.literal("poeItem"),
+  _key: z.string().min(1, "poeItem markDef._key must not be empty"),
+  rawText: z.string().min(1, "poeItem markDef.rawText must not be empty"),
+  iconUrl: z.string().optional(),
+});
+
+const portableTextMarkDefSchema = z.discriminatedUnion("_type", [
+  portableTextLinkMarkSchema,
+  portableTextPoeItemMarkSchema,
+]);
+
+const portableTextBlockSchema = z.object({
+  _type: z.literal("block"),
+  _key: z.string().min(1, "block._key must not be empty"),
+  style: z.enum(["normal", "h1", "h2", "h3", "h4", "blockquote"]),
+  listItem: z.enum(["bullet", "number"]).optional(),
+  level: z.number().int().min(1).optional(),
+  children: z.array(portableTextSpanSchema).min(1, "block.children must contain at least one span"),
+  markDefs: z.array(portableTextMarkDefSchema),
+});
+
+const portableTextImageBlockSchema = z.object({
+  _type: z.literal("image"),
+  _key: z.string().min(1, "image block._key must not be empty"),
+  asset: sanityReferenceSchema,
+  hotspot: z
+    .object({ x: z.number(), y: z.number(), height: z.number(), width: z.number() })
+    .optional(),
+  crop: z
+    .object({ top: z.number(), bottom: z.number(), left: z.number(), right: z.number() })
+    .optional(),
+  alt: z.string().optional(),
+});
+
+const portableTextCodeBlockSchema = z.object({
+  _type: z.literal("code"),
+  _key: z.string().min(1, "code block._key must not be empty"),
+  code: z.string(),
+  language: z.string().optional(),
+});
+
+const portableTextTableRowSchema = z.object({
+  _type: z.literal("row"),
+  _key: z.string().min(1, "table row._key must not be empty"),
+  cells: z.array(z.string()),
+});
+
+const portableTextTableBlockSchema = z.object({
+  _type: z.literal("table"),
+  _key: z.string().min(1, "table block._key must not be empty"),
+  rows: z.array(portableTextTableRowSchema).min(1, "table block must have at least one row"),
+});
+
+const poeItemBlockSchema = z.object({
+  _type: z.literal("poeItem"),
+  _key: z.string().min(1, "poeItem block._key must not be empty"),
+  rawText: z.string().min(1, "poeItem block.rawText must not be empty"),
+  iconUrl: z.string().optional(),
+});
+
+/**
+ * Discriminated union of the 5 block types accepted by the Sanity Studio
+ * blockContent schema. Zod will report the offending `_type` in the error
+ * message when an unknown type (e.g. 'poeCurrency') is encountered.
+ */
+const portableTextContentSchema = z.discriminatedUnion("_type", [
+  portableTextBlockSchema,
+  portableTextImageBlockSchema,
+  portableTextCodeBlockSchema,
+  portableTextTableBlockSchema,
+  poeItemBlockSchema,
+]);
+
 /**
  * Zod schema for a SanityPost write. Mirrors the required fields from
  * poetrade-dev/sanity/schemas/post.ts.
@@ -49,7 +143,9 @@ export const sanityPostSchema = z.object({
     })
     .optional(),
   publishedAt: z.string().min(1, "publishedAt is required"),
-  body: z.array(z.unknown()).min(1, "body must contain at least one block"),
+  body: z
+    .array(portableTextContentSchema)
+    .min(1, "body must contain at least one block"),
 });
 
 export type SanityPostInput = z.infer<typeof sanityPostSchema>;

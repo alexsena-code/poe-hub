@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 10 + 12 hotfixes — Wave 1-3 ok, 11 hotfixes de smoke + 1 fix final do bug body=Empty. Root cause: draft zumbi renderizado pelo Studio em cima do published saudável. Fix: `publishPost` agora usa transação atômica `createOrReplace + delete(drafts.id)`. 648 tests verdes. Ver session-10.md "BUG RESOLVIDO").
+Last updated: 2026-04-24 (session 11 — dívida técnica S10 liquidada. S11.a: schema zod estrito pro body do SanityPost (discriminated union dos 5 tipos aceitos pelo Sanity, backstop contra silent drops). S11.b: converter Markdown migrado pra path canônico `@portabletext/block-tools` + schema compilado. Dupla defesa contra regressão body=Empty. **684 tests verdes** (+36 vs S10).).
 
 ## Current status
 
@@ -13,7 +13,7 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(**648 passing, 0 falhos** pós session 10) + Playwright (32 E2E, rodando
+(**684 passing, 0 falhos** pós session 11) + Playwright (32 E2E, rodando
 fora do Vitest glob).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
@@ -122,6 +122,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [11](progress/session-11.md) | 2026-04-24 | dívida técnica S10 liquidada — schema zod estrito pro body (discriminated union dos 5 tipos Sanity) + converter Markdown via `@portabletext/block-tools` canônico (marked + jsdom + schema compilado). Dupla defesa contra silent drops tipo body=Empty |
 | [10](progress/session-10.md) | 2026-04-24 | editor UI/UX overhaul — wizard Edit→Publish (rota /publish nova) + right rail de 5 widgets (Score/Slang/Q&A/Assets/Slang Lookup) + fix publish blocker (transform IDs→refs + slug collision per language) + importar guide LLM (markdown→Portable Text, 2 drafts PT-BR+EN automáticos) + toolbar completa (Undo/Redo, alignment, HR, table) + Spinner/EmptyState polish |
 | [09](progress/session-09.md) | 2026-04-24 | carryover cleanup da session 08 (chip currency paridade iconUrl + vitest e2e exclude + migration retroativa 4 commits drift + tracker hygiene) |
 | [08](progress/session-08.md) | 2026-04-23 | editor profissional (Tiptap) + publish direto no Sanity + drag-drop currencies + Q&A inline + preview render fiel do poetrade-dev |
@@ -145,7 +146,7 @@ new work lives in numbered sessions.
 | TS/TSX files | ~640 | session 10 adicionou ~25 arquivos novos em `components/editor/widgets/`, `components/editor/publish/`, `lib/converters/`, `app/api/sanity/draft-from-guide/` |
 | Routes | **76** | +1 (`/workspace/blog/[id]/publish` — wizard) |
 | `'use client'` pages | **20** (app/auth) | +1 (publish é client wrapper) |
-| Vitest tests | **648 passed / 0 failed** | +109 vs session 09 (Wave 1: 47, Wave 2: 46, Wave 3: 16) |
+| Vitest tests | **684 passed / 0 failed** | +36 session 11 (S11.a: +10 schema estrito, S11.b: +15 net converter, S10 baseline 648) |
 | Playwright E2E | 32 | stable |
 | God files >1000L | **0** | stable |
 | God files 500-1000L | **0** | session 10 deletou `editor-sidebar.tsx` 487L |
@@ -181,13 +182,11 @@ new work lives in numbered sessions.
 - [ ] shadcn/ui audit — inconsistent usage across modules, several
       primitives are under-used (Tabs, Accordion, Chart).
 
-## Release 1.0 pending (from legacy)
+## Release 1.0 pending
 
-Still open from `progress/legacy-phases.md`:
-
-- [ ] Export vendas para CSV
-- [ ] Revisar todos os TODO/FIXME no código
-- [ ] Verificar que todas as rotas validam auth
-- [ ] Testar deploy via Docker Compose completo (app + db + scraper)
-- [ ] Gerar NEXTAUTH_SECRET + ENCRYPTION_KEY de produção
-- [ ] Trocar senha admin padrão (admin123)
+**Removido em session 11** (decisão do operador): o checklist legacy de
+Release 1.0 foi retirado do progress tracker ativo. Itens como export CSV,
+auditoria de auth em rotas, deploy Docker completo, rotação de secrets e
+troca de senha admin são tarefas operacionais pontuais, não ficam mais no
+radar de planning. Se virarem prioridade no futuro, renascem como session
+dedicada.

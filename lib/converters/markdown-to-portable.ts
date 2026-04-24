@@ -6,280 +6,202 @@
  * produce Portable Text that the existing blog editor (Tiptap ↔ Sanity) can
  * open without loss. This is a one-way converter: Markdown → PortableTextContent[].
  *
- * Placeholder support: inline tokens `{{kind:value|modifier}}` emitted by the
- * engine are parsed and converted to custom Portable Text blocks consumed by
- * the editor's `portableToTiptap` deserialiser. The node types and value-attrs
- * mirror `components/editor/serializer/tiptap-to-portable.ts`.
+ * Implementation: `marked` (MD → HTML) + `@portabletext/block-tools.htmlToBlocks`
+ * with a compiled @sanity/schema. This is the canonical Sanity path — the schema
+ * constrains output to only types Sanity accepts, closing the door on session-10-
+ * style bugs (emitting custom block types that Sanity silently drops).
  *
- * The output shape is consumed by `portableToTiptap()` in
- * `components/editor/serializer/portable-to-tiptap.ts`. Both sides must agree
- * on `_type` values and attribute names — see POE_BLOCK_TYPE_FOR_KIND below.
+ * Reference implementation: poetrade-dev/scripts/sync-wiki-to-sanity.ts:38-66.
+ * Schema mirrors: poetrade-dev/sanity/schemas/blockContent.ts (block + code types
+ * only — image omitted because `options:{hotspot}` requires sanity.imageHotspot
+ * which is unavailable in a local compile, and the LLM never emits images anyway).
  *
- * Session 10.e.
+ * Placeholder tokens `{{kind:value|modifier}}` pass through as literal span text
+ * because `marked` emits them verbatim in <p> tags — the blog resolver and
+ * portableToTiptap expand them at render time.
+ *
+ * Session 10.e / Session 11.b.
  */
 
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkGfm from "remark-gfm";
-import { toString as mdastToString } from "mdast-util-to-string";
+import { marked } from "marked";
+import { htmlToBlocks } from "@portabletext/block-tools";
+import type { DeserializerRule, ArbitraryTypedObject } from "@portabletext/block-tools";
+// JSDOM has no bundled types — @types/jsdom provides them (devDep, session 11.b).
+import { JSDOM } from "jsdom";
+// Named import — default export is deprecated per @sanity/schema warning.
+import { Schema } from "@sanity/schema";
 import { nanoid } from "nanoid";
-import type {
-  PortableTextContent,
-  PortableTextBlock,
-  PortableTextSpan,
-  PortableTextMarkDef,
-  PortableTextCodeBlock,
-} from "@/lib/sanity/types";
+import type { PortableTextContent, PortableTextBlock, PortableTextCodeBlock } from "@/lib/sanity/types";
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+// ─── Module-scope singletons (expensive to create — do once) ──────────────────
 
-/** Blocks emitted by this converter — only types the Sanity blockContent
- * schema accepts: `block`, `code`. (`image` and `table` aren't produced by
- * the LLM markdown.) Custom block types like poeCurrency/poePassive used to
- * be emitted here but Sanity schema dropped them silently — placeholders
- * `{{kind:value}}` now stay as literal span text and are expanded at render
- * time by the resolver. */
-type EmittedBlock = PortableTextContent;
+const { window: jsdomWindow } = new JSDOM("");
 
-/** Portable Text span marks recognised by the editor. */
-type SpanMark = "strong" | "em" | "code";
+/** Schema declaration mirrors poetrade-dev blockContent.ts (block + code).
+ * `number` list and `code` decorator added to match old converter's output.
+ * `image` omitted: sanity.imageHotspot unknown in local compile; LLM never
+ * produces image markdown with valid Sanity asset refs anyway. */
+const compiledSchema = Schema.compile({
+  name: "default",
+  types: [
+    {
+      type: "object",
+      name: "postBody",
+      fields: [
+        {
+          name: "body",
+          type: "array",
+          of: [
+            {
+              type: "block",
+              styles: [
+                { title: "Normal", value: "normal" },
+                { title: "H1", value: "h1" },
+                { title: "H2", value: "h2" },
+                { title: "H3", value: "h3" },
+                { title: "H4", value: "h4" },
+                { title: "Quote", value: "blockquote" },
+              ],
+              lists: [
+                { title: "Bullet", value: "bullet" },
+                { title: "Number", value: "number" },
+              ],
+              marks: {
+                decorators: [
+                  { title: "Strong", value: "strong" },
+                  { title: "Emphasis", value: "em" },
+                  // code inline mark — needed so <code> inside <p> is preserved.
+                  { title: "Code", value: "code" },
+                ],
+                annotations: [
+                  {
+                    title: "URL",
+                    name: "link",
+                    type: "object",
+                    fields: [
+                      { title: "URL", name: "href", type: "string" },
+                      { title: "Open in new tab", name: "blank", type: "boolean" },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+
+const blockContentType = compiledSchema
+  .get("postBody")
+  .fields.find((f: { name: string }) => f.name === "body").type;
+
+// ─── Custom htmlToBlocks rules ────────────────────────────────────────────────
+
+/** Rules passed to htmlToBlocks to handle elements that the default parser
+ * doesn't map correctly given our constrained schema.
+ * Types come from @portabletext/block-tools: DeserializerRule uses `Node` (DOM)
+ * for `el`, and `ArbitraryTypedObject` for the createBlock props. */
+const DESERIALIZE_RULES: DeserializerRule[] = [
+  {
+    // <pre><code class="language-*"> → custom code block type.
+    // Default parser converts <pre> to a normal paragraph — not what we want.
+    deserialize(el: Node, _next, block) {
+      if (el.nodeName !== "PRE") return undefined;
+      const preEl = el as Element;
+      const codeEl = preEl.querySelector("code");
+      const rawText = codeEl?.textContent ?? preEl.textContent ?? "";
+      // Trim trailing newline that marked appends inside <code>.
+      const code = rawText.replace(/\n$/, "");
+      const langMatch = codeEl?.className.match(/language-(\w+)/);
+      const language = langMatch ? langMatch[1] : "text";
+      return block({ _type: "code", code, language } as ArbitraryTypedObject);
+    },
+  },
+  {
+    // <h5>/<h6> → h4 (schema only goes to h4; default parser falls back to normal).
+    deserialize(el: Node, next, block) {
+      if (!["H5", "H6"].includes(el.nodeName)) return undefined;
+      return block({
+        _type: "block",
+        style: "h4",
+        children: next((el as Element).childNodes),
+      } as ArbitraryTypedObject);
+    },
+  },
+];
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
 /**
  * Convert a Markdown string to a Portable Text block array.
+ * Signature is preserved from the old unified/remark implementation so
+ * existing callers (app/api/sanity/draft-from-guide/route.ts) need no changes.
  *
  * @example
  * const blocks = markdownToPortableText("# Hello\n\nBuy {{currency:Chaos Orb}}.")
  * // → [{ _type:'block', style:'h1', ... }, { _type:'block', style:'normal', children:[...] }]
  */
-export function markdownToPortableText(md: string): EmittedBlock[] {
+export function markdownToPortableText(md: string): PortableTextContent[] {
   if (!md || md.trim() === "") return [];
 
-  const processor = unified().use(remarkParse).use(remarkGfm);
-  const tree = processor.parse(md);
+  // marked.parse with async:false uses the synchronous overload — no await needed.
+  const html = marked.parse(md, { async: false }) as string;
 
-  const blocks: EmittedBlock[] = [];
-  for (const node of tree.children) {
-    const converted = convertNode(node as MdastNode);
-    blocks.push(...converted);
-  }
-  return blocks;
+  const rawBlocks = htmlToBlocks(html, blockContentType, {
+    parseHtml: (htmlStr) =>
+      new jsdomWindow.DOMParser().parseFromString(htmlStr, "text/html"),
+    rules: DESERIALIZE_RULES,
+  });
+
+  // htmlToBlocks returns PortableTextBlock[] from @portabletext/block-tools, but
+  // our PortableTextContent type adds _key as required and includes the code
+  // variant — cast via unknown because the shapes diverge intentionally here.
+  return (rawBlocks as unknown as Record<string, unknown>[]).map(normalizeBlock);
 }
 
-// ─── MDAST node types (minimal subset we need) ────────────────────────────────
+// ─── Block normalisation ──────────────────────────────────────────────────────
 
-interface MdastNode {
-  type: string;
-  children?: MdastNode[];
-  value?: string;
-  depth?: number;
-  ordered?: boolean;
-  lang?: string;
-  url?: string;
-  alt?: string;
-  title?: string;
-  spread?: boolean;
+/** Ensure every block has `_type`, `_key`, and (for `block` type) `markDefs`. */
+function normalizeBlock(raw: Record<string, unknown>): PortableTextContent {
+  const withKey = raw._key ? raw : { ...raw, _key: nanoid() };
+
+  // Custom code blocks from our PRE rule have _type:'code' set explicitly.
+  if (withKey._type === "code") return normalizeCodeBlock(withKey);
+
+  // All other blocks are standard `block` type (htmlToBlocks default).
+  return normalizeTextBlock(withKey);
 }
 
-// ─── Node dispatcher ──────────────────────────────────────────────────────────
-
-function convertNode(node: MdastNode): EmittedBlock[] {
-  switch (node.type) {
-    case "heading":      return [convertHeading(node)];
-    case "paragraph":    return convertParagraph(node);
-    case "list":         return convertList(node);
-    case "listItem":     return convertListItem(node, "bullet", 1);
-    case "blockquote":   return [convertBlockquote(node)];
-    case "code":         return [convertCode(node)];
-    case "thematicBreak": return [];
-    case "image":        return []; // images need Sanity asset refs — skip for now
-    default:             return [];
-  }
-}
-
-// ─── Heading ──────────────────────────────────────────────────────────────────
-
-function convertHeading(node: MdastNode): PortableTextBlock {
-  const level = Math.min(node.depth ?? 1, 4) as 1 | 2 | 3 | 4;
-  const style = `h${level}` as "h1" | "h2" | "h3" | "h4";
-  const text = mdastToString(node as Parameters<typeof mdastToString>[0]);
-  return makeTextBlock(style, text, [], []);
-}
-
-// ─── Paragraph (may contain placeholders → split into spans + custom blocks) ──
-
-/**
- * Converts a paragraph to a Portable Text block. Placeholder tokens
- * `{{kind:value|modifier}}` are preserved as literal span text — the
- * blog frontend's resolver (and the editor's portableToTiptap) detect
- * them at render-time and expand into chips/refs.
- *
- * Why not emit custom blocks (poeCurrency, poePassive, etc.): the Sanity
- * `blockContent` schema only allows `block | image | code | table | poeItem`.
- * Custom block types are silently dropped on write — that was the cause of
- * "body Empty" after publish. Keeping placeholders as span text guarantees
- * the body round-trips through Sanity intact.
- */
-function convertParagraph(node: MdastNode): EmittedBlock[] {
-  const { spans, markDefs } = convertInlineChildren(node.children ?? []);
-  if (!spans.length) return [];
-  return [{ _type: "block", _key: nanoid(), style: "normal", children: spans, markDefs }];
-}
-
-// ─── List ─────────────────────────────────────────────────────────────────────
-
-function convertList(node: MdastNode): EmittedBlock[] {
-  const listType = node.ordered ? "number" : "bullet";
-  const blocks: EmittedBlock[] = [];
-  for (const child of node.children ?? []) {
-    blocks.push(...convertListItem(child, listType, 1));
-  }
-  return blocks;
-}
-
-function convertListItem(
-  node: MdastNode,
-  listType: "bullet" | "number",
-  level: number,
-): EmittedBlock[] {
-  const blocks: EmittedBlock[] = [];
-
-  for (const child of node.children ?? []) {
-    if (child.type === "paragraph") {
-      const { spans, markDefs } = convertInlineChildren(child.children ?? []);
-      if (spans.length) {
-        const block: PortableTextBlock = {
-          _type: "block",
-          _key: nanoid(),
-          style: "normal",
-          listItem: listType,
-          level,
-          children: spans,
-          markDefs,
-        };
-        blocks.push(block);
-      }
-    } else if (child.type === "list") {
-      // Nested list — increase level.
-      const nestedType = child.ordered ? "number" : "bullet";
-      for (const nestedItem of child.children ?? []) {
-        blocks.push(...convertListItem(nestedItem, nestedType, level + 1));
-      }
-    }
-  }
-
-  return blocks;
-}
-
-// ─── Blockquote ───────────────────────────────────────────────────────────────
-
-function convertBlockquote(node: MdastNode): PortableTextBlock {
-  const text = mdastToString(node as Parameters<typeof mdastToString>[0]);
-  return makeTextBlock("blockquote", text, [], []);
-}
-
-// ─── Code block ───────────────────────────────────────────────────────────────
-
-function convertCode(node: MdastNode): PortableTextCodeBlock {
+function normalizeCodeBlock(raw: Record<string, unknown>): PortableTextCodeBlock {
   return {
     _type: "code",
-    _key: nanoid(),
-    code: node.value ?? "",
-    language: node.lang ?? "text",
+    _key: (raw._key as string) || nanoid(),
+    code: (raw.code as string) ?? "",
+    language: (raw.language as string) ?? "text",
   };
 }
 
-// ─── Inline children → spans ─────────────────────────────────────────────────
-
-interface SpanResult {
-  spans: PortableTextSpan[];
-  markDefs: PortableTextMarkDef[];
-}
-
-function convertInlineChildren(
-  nodes: MdastNode[],
-  inheritedMarks: SpanMark[] = [],
-): SpanResult {
-  const spans: PortableTextSpan[] = [];
-  const markDefs: PortableTextMarkDef[] = [];
-
-  for (const node of nodes) {
-    const result = convertInlineNode(node, inheritedMarks, markDefs);
-    spans.push(...result);
-  }
-
-  return { spans, markDefs };
-}
-
-function convertInlineNode(
-  node: MdastNode,
-  marks: SpanMark[],
-  markDefs: PortableTextMarkDef[],
-): PortableTextSpan[] {
-  switch (node.type) {
-    case "text":
-      return [makeSpan(node.value ?? "", marks)];
-
-    case "strong": {
-      const children = convertInlineChildren(node.children ?? [], [...marks, "strong"]);
-      markDefs.push(...children.markDefs);
-      return children.spans;
-    }
-
-    case "emphasis": {
-      const children = convertInlineChildren(node.children ?? [], [...marks, "em"]);
-      markDefs.push(...children.markDefs);
-      return children.spans;
-    }
-
-    case "inlineCode":
-      return [makeSpan(node.value ?? "", [...marks, "code"])];
-
-    case "link": {
-      const linkKey = nanoid();
-      const href = node.url ?? "";
-      markDefs.push({ _type: "link", _key: linkKey, href, blank: true });
-      const linkMark = linkKey as unknown as SpanMark;
-      const children = convertInlineChildren(node.children ?? [], [...marks, linkMark]);
-      markDefs.push(...children.markDefs);
-      return children.spans;
-    }
-
-    case "image":
-      // Inline images lack Sanity asset refs — emit alt text as a span.
-      return node.alt ? [makeSpan(`[${node.alt}]`, marks)] : [];
-
-    default:
-      // Unknown inline node — extract plain text as fallback.
-      return [makeSpan(mdastToString(node as Parameters<typeof mdastToString>[0]), marks)];
-  }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function makeSpan(text: string, marks: SpanMark[]): PortableTextSpan {
-  return {
-    _type: "span",
-    _key: nanoid(),
-    text,
-    marks: marks as string[],
-  };
-}
-
-function makeTextBlock(
-  style: PortableTextBlock["style"],
-  text: string,
-  spans: PortableTextSpan[],
-  markDefs: PortableTextMarkDef[],
-): PortableTextBlock {
-  const children: PortableTextSpan[] =
-    spans.length > 0 ? spans : [makeSpan(text, [])];
+function normalizeTextBlock(raw: Record<string, unknown>): PortableTextBlock {
+  // @portabletext/block-tools emits plain objects; our PortableTextBlock requires
+  // _key + typed children — cast via unknown to bridge the structural gap.
+  const block = raw as unknown as PortableTextBlock;
   return {
     _type: "block",
-    _key: nanoid(),
-    style,
-    children,
-    markDefs,
+    _key: block._key || nanoid(),
+    style: block.style ?? "normal",
+    ...(block.listItem ? { listItem: block.listItem, level: block.level ?? 1 } : {}),
+    children: (block.children ?? []).map((s) => normalizeSpan(s as unknown as Record<string, unknown>)),
+    markDefs: block.markDefs ?? [],
+  };
+}
+
+function normalizeSpan(span: Record<string, unknown>) {
+  return {
+    _type: "span" as const,
+    _key: (span._key as string) || nanoid(),
+    text: (span.text as string) ?? "",
+    marks: (span.marks as string[]) ?? [],
   };
 }

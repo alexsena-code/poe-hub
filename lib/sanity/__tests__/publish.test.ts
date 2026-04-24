@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { publishPost, saveDraft, deleteDraft, publishDraft } from "../publish";
+import { publishPost, saveDraft, deleteDraft, publishDraft, sanityPostSchema } from "../publish";
 import type { SanityPost } from "../types";
 
 // ─── Mock the Sanity client module ────────────────────────────────────────────
@@ -332,5 +332,195 @@ describe("publishDraft", () => {
     // Published ID should have no prefix
     const arg = mockTxCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
     expect(arg._id).toBe("post-abc123");
+  });
+});
+
+// ─── sanityPostSchema — strict body validation ────────────────────────────────
+// These tests exercise the portableTextContentSchema discriminated union
+// without invoking publishPost (no Sanity client needed). They are the
+// backstop that catches session-10 regressions where custom _types were
+// silently dropped by the Studio.
+
+/** Minimal valid post fixture with a body that can be overridden per-test. */
+function makePostPayload(body: unknown[]): unknown {
+  return {
+    _id: "post-abc123",
+    _type: "post",
+    language: "pt-br",
+    title: "Test",
+    metadata: "Test description for SEO",
+    gameVersion: "path-of-exile-2",
+    category: { _type: "reference", _ref: "cat-001" },
+    slug: { _type: "slug", current: "test-slug" },
+    tags: ["test"],
+    author: { _type: "reference", _ref: "author-001" },
+    publishedAt: "2026-04-24T00:00:00.000Z",
+    body,
+  };
+}
+
+describe("sanityPostSchema — body strict validation", () => {
+  // Happy path: mixed valid block types all accepted together.
+  it("accepts body with block + code + poeItem blocks", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "block",
+          _key: "b1",
+          style: "normal",
+          children: [{ _type: "span", _key: "s1", text: "Hello.", marks: [] }],
+          markDefs: [],
+        },
+        {
+          _type: "code",
+          _key: "c1",
+          code: 'print("hello")',
+          language: "python",
+        },
+        {
+          _type: "poeItem",
+          _key: "p1",
+          rawText: "Chaos Orb",
+          iconUrl: "https://example.com/chaos.png",
+        },
+      ]),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  // Regression S10: poeCurrency was silently dropped by Studio because it's
+  // not in blockContent. Now zod must reject it before the write happens.
+  // Zod v4 discriminatedUnion reports code="invalid_union" with path ending in
+  // "_type" — the path is our confirmation that the discriminator was the issue.
+  it("rejects body with _type 'poeCurrency' (S10 regression)", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([{ _type: "poeCurrency", _key: "x1", value: "1c" }]),
+    );
+    expect(result.success).toBe(false);
+    // Path must point at the _type field so the error is traceable to the offender.
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths.some((p) => p.includes("_type"))).toBe(true);
+  });
+
+  // Regression S10: poePassive same silent-drop family.
+  it("rejects body with _type 'poePassive' (S10 regression)", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([{ _type: "poePassive", _key: "x2", name: "Iron Grip" }]),
+    );
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths.some((p) => p.includes("_type"))).toBe(true);
+  });
+
+  it("rejects block without _key", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "block",
+          style: "normal",
+          children: [{ _type: "span", _key: "s1", text: "Hi.", marks: [] }],
+          markDefs: [],
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths.some((p) => p.includes("_key"))).toBe(true);
+  });
+
+  it("rejects block with empty children array", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "block",
+          _key: "b1",
+          style: "normal",
+          children: [],
+          markDefs: [],
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const messages = result.error?.issues.map((i) => i.message) ?? [];
+    expect(messages.some((m) => m.includes("at least one span"))).toBe(true);
+  });
+
+  it("rejects span without text field", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "block",
+          _key: "b1",
+          style: "normal",
+          children: [{ _type: "span", _key: "s1", marks: [] }],
+          markDefs: [],
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths.some((p) => p.includes("text"))).toBe(true);
+  });
+
+  it("rejects link markDef without href", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "block",
+          _key: "b1",
+          style: "normal",
+          children: [{ _type: "span", _key: "s1", text: "Click here.", marks: ["lnk1"] }],
+          markDefs: [{ _type: "link", _key: "lnk1" }],
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths.some((p) => p.includes("href"))).toBe(true);
+  });
+
+  it("rejects image block without asset._ref", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "image",
+          _key: "img1",
+          asset: { _type: "reference", _ref: "" },
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const messages = result.error?.issues.map((i) => i.message) ?? [];
+    expect(messages.some((m) => m.includes("_ref"))).toBe(true);
+  });
+
+  it("rejects table block with empty rows array", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "table",
+          _key: "tbl1",
+          rows: [],
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const messages = result.error?.issues.map((i) => i.message) ?? [];
+    expect(messages.some((m) => m.includes("at least one row"))).toBe(true);
+  });
+
+  it("rejects poeItem block without rawText", () => {
+    const result = sanityPostSchema.safeParse(
+      makePostPayload([
+        {
+          _type: "poeItem",
+          _key: "pi1",
+          rawText: "",
+        },
+      ]),
+    );
+    expect(result.success).toBe(false);
+    const paths = result.error?.issues.map((i) => i.path.join(".")) ?? [];
+    expect(paths.some((p) => p.includes("rawText"))).toBe(true);
   });
 });
