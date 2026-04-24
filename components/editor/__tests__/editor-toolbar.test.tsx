@@ -73,6 +73,8 @@ vi.mock('../editor-context', () => ({
   useEditorContext: () => ({
     editor: fakeEditor,
     draftId: 'draft-test-id',
+    meta: { title: '', language: 'pt-br' },
+    setMeta: vi.fn(),
   }),
 }));
 
@@ -94,7 +96,7 @@ import { EditorToolbar } from '../editor-toolbar';
 function renderToolbar() {
   return render(
     <EditorToolbar
-      phase="edit"
+      phase="draft"
       onPhaseToggle={vi.fn()}
       autosaveStatus="idle"
       lastSavedAt={null}

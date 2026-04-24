@@ -182,7 +182,7 @@ export function EditorToolbar({
   autosaveStatus,
   lastSavedAt,
 }: EditorToolbarProps) {
-  const { editor, draftId } = useEditorContext();
+  const { editor, draftId, meta, setMeta } = useEditorContext();
   const router = useRouter();
 
   const cmd = (fn: () => boolean) => { fn(); };
@@ -195,8 +195,24 @@ export function EditorToolbar({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-4 py-2 min-h-[44px]">
-        {/* Left: formatting buttons (hidden in preview) */}
-        <div className="flex flex-1 items-center gap-0.5 flex-wrap">
+        {/* Title input (left) — Google-Docs-style inline. On blur, scrolls left
+            so the start of the title is shown (input doesn't support CSS truncate). */}
+        <input
+          type="text"
+          value={meta.title}
+          onChange={(e) => setMeta({ title: e.target.value })}
+          onBlur={(e) => { e.currentTarget.scrollLeft = 0; }}
+          placeholder="Título do post…"
+          aria-label="Título do post"
+          title={meta.title || 'Título do post'}
+          className="w-72 shrink-0 bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground/40 focus:outline-none md:w-96 lg:w-[28rem]"
+        />
+
+        <Separator orientation="vertical" className="h-5 bg-zinc-700 shrink-0" />
+
+        {/* Center: formatting buttons (hidden in preview) — flex-1 +
+            justify-center pushes the group to the middle of the remaining space. */}
+        <div className="flex flex-1 items-center justify-center gap-0.5 flex-wrap min-w-0">
           {!isPreview && (
             <>
               <FmtButton

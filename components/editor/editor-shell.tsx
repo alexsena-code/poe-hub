@@ -119,6 +119,18 @@ export function EditorShell({
     initialContentLoaded.current = true;
   }, [editor, initialBody]);
 
+  // Toggle `editor-fullscreen` on #app-main so the auth layout drops its
+  // padding + overflow-auto while the editor is mounted. Without this the
+  // page-level scrollbar appears on load because layout padding + h-screen
+  // shell exceed viewport height. Utility defined in app/globals.css.
+  useEffect(() => {
+    const main = document.getElementById('app-main');
+    main?.classList.add('editor-fullscreen');
+    return () => {
+      main?.classList.remove('editor-fullscreen');
+    };
+  }, []);
+
   // ── Autosave ─────────────────────────────────────────────────────────────────
   const { status: autosaveStatus, lastSavedAt } = useAutosave({
     draftId,
@@ -149,7 +161,7 @@ export function EditorShell({
   return (
     <EditorProvider value={contextValue}>
       <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden">
-        {/* Toolbar spans full width at the top */}
+        {/* Toolbar — inline title + formatting + autosave + Prosseguir */}
         <EditorToolbar
           phase={phase}
           onPhaseToggle={togglePhase}
