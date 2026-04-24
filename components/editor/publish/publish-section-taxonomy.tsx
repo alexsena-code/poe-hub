@@ -11,7 +11,7 @@
  * Session 10.b.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
@@ -128,22 +128,49 @@ export function PublishSectionTaxonomy() {
   const { authors, isLoading: authorsLoading } = useAuthors();
   const { categories, isLoading: catsLoading } = useCategories(language);
 
-  // Orphan-category guard: when language flips, the selected category may no
-  // longer exist in the new language's list (categories are language-scoped
-  // in Sanity). Try to match by tagname first (so "noticias" PT-BR maps to
-  // "noticias" EN if both exist), otherwise clear and warn the operator.
+  // Track the tagname + display title of the currently-selected category so
+  // we can match a sibling in the other language when the operator flips
+  // PT-BR ↔ EN. Update whenever the selected category is found in the
+  // current list — that's our "ground truth" snapshot before the list
+  // potentially refetches under a different language.
+  const lastKnownRef = useRef<{ tagname: string; title: string } | null>(null);
+  useEffect(() => {
+    if (!categoryId) {
+      lastKnownRef.current = null;
+      return;
+    }
+    const current = categories.find((c) => c._id === categoryId);
+    if (current) {
+      lastKnownRef.current = {
+        tagname: current.tagname,
+        title: current.title ?? current.tagname,
+      };
+    }
+  }, [categoryId, categories]);
+
+  // Orphan-category guard: when language flips, the selected categoryId may
+  // refer to a category in the previous language. Two-step recovery:
+  //   1. Try sibling match by tagname (lastKnownRef captured pre-switch).
+  //      Operators that name PT-BR/EN pairs with the same tagname (e.g.
+  //      "noticias" in both) get auto-substitution — no toast, no extra clicks.
+  //   2. If no sibling exists, clear categoryId and toast so the operator
+  //      knows they need to pick a new one or create with "+ Nova categoria".
   useEffect(() => {
     if (catsLoading) return;
     if (!categoryId) return;
     if (categories.some((c) => c._id === categoryId)) return;
-    // categoryId is orphaned for this language. Best effort: find a sibling
-    // category with the same tagname (operator's convention for cross-locale
-    // pairs). Fall back to clearing.
-    // The previous-language category isn't loaded here, so we can't fetch its
-    // tagname directly — clear and let the operator pick. Toast informs why.
+    const lastTag = lastKnownRef.current?.tagname;
+    if (lastTag) {
+      const sibling = categories.find((c) => c.tagname === lastTag);
+      if (sibling) {
+        setValue('categoryId', sibling._id, { shouldValidate: true, shouldDirty: true });
+        return;
+      }
+    }
     setValue('categoryId', '', { shouldValidate: true, shouldDirty: true });
+    const previousLabel = lastKnownRef.current?.title ?? 'selecionada';
     toast.warning(
-      `Categoria não existe em ${language.toUpperCase()}. Selecione uma nova ou crie com "+ Nova categoria".`,
+      `Categoria "${previousLabel}" não tem equivalente em ${language.toUpperCase()}. Selecione uma nova ou crie com "+ Nova categoria".`,
     );
   }, [language, categoryId, categories, catsLoading, setValue]);
 
