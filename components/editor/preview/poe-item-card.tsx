@@ -18,7 +18,7 @@
  * Session 08.d.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import Image from "next/image";
 import {
   Tooltip,
@@ -193,9 +193,13 @@ function ItemTooltipBody({
  */
 export function PoeItemCard({ value }: { value: PoeItemCardValue }) {
   const item = useMemo(() => parseRawPoeItem(value.rawText), [value.rawText]);
+  // imgFailed must be declared unconditionally; reset whenever iconUrl changes.
+  const [imgFailed, setImgFailed] = useState(false);
+  const iconUrl = value.iconUrl ?? item?.iconUrl ?? null;
+  useEffect(() => { setImgFailed(false); }, [iconUrl]);
+
   if (!item) return null;
 
-  const iconUrl = value.iconUrl ?? item.iconUrl ?? null;
   const rarityHsl = RARITY_HSL[item.rarity] ?? RARITY_HSL.Normal;
 
   const gemNameColor = value.isGem
@@ -235,7 +239,7 @@ export function PoeItemCard({ value }: { value: PoeItemCardValue }) {
             role="button"
             tabIndex={0}
           >
-            {iconUrl && (
+            {iconUrl && !imgFailed ? (
               <span className="relative inline-block shrink-0" style={{ width: "1.7em", height: "1.7em" }}>
                 <Image
                   src={iconUrl}
@@ -244,8 +248,26 @@ export function PoeItemCard({ value }: { value: PoeItemCardValue }) {
                   sizes="32px"
                   className="object-contain"
                   unoptimized
-                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  onError={() => setImgFailed(true)}
                 />
+              </span>
+            ) : (
+              // Placeholder when iconUrl is null OR the asset 404'd (common for
+              // ascendancy passives that aren't on the public CDN). Shows a
+              // small rounded square tinted with the rarity colour + the
+              // item's initial — keeps the chip layout intact.
+              <span
+                className="relative inline-flex items-center justify-center shrink-0 rounded-sm border text-[0.7em] font-bold"
+                style={{
+                  width: "1.7em",
+                  height: "1.7em",
+                  borderColor: `hsl(${rarityHsl} / 0.5)`,
+                  backgroundColor: `hsl(${rarityHsl} / 0.15)`,
+                  color: `hsl(${rarityHsl})`,
+                }}
+                aria-hidden="true"
+              >
+                {item.name.charAt(0).toUpperCase()}
               </span>
             )}
             <span
