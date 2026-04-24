@@ -18,7 +18,7 @@
  * Session 08.e → updated S10.b.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 // useCallback retained: setMeta is memoized to avoid re-renders on every keystroke.
 import type { JSONContent } from '@tiptap/core';
 import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
@@ -99,7 +99,8 @@ export function EditorShell({
   const [bodyJson, setBodyJson] = useState<JSONContent>({ type: 'doc', content: [] });
 
   // Track whether the initial content has been loaded into the editor.
-  const initialContentLoaded = useRef(false);
+  // State (not ref) because useAutosave needs to react to this flip.
+  const [initialContentLoaded, setInitialContentLoaded] = useState(false);
 
   // ── Patch meta (partial update — kept for context consumers like RightRail) ──
   const setMeta = useCallback((patch: Partial<EditorMetaForm>) => {
@@ -113,12 +114,18 @@ export function EditorShell({
 
   // ── Load initial body into Tiptap ────────────────────────────────────────────
   useEffect(() => {
-    if (!editor || !initialBody || initialContentLoaded.current) return;
+    if (!editor) return;
+    if (initialContentLoaded) return;
+    if (initialBody === undefined) {
+      // No initialBody expected (fresh /new draft) — mark loaded so autosave can run.
+      setInitialContentLoaded(true);
+      return;
+    }
     const tiptapDoc = portableToTiptap(initialBody);
     editor.commands.setContent(tiptapDoc as JSONContent);
     setBodyJson(editor.getJSON());
-    initialContentLoaded.current = true;
-  }, [editor, initialBody]);
+    setInitialContentLoaded(true);
+  }, [editor, initialBody, initialContentLoaded]);
 
   // Toggle `editor-fullscreen` on #app-main so the auth layout drops its
   // padding + overflow-auto while the editor is mounted. Without this the
@@ -133,11 +140,14 @@ export function EditorShell({
   }, []);
 
   // ── Autosave ─────────────────────────────────────────────────────────────────
+  // enabled gates the very first save so the empty Tiptap doc can't overwrite
+  // a non-empty persisted body before portableToTiptap(initialBody) runs.
   const { status: autosaveStatus, lastSavedAt } = useAutosave({
     draftId,
     meta,
     bodyJson,
     language: meta.language,
+    enabled: initialContentLoaded,
   });
 
   // ── Phase toggle ─────────────────────────────────────────────────────────────

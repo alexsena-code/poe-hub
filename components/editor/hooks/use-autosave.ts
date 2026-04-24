@@ -28,6 +28,12 @@ export interface UseAutosaveOptions {
   meta: EditorMetaForm;
   bodyJson: JSONContent;
   language: 'pt-br' | 'en';
+  /**
+   * When false, skips all autosave attempts. Used while the editor is still
+   * loading initial content so the empty Tiptap doc doesn't overwrite the
+   * persisted body before portableToTiptap(initialBody) runs.
+   */
+  enabled?: boolean;
 }
 
 export interface UseAutosaveReturn {
@@ -96,6 +102,7 @@ export function useAutosave({
   meta,
   bodyJson,
   language,
+  enabled = true,
 }: UseAutosaveOptions): UseAutosaveReturn {
   const [status, setStatus] = useState<AutosaveStatus>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -105,6 +112,7 @@ export function useAutosave({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const performSave = useCallback(async () => {
+    if (!enabled) return;
     if (isContentEmpty(bodyJson, meta)) return;
 
     // Cancel any previous in-flight request before starting a new one.
@@ -143,6 +151,7 @@ export function useAutosave({
   // Restart the debounce timer whenever content changes.
   useEffect(() => {
     if (timerRef.current !== null) clearTimeout(timerRef.current);
+    if (!enabled) return;
     // Reset to idle while the operator is still typing.
     if (status === 'saved') setStatus('idle');
 
@@ -154,7 +163,7 @@ export function useAutosave({
       if (timerRef.current !== null) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftId, meta, bodyJson, language]);
+  }, [draftId, meta, bodyJson, language, enabled]);
 
   // Abort in-flight request on unmount.
   useEffect(() => {
