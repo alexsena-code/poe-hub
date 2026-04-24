@@ -24,9 +24,6 @@ import { useRouter } from 'next/navigation';
 import type { PortableTextContent } from '@/lib/sanity/types';
 import { editorMetaSchema, editorMetaDefaults } from '../editor-meta-schema';
 import type { EditorMetaForm } from '../editor-meta-schema';
-import { tiptapToPortable } from '../serializer/tiptap-to-portable';
-import type { TiptapDoc } from '../serializer/tiptap-to-portable';
-import type { JSONContent } from '@tiptap/core';
 import { PublishSectionBasic } from './publish-section-basic';
 import { PublishSectionTaxonomy } from './publish-section-taxonomy';
 import { PublishSectionSeo } from './publish-section-seo';
@@ -39,8 +36,13 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 
 interface PublishFormProps {
   initialMeta: Partial<EditorMetaForm>;
-  /** Body as Tiptap JSON — converted to Portable Text on publish. */
-  body: JSONContent;
+  /**
+   * Body as Portable Text (canonical Sanity format). Sent directly to the
+   * publish endpoint — no further conversion. Autosave in the editor already
+   * persisted Tiptap → Portable Text (use-autosave#buildDraftPayload), so the
+   * GET draft response carries the same Portable Text shape Sanity wants.
+   */
+  body: PortableTextContent[];
   draftId: string;
 }
 
@@ -123,12 +125,16 @@ export function PublishForm({ initialMeta, body, draftId }: PublishFormProps) {
 
   const handlePublish = methods.handleSubmit((meta) => {
     startTransition(async () => {
-      const portableBody = tiptapToPortable(body as TiptapDoc) as PortableTextContent[];
+      // body is already Portable Text from the API — pass through.
+      console.group('[publish-form] sending');
+      console.log('draftId:', draftId);
+      console.log('body length:', body?.length, 'first block:', body?.[0]);
+      console.groupEnd();
       try {
         const res = await fetch('/api/sanity/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ meta, body: portableBody, draftId }),
+          body: JSON.stringify({ meta, body, draftId }),
         });
 
         if (res.status === 409) {

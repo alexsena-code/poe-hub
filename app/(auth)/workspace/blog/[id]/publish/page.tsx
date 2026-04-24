@@ -21,7 +21,7 @@ import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
-import type { JSONContent } from '@tiptap/core';
+import type { PortableTextContent } from '@/lib/sanity/types';
 import type { EditorMetaForm } from '@/components/editor/editor-meta-schema';
 import { PublishForm } from '@/components/editor/publish/publish-form';
 
@@ -29,7 +29,11 @@ import { PublishForm } from '@/components/editor/publish/publish-form';
 
 interface DraftResponse {
   meta: Partial<EditorMetaForm>;
-  body: JSONContent;
+  // GET /api/sanity/draft/[id] returns Portable Text (canonical Sanity format),
+  // NOT Tiptap JSON. Fixed regression where the type lied as JSONContent and
+  // PublishForm did tiptapToPortable() on already-Portable-Text input,
+  // producing an empty array → publish 400 "body must contain at least one block".
+  body: PortableTextContent[];
   draftId: string;
 }
 

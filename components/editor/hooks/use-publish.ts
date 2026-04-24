@@ -54,6 +54,15 @@ export function usePublish(): UsePublishReturn {
       setPublishing(true);
       setPublishError(null);
 
+      // DEBUG: log full payload pre-flight so the operator can copy it into a
+      // bug report. Remove once the publish 400 root cause is settled.
+      console.group('[publish] sending payload');
+      console.log('draftId:', draftId);
+      console.log('meta:', meta);
+      console.log('body length:', body?.length, 'first block:', body?.[0]);
+      console.log('full body sample:', JSON.stringify(body).slice(0, 500));
+      console.groupEnd();
+
       try {
         const res = await fetch('/api/sanity/publish', {
           method: 'POST',
@@ -64,9 +73,25 @@ export function usePublish(): UsePublishReturn {
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({ error: res.statusText }));
+          // DEBUG: dump full server response (includes zod issues with paths)
+          console.group('[publish] server error response');
+          console.error('status:', res.status, res.statusText);
+          console.error('body:', data);
+          if (Array.isArray(data?.details)) {
+            console.table(data.details.map((d: { path?: unknown[]; message?: string; code?: string }) => ({
+              path: Array.isArray(d.path) ? d.path.join('.') : '',
+              code: d.code,
+              message: d.message,
+            })));
+          }
+          console.groupEnd();
           const msg = `Falha ao publicar: ${data.error ?? res.statusText}`;
           setPublishError(msg);
-          toast.error('Erro ao publicar', { description: msg });
+          toast.error('Erro ao publicar', {
+            description: Array.isArray(data?.details) && data.details.length
+              ? `${data.error}: ${data.details.map((d: { message?: string; path?: unknown[] }) => `${Array.isArray(d.path) ? d.path.join('.') : ''} — ${d.message}`).join('; ')}`
+              : msg,
+          });
           return null;
         }
 
