@@ -6,9 +6,6 @@
 
 import { ContentBrief } from './types';
 import {
-  URGENCY_COLORS,
-  EFFORT_COLORS,
-  STATUS_COLORS,
   TEMPLATE_LABELS,
   CANONICAL_DATA_SOURCES,
   IDEAS_API,

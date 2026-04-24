@@ -1,229 +1,25 @@
-"use client";
+// RSC shell — fetches proxy config server-side; form + PUT mutation in client island.
+// S05.a migration: was 229L 'use client'; now RSC + ProxyClient island.
+// Sensitive fields (username, password) are decrypted by /api/proxy-config before
+// being forwarded here; they are never logged or leaked in route responses.
+import { fetchEngine } from "@/lib/fetch-engine";
+import { ProxyClient } from "@/components/modules/admin/config/proxy-client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod/v4";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, Eye, EyeOff, Save } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
-import { PageHeader } from "@/components/ui/page-header";
+interface ProxyConfig {
+  port: number;
+  username: string;
+  password: string;
+  notes?: string;
+}
 
-const proxySchema = z.object({
-  port: z.number().int().min(1).max(65535),
-  username: z.string().min(1, "Username obrigatorio"),
-  password: z.string().min(1, "Password obrigatorio"),
-  notes: z.string().optional(),
-});
-
-type ProxyForm = z.infer<typeof proxySchema>;
-
-export default function ProxySettingsPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showUsername, setShowUsername] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<ProxyForm>({
-    resolver: zodResolver(proxySchema),
-    defaultValues: {
-      port: 8080,
-      username: "",
-      password: "",
-      notes: "",
-    },
-  });
-
-  const fetchConfig = useCallback(async () => {
-    try {
-      const res = await fetch("/api/proxy-config");
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      if (data) {
-        reset({
-          port: data.port,
-          username: data.username,
-          password: data.password,
-          notes: data.notes ?? "",
-        });
-      }
-    } catch {
-      toast.error("Erro ao carregar configuracao de proxy");
-    } finally {
-      setLoading(false);
-    }
-  }, [reset]);
-
-  useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
-
-  async function onSubmit(data: ProxyForm) {
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/proxy-config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Erro ao salvar");
-      }
-
-      toast.success("Configuracao de proxy atualizada");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Erro ao salvar"
-      );
-    } finally {
-      setSubmitting(false);
-    }
+export default async function ProxySettingsPage() {
+  // Null means no config saved yet; ProxyClient falls back to defaults (port 8080).
+  let initialConfig: ProxyConfig | null = null;
+  try {
+    initialConfig = await fetchEngine<ProxyConfig>("/api/proxy-config");
+  } catch {
+    // Not found or 500 — client island renders with empty defaults
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Spinner size="lg" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-2"
-          onClick={() => router.push("/admin/config")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Configuracoes
-        </Button>
-        <PageHeader
-          title="Proxy Global"
-          description="Configuracao de proxy compartilhada entre os bots."
-        />
-      </div>
-
-      <Card className="max-w-lg">
-        <CardHeader>
-          <CardTitle>Configuracao do Proxy</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="port">Porta</Label>
-              <Input
-                id="port"
-                type="number"
-                min={1}
-                max={65535}
-                {...register("port", { valueAsNumber: true })}
-              />
-              {errors.port && (
-                <p className="text-sm text-destructive">{errors.port.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="username">Username</Label>
-              <div className="relative">
-                <Input
-                  id="username"
-                  type={showUsername ? "text" : "password"}
-                  autoComplete="off"
-                  {...register("username")}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowUsername(!showUsername)}
-                >
-                  {showUsername ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {errors.username && (
-                <p className="text-sm text-destructive">
-                  {errors.username.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="off"
-                  {...register("password")}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              {errors.password && (
-                <p className="text-sm text-destructive">
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notas (opcional)</Label>
-              <Input
-                id="notes"
-                placeholder="Observacoes sobre o proxy"
-                {...register("notes")}
-              />
-            </div>
-
-            <Button type="submit" disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Salvar
-                </>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <ProxyClient initialConfig={initialConfig} />;
 }

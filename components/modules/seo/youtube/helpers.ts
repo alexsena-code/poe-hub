@@ -1,18 +1,23 @@
 // ---------------------------------------------------------------------------
 // Helpers — YouTube Trends module
 // Pure formatter / classifier functions — no React, no state.
+// S05.b — intentColor/viceColor migrated to semantic tokens. statusColor
+// replaced by statusVariant returning StatusBadgeVariant. channelColor kept
+// as identity (deterministic hash — not semantic).
 // ---------------------------------------------------------------------------
 
 import type { ScanRecordRaw, ScanRecord } from './types';
+import type { StatusBadgeVariant } from '@/components/ui/status-badge';
 
 export function scoreColor(score: number): string {
-  if (score >= 5000) return 'text-emerald-400 font-bold';
-  if (score >= 1000) return 'text-emerald-300';
-  if (score >= 500) return 'text-amber-300';
-  if (score >= 100) return 'text-amber-400';
+  if (score >= 5000) return 'text-success font-bold';
+  if (score >= 1000) return 'text-success';
+  if (score >= 500) return 'text-warning';
+  if (score >= 100) return 'text-warning';
   return 'text-muted-foreground';
 }
 
+/** Channel color — identity, not semantic. Deterministic hash over known colors. */
 export function channelColor(channel: string): string {
   // Deterministic color based on channel name
   const colors = [
@@ -69,31 +74,37 @@ export function timeAgo(iso: string): string {
   }
 }
 
+/** Intent text color — text-only, no badge background. Uses semantic tokens. */
 export function intentColor(intent: string | null): string {
   switch (intent) {
-    case 'informational': return 'text-sky-400';
-    case 'commercial': return 'text-amber-400';
-    case 'transactional': return 'text-red-400';
-    case 'navigational': return 'text-purple-400';
-    default: return 'text-muted-foreground';
+    case 'informational': return 'text-info';
+    case 'commercial':    return 'text-warning';
+    case 'transactional': return 'text-destructive';
+    case 'navigational':  return 'text-purple-400';
+    default:              return 'text-muted-foreground';
   }
 }
 
+/**
+ * VICE score text color — text-only display.
+ * >=80 → success bold, >=60 → success, >=40 → warning, else → danger.
+ */
 export function viceColor(score: number | null): string {
   if (!score) return 'text-muted-foreground';
-  if (score >= 80) return 'text-emerald-400 font-bold';
-  if (score >= 60) return 'text-emerald-300';
-  if (score >= 40) return 'text-amber-300';
-  return 'text-red-300';
+  if (score >= 80) return 'text-success font-bold';
+  if (score >= 60) return 'text-success';
+  if (score >= 40) return 'text-warning';
+  return 'text-destructive';
 }
 
-export function statusColor(status: string): string {
+/** Status badge variant for YouTube keyword lifecycle status. */
+export function statusVariant(status: string): StatusBadgeVariant {
   switch (status) {
-    case 'new': return 'bg-sky-900/40 text-sky-300';
-    case 'approved': return 'bg-emerald-900/40 text-emerald-300';
-    case 'rejected': return 'bg-red-900/40 text-red-300';
-    case 'published': return 'bg-purple-900/40 text-purple-300';
-    default: return 'bg-surface text-muted-foreground';
+    case 'new':       return 'info';
+    case 'approved':  return 'success';
+    case 'rejected':  return 'danger';
+    case 'published': return 'seo';
+    default:          return 'neutral';
   }
 }
 

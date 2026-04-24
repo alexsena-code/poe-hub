@@ -4,8 +4,8 @@
 // Dates rendered dd/mm/yyyy pt-BR per operator convention.
 
 import React from 'react';
-import { SeoBadge } from '../shared/seo-primitives';
-import { sourceColor, formatDatetimeBR } from '../shared/helpers';
+import { sourceVariant, formatDatetimeBR } from '../shared/helpers';
+import { StatusBadge } from '@/components/ui/status-badge';
 import type { ScanResult } from '../shared/types';
 
 interface ScanHistoryTabProps {
@@ -37,9 +37,9 @@ export function ScanHistoryTab({ scans }: ScanHistoryTabProps) {
             scans.map((scan) => (
               <tr key={scan.id} className="border-b border-border/50 hover:bg-surface-hover transition-colors">
                 <td className="px-3 py-2">
-                  <SeoBadge className={sourceColor(scan.scanType.split('_')[0])}>
+                  <StatusBadge variant={sourceVariant(scan.scanType.split('_')[0])}>
                     {scan.scanType}
-                  </SeoBadge>
+                  </StatusBadge>
                 </td>
                 <td className="px-3 py-2 text-right font-mono text-xs text-foreground">
                   {scan.keywordsFound}

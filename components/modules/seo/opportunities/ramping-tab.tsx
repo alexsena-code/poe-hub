@@ -5,8 +5,8 @@
 // Controls: period selector (3/7/14/30d) + min delta threshold.
 
 import React from 'react';
-import { SeoBadge } from '../shared/seo-primitives';
-import { sourceColor, clusterLabel, viceColor } from '../shared/helpers';
+import { sourceVariant, clusterLabel, viceColor } from '../shared/helpers';
+import { StatusBadge } from '@/components/ui/status-badge';
 import type { RampingEntry } from '../shared/types';
 
 interface RampingTabProps {
@@ -96,7 +96,7 @@ export function RampingTab({ data, loading, days, minDelta, onDaysChange, onMinD
                     {row.youtubeViews != null ? row.youtubeViews.toLocaleString() : '-'}
                   </td>
                   <td className="py-2 pr-4">
-                    <SeoBadge className={sourceColor(row.source)}>{row.source}</SeoBadge>
+                    <StatusBadge variant={sourceVariant(row.source)}>{row.source}</StatusBadge>
                   </td>
                   <td className="py-2">
                     <span className="text-xs text-muted-foreground">{clusterLabel(row.cluster)}</span>

@@ -4,8 +4,9 @@
 // DbKeywordsTab — YouTube keywords imported into the SEO DB
 // ---------------------------------------------------------------------------
 
-import { useSort, SortHeader, Tip, YtBadge } from './primitives';
-import { scoreColor, formatNumber, intentColor, viceColor, statusColor } from './helpers';
+import { useSort, SortHeader, Tip } from './primitives';
+import { scoreColor, formatNumber, intentColor, viceColor, statusVariant } from './helpers';
+import { StatusBadge } from '@/components/ui/status-badge';
 import type { KeywordOpportunity } from './types';
 
 interface Props {
@@ -146,7 +147,7 @@ export function DbKeywordsTab({ keywords, loading }: Props) {
                 {kw.viceScore != null ? kw.viceScore.toFixed(0) : '-'}
               </td>
               <td className="py-2 pr-3">
-                <YtBadge className={statusColor(kw.status)}>{kw.status}</YtBadge>
+                <StatusBadge variant={statusVariant(kw.status)}>{kw.status}</StatusBadge>
               </td>
             </tr>
           ))}

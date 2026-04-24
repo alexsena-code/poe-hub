@@ -4,8 +4,9 @@
 // Client-side sort only (dataset is small — typically <200 rows from the engine).
 
 import React from 'react';
-import { SortHeader, SeoBadge, useSort } from '../shared/seo-primitives';
+import { SortHeader, useSort } from '../shared/seo-primitives';
 import { actionBadge } from '../shared/helpers';
+import { StatusBadge } from '@/components/ui/status-badge';
 import type { StrikingKeyword } from '../shared/types';
 
 interface StrikingDistanceTabProps {
@@ -63,7 +64,7 @@ export function StrikingDistanceTab({ data, loading }: StrikingDistanceTabProps)
                     {kw.opportunityScore.toFixed(0)}
                   </td>
                   <td className="px-3 py-2">
-                    <SeoBadge className={badge.color}>{badge.label}</SeoBadge>
+                    <StatusBadge variant={badge.variant}>{badge.label}</StatusBadge>
                   </td>
                 </tr>
               );

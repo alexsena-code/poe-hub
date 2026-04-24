@@ -5,7 +5,8 @@
 // Click expands the detail panel (controlled by parent via onToggleExpand).
 
 import { ContentBrief } from './types';
-import { URGENCY_COLORS, EFFORT_COLORS, STATUS_COLORS, TEMPLATE_LABELS } from './constants';
+import { URGENCY_VARIANTS, EFFORT_CLASSES, STATUS_VARIANTS, TEMPLATE_LABELS } from './constants';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 interface BriefCardProps {
   brief: ContentBrief;
@@ -23,12 +24,12 @@ export function BriefCard({ brief: b, expanded, onToggleExpand }: BriefCardProps
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-mono text-muted-foreground">#{b.rank}</span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${URGENCY_COLORS[b.urgency] || 'bg-surface text-muted-foreground'}`}>
+            <StatusBadge variant={URGENCY_VARIANTS[b.urgency] ?? 'neutral'}>
               {b.urgency}
-            </span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[b.status] || ''}`}>
+            </StatusBadge>
+            <StatusBadge variant={STATUS_VARIANTS[b.status] ?? 'neutral'}>
               {b.status}
-            </span>
+            </StatusBadge>
             <span className="text-[10px] text-muted-foreground">
               {TEMPLATE_LABELS[b.templateType] || b.templateType}
             </span>
@@ -39,7 +40,9 @@ export function BriefCard({ brief: b, expanded, onToggleExpand }: BriefCardProps
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Effort</div>
-            <div className={`text-sm font-bold ${EFFORT_COLORS[b.effort] || 'text-muted-foreground'}`}>{b.effort}</div>
+            <div className={`text-sm font-bold ${EFFORT_CLASSES[b.effort] ?? 'text-muted-foreground'}`}>
+              {b.effort}
+            </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Score</div>

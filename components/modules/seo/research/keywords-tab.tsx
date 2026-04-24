@@ -4,8 +4,9 @@
 // Pagination and sorting are server-side (engine API); client handles row expansion only.
 
 import React from 'react';
-import { SortHeader, SeoBadge } from '../shared/seo-primitives';
-import { sourceColor, intentColor, viceColor, clusterLabel, formatDateBR, API_URL } from '../shared/helpers';
+import { SortHeader } from '../shared/seo-primitives';
+import { sourceVariant, intentColor, viceColor, clusterLabel, formatDateBR, API_URL } from '../shared/helpers';
+import { StatusBadge } from '@/components/ui/status-badge';
 import type { KeywordOpportunity } from '../shared/types';
 
 // ---------------------------------------------------------------------------
@@ -201,7 +202,7 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
                     {kw.viceScore != null ? kw.viceScore.toFixed(0) : '-'}
                   </td>
                   <td className="px-3 py-2">
-                    <SeoBadge className={sourceColor(kw.source)}>{kw.source}</SeoBadge>
+                    <StatusBadge variant={sourceVariant(kw.source)}>{kw.source}</StatusBadge>
                   </td>
                   <td className={`px-3 py-2 text-xs ${intentColor(kw.intent)}`}>{kw.intent ?? '-'}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">

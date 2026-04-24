@@ -7,15 +7,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSort, SortHeader, Tip, YtBadge } from './primitives';
 import { scoreColor, channelColor, formatNumber } from './helpers';
+import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import type { AggregatedKeyword, AggregatedKeywordsResponse, Video } from './types';
 
 const API_URL = '/api/engine';
 
-const MOMENTUM_STYLE: Record<string, { label: string; className: string }> = {
-  rising: { label: 'Rising', className: 'bg-emerald-900/40 text-emerald-300' },
-  stable: { label: 'Stable', className: 'bg-blue-900/40 text-blue-300' },
-  declining: { label: 'Declining', className: 'bg-red-900/40 text-red-300' },
-  new: { label: 'New', className: 'bg-purple-900/40 text-purple-300' },
+// S05.b — migrated from hardcoded hues to StatusBadgeVariant.
+// "new" uses info (blue) since there's no purple token; purple was non-semantic.
+const MOMENTUM_STYLE: Record<string, { label: string; variant: StatusBadgeVariant }> = {
+  rising:   { label: 'Rising',    variant: 'success' },
+  stable:   { label: 'Stable',    variant: 'info' },
+  declining:{ label: 'Declining', variant: 'danger' },
+  new:      { label: 'New',       variant: 'neutral' },
 };
 
 // ---------------------------------------------------------------------------
@@ -353,9 +356,9 @@ export function TrendingTab({ minMentions }: Props) {
                     {kw.momentum.map((tag) => {
                       const style = MOMENTUM_STYLE[tag] ?? MOMENTUM_STYLE.new;
                       return (
-                        <span key={tag} className={`px-1.5 py-0.5 text-[10px] rounded ${style.className}`}>
+                        <StatusBadge key={tag} variant={style.variant}>
                           {style.label}
-                        </span>
+                        </StatusBadge>
                       );
                     })}
                   </div>

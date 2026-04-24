@@ -1,23 +1,28 @@
 // Shared API prefix for all ideation endpoints
 export const IDEAS_API = '/api/engine';
 
-export const URGENCY_COLORS: Record<string, string> = {
-  hot: 'bg-red-900/40 text-red-300',
-  timely: 'bg-amber-900/40 text-amber-300',
-  evergreen: 'bg-emerald-900/40 text-emerald-300',
+// S05.b — migrated to semantic StatusBadge variants. Old *_COLORS removed.
+
+import type { StatusBadgeVariant } from '@/components/ui/status-badge';
+
+export const URGENCY_VARIANTS: Record<string, StatusBadgeVariant> = {
+  hot: 'danger',
+  timely: 'warning',
+  evergreen: 'success',
 };
 
-export const EFFORT_COLORS: Record<string, string> = {
-  S: 'text-emerald-400',
-  M: 'text-amber-400',
-  L: 'text-red-400',
+// Effort is text-only (not a badge), so we keep direct semantic token classes.
+export const EFFORT_CLASSES: Record<string, string> = {
+  S: 'text-success',
+  M: 'text-warning',
+  L: 'text-destructive',
 };
 
-export const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-zinc-700/50 text-zinc-300',
-  accepted: 'bg-emerald-900/40 text-emerald-300',
-  rejected: 'bg-red-900/40 text-red-300',
-  generated: 'bg-blue-900/40 text-blue-300',
+export const STATUS_VARIANTS: Record<string, StatusBadgeVariant> = {
+  pending: 'neutral',
+  accepted: 'success',
+  rejected: 'danger',
+  generated: 'info',
 };
 
 export const TEMPLATE_LABELS: Record<string, string> = {
