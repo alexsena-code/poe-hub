@@ -11,15 +11,13 @@
  * fetching via the auth-protected API route is safer and consistent with
  * the rest of the hub's data patterns.
  *
- * Session 08 S08.h.
+ * Session 10 S10.a — side panels removed; right rail is mounted inside EditorShell.
  */
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import { EditorShell } from "@/components/editor/editor-shell";
-import { SidePanelQa } from "@/components/editor/side-panel-qa";
-import { SidePanelAssets } from "@/components/editor/side-panel-assets";
 import type { SanityPost } from "@/lib/sanity/types";
 
 type LoadState =
@@ -98,18 +96,10 @@ export default function EditBlogPostPage() {
 
   const { post } = state;
 
-  const sidePanels = (
-    <>
-      <SidePanelQa />
-      <SidePanelAssets />
-    </>
-  );
-
   return (
     <EditorShell
       initialPost={post}
       draftId={id}
-      slotSidePanels={sidePanels}
     />
   );
 }

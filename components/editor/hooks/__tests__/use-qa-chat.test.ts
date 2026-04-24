@@ -7,7 +7,11 @@
  * 2. send() on engine failure marks user message as error
  * 3. retry() re-sends the question and clears error flag
  * 4. messages persist to localStorage and reload on remount
- * 5. language is passed through to the engine call
+ * 5. language is derived from EditorContext (not local state)
+ * 6. fetch is called with the context language in the body
+ *
+ * Session 10.c: adapted to mock useEditorContext() after the local language
+ * state was removed and replaced with EditorContext.meta.language.
  *
  * Mocks /api/engine/knowledge/answer fetch directly (the hook calls
  * fetch, not askQuestion from content-api, so we mock global.fetch).
@@ -16,6 +20,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useQaChat } from '../use-qa-chat';
+
+// ---------------------------------------------------------------------------
+// Mock useEditorContext
+// ---------------------------------------------------------------------------
+
+// Default language returned by the context mock — tests can override.
+let contextLanguage: 'pt-br' | 'en' = 'pt-br';
+
+vi.mock('../../editor-context', () => ({
+  useEditorContext: () => ({
+    editor: null,
+    meta: { language: contextLanguage },
+    setMeta: vi.fn(),
+    draftId: 'context-draft-id',
+    language: contextLanguage,
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,6 +68,7 @@ function mockFetchError(status = 500) {
 beforeEach(() => {
   localStorage.clear();
   vi.restoreAllMocks();
+  contextLanguage = 'pt-br';
 });
 
 afterEach(() => {
@@ -202,19 +224,21 @@ describe('useQaChat', () => {
     expect(result.current.messages[0].content).toBe('Other draft');
   });
 
-  it('language toggle changes language state', () => {
+  it('language reflects EditorContext.meta.language (pt-br by default)', () => {
+    contextLanguage = 'pt-br';
     const { result } = renderHook(() => useQaChat({ draftId: DRAFT_ID }));
-
     expect(result.current.language).toBe('pt-br');
+  });
 
-    act(() => {
-      result.current.setLanguage('en');
-    });
-
+  it('language reflects EditorContext.meta.language when set to en', () => {
+    contextLanguage = 'en';
+    const { result } = renderHook(() => useQaChat({ draftId: DRAFT_ID }));
     expect(result.current.language).toBe('en');
   });
 
-  it('fetch is called with language in the body', async () => {
+  it('fetch is called with language from EditorContext in the body', async () => {
+    contextLanguage = 'en';
+
     const spy = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: async () => ({ answer: 'ok', cost: 0 }),
@@ -222,10 +246,6 @@ describe('useQaChat', () => {
     global.fetch = spy;
 
     const { result } = renderHook(() => useQaChat({ draftId: DRAFT_ID }));
-
-    act(() => {
-      result.current.setLanguage('en');
-    });
 
     act(() => {
       result.current.send('Test language param');
@@ -240,5 +260,18 @@ describe('useQaChat', () => {
     const body = JSON.parse(callArgs[1].body as string);
     expect(body.language).toBe('en');
     expect(body.question).toBe('Test language param');
+  });
+
+  it('setLanguage is a backward-compat no-op and does not change the language', () => {
+    contextLanguage = 'pt-br';
+    const { result } = renderHook(() => useQaChat({ draftId: DRAFT_ID }));
+
+    act(() => {
+      // This used to change state; now it's a no-op since language comes from context.
+      result.current.setLanguage('en');
+    });
+
+    // Language should still be what the context says (pt-br), not 'en'.
+    expect(result.current.language).toBe('pt-br');
   });
 });

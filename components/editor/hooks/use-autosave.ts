@@ -52,26 +52,33 @@ function isContentEmpty(bodyJson: JSONContent, meta: EditorMetaForm): boolean {
   return !hasTitle && (!hasBody || !hasNonEmptyBlock);
 }
 
-/** Assembles the PUT payload to send to /api/sanity/draft/{id}. */
+/**
+ * Assembles the PUT payload to send to /api/sanity/draft/{id}.
+ *
+ * Session 10.c: restructured to `{ meta, body }` so the route handler
+ * receives editor-native field names (categoryId, authorId) and converts
+ * them to Sanity references server-side. `language` stays at the top level
+ * of `meta` and is always required for draft disambiguation.
+ */
 function buildDraftPayload(
-  draftId: string,
   meta: EditorMetaForm,
   bodyJson: JSONContent,
   language: 'pt-br' | 'en',
 ): Record<string, unknown> {
   const body = tiptapToPortable(bodyJson as TiptapDoc);
   return {
-    draftId,
-    language,
-    title: meta.title,
-    metadata: meta.metadata,
-    slug: meta.slug,
-    gameVersion: meta.gameVersion,
-    categoryId: meta.categoryId,
-    authorId: meta.authorId,
-    tags: meta.tags,
-    mainImageAssetId: meta.mainImageAssetId,
-    publishedAt: meta.publishedAt,
+    meta: {
+      language,
+      title: meta.title,
+      metadata: meta.metadata,
+      slug: meta.slug,
+      gameVersion: meta.gameVersion,
+      categoryId: meta.categoryId,
+      authorId: meta.authorId,
+      tags: meta.tags,
+      mainImageAssetId: meta.mainImageAssetId,
+      publishedAt: meta.publishedAt,
+    },
     body,
   };
 }
@@ -107,7 +114,7 @@ export function useAutosave({
 
     setStatus('saving');
     try {
-      const payload = buildDraftPayload(draftId, meta, bodyJson, language);
+      const payload = buildDraftPayload(meta, bodyJson, language);
       const res = await fetch(`/api/sanity/draft/${draftId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

@@ -58,7 +58,8 @@ export function usePublish(): UsePublishReturn {
         const res = await fetch('/api/sanity/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ meta, body }),
+          // draftId is required by the new publishRequestSchema (session 10.c).
+          body: JSON.stringify({ meta, body, draftId }),
         });
 
         if (!res.ok) {

@@ -6,15 +6,21 @@
  * - Persists messages to localStorage keyed by draftId so history
  *   survives page reloads for the same draft.
  * - History is cleared when draftId changes (new post or different draft).
- * - Calls `askQuestion()` from `lib/content-api` with optional language param.
+ * - Calls the hub's engine proxy endpoint with the current editor language.
  * - Supports retry: re-sends the question attached to a failed user message.
  *
+ * Session 10.c: removed local `language` state — now derived from
+ * `useEditorContext().meta.language` so Q&A always tracks the post's language
+ * without an extra toggle. `setLanguage` is kept in the return type for
+ * backward compatibility but is now a no-op (callers should update meta.language
+ * via the sidebar instead).
+ *
  * @example
- * const { messages, send, retry, language, setLanguage, loading } = useQaChat({ draftId });
+ * const { messages, send, retry, loading } = useQaChat({ draftId });
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { askQuestion } from '@/lib/content-api';
+import { useEditorContext } from '../editor-context';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,7 +49,16 @@ export interface UseQaChatResult {
   send: (question: string) => Promise<void>;
   /** Re-sends the question at the given index (must be an errored user message) */
   retry: (index: number) => Promise<void>;
+  /**
+   * @deprecated Language is now controlled by meta.language in EditorContext.
+   * This field is kept for backward compatibility — it always reflects
+   * the editor's current language.
+   */
   language: QaLanguage;
+  /**
+   * @deprecated No-op since session 10.c. Update meta.language via the
+   * editor sidebar to change the Q&A language.
+   */
   setLanguage: (lang: QaLanguage) => void;
   loading: boolean;
   error: string | null;
@@ -77,9 +92,7 @@ function persistMessages(draftId: string, messages: QaMessage[]): void {
 }
 
 // ---------------------------------------------------------------------------
-// askQuestion wrapper — adapts to optional language param
-// Content-api signature is `askQuestion(question: string)` — we send language
-// via the body by calling the hub proxy endpoint directly to stay non-breaking.
+// Engine call
 // ---------------------------------------------------------------------------
 
 interface AskResult {
@@ -90,9 +103,9 @@ interface AskResult {
 }
 
 async function askWithLanguage(question: string, language: QaLanguage): Promise<AskResult> {
-  // `askQuestion` currently passes only `{ question }` in the body.
-  // We extend by calling the same endpoint with language included.
-  // The engine may ignore unknown fields — gracefully degrades.
+  // `askQuestion` from content-api currently passes only `{ question }` in the body.
+  // We call the hub proxy directly so we can include `language` — the engine
+  // may ignore unknown fields, which gracefully degrades to language-agnostic answers.
   const res = await fetch('/api/engine/knowledge/answer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -120,9 +133,12 @@ export function useQaChat({ draftId }: UseQaChatOptions): UseQaChatResult {
   const [messages, setMessages] = useState<QaMessage[]>(() =>
     loadPersistedMessages(draftId),
   );
-  const [language, setLanguage] = useState<QaLanguage>('pt-br');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Derive language from the editor context — single source of truth.
+  const { meta } = useEditorContext();
+  const editorLanguage: QaLanguage = meta.language;
 
   // When draftId changes, reload persisted history for the new draft.
   useEffect(() => {
@@ -152,7 +168,7 @@ export function useQaChat({ draftId }: UseQaChatOptions): UseQaChatResult {
       });
 
       try {
-        const result = await askWithLanguage(question, language);
+        const result = await askWithLanguage(question, editorLanguage);
         const assistantMsg: QaMessage = {
           role: 'assistant',
           content: result.answer ?? '',
@@ -173,7 +189,7 @@ export function useQaChat({ draftId }: UseQaChatOptions): UseQaChatResult {
         setLoading(false);
       }
     },
-    [language],
+    [editorLanguage],
   );
 
   const send = useCallback(
@@ -190,5 +206,11 @@ export function useQaChat({ draftId }: UseQaChatOptions): UseQaChatResult {
     [messages, runQuestion],
   );
 
-  return { messages, send, retry, language, setLanguage, loading, error };
+  // `setLanguage` is kept as a no-op for backward compatibility.
+  // Consumers should update meta.language via the editor sidebar instead.
+  const setLanguage = useCallback((_lang: QaLanguage): void => {
+    // no-op: language is controlled by EditorContext.meta.language
+  }, []);
+
+  return { messages, send, retry, language: editorLanguage, setLanguage, loading, error };
 }

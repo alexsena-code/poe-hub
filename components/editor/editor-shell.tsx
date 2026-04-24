@@ -26,10 +26,12 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { JSONContent } from '@tiptap/core';
 import type { SanityPost } from '@/lib/sanity/types';
+import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
 import { EditorProvider } from './editor-context';
 import { EditorToolbar } from './editor-toolbar';
 import { EditorBody } from './editor-body';
 import { EditorSidebar } from './editor-sidebar';
+import { RightRail } from './right-rail';
 import { PreviewPane } from './preview/preview-pane';
 import { useTiptapEditor } from './hooks/use-tiptap-editor';
 import { useAutosave } from './hooks/use-autosave';
@@ -56,10 +58,15 @@ export interface EditorShellProps {
   /** Starting language — overridden by initialPost.language when editing. */
   defaultLanguage?: 'pt-br' | 'en';
   /**
-   * Slot for S08.h: Q&A panel, Assets panel mounted by the page-level shell.
-   * Rendered beside the sidebar when provided.
+   * Content Score from engine Fase C — passed when editing an existing post
+   * that has been processed. Exposed via EditorContext to the right rail widgets.
    */
-  slotSidePanels?: React.ReactNode;
+  contentScore?: ContentScoreReport;
+  /**
+   * Slang Report from engine Fase C — passed when editing an existing post
+   * that has been processed. Exposed via EditorContext to the right rail widgets.
+   */
+  slangReport?: SlangReport;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -90,7 +97,8 @@ export function EditorShell({
   initialPost,
   draftId,
   defaultLanguage = 'pt-br',
-  slotSidePanels,
+  contentScore,
+  slangReport,
 }: EditorShellProps) {
   // ── State ────────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState<EditorPhase>('draft');
@@ -156,6 +164,8 @@ export function EditorShell({
     setMeta,
     draftId,
     language: meta.language,
+    contentScore,
+    slangReport,
   };
 
   // ── Preview data ─────────────────────────────────────────────────────────────
@@ -176,11 +186,8 @@ export function EditorShell({
           publishing={publishing}
         />
 
-        {/* 3-column grid: [side panels] | main content | sidebar */}
+        {/* 4-column layout: main content | meta sidebar | right rail */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Optional side panels slot — S08.f/g/h mount Q&A + Assets here */}
-          {slotSidePanels}
-
           {/* Main content area: editor body or preview */}
           <main className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
             {phase === 'preview' ? (
@@ -196,7 +203,7 @@ export function EditorShell({
             )}
           </main>
 
-          {/* Right sidebar — meta form */}
+          {/* Meta form sidebar — S10.b will migrate this to /publish */}
           <EditorSidebar
             initialValues={buildInitialMeta(initialPost)}
             onMetaChange={(values) => setMetaState(values)}
@@ -205,6 +212,9 @@ export function EditorShell({
               setFormErrors(errs);
             }}
           />
+
+          {/* Right rail — Q&A, Score, Slang Report, Assets, Slang Lookup */}
+          <RightRail draftId={draftId} />
         </div>
       </div>
 

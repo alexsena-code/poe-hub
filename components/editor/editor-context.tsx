@@ -18,6 +18,7 @@
 import React, { createContext, useContext } from 'react';
 import type { Editor } from '@tiptap/react';
 import type { EditorMetaForm } from './editor-meta-schema';
+import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
 
 // ─── Context value shape ───────────────────────────────────────────────────────
 
@@ -32,6 +33,16 @@ export interface EditorContextValue {
   draftId: string;
   /** Active language — determines Sanity locale and GROQ category filter. */
   language: 'pt-br' | 'en';
+  /**
+   * Content Score from the engine's Fase C pipeline — present when editing an
+   * existing post that has been processed. Undefined for new posts.
+   */
+  contentScore?: ContentScoreReport;
+  /**
+   * Slang Report from the engine's Fase C pipeline — present when editing an
+   * existing post that has been processed. Undefined for new posts.
+   */
+  slangReport?: SlangReport;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
