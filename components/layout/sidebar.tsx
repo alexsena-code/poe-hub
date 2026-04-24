@@ -126,6 +126,8 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Ligas", href: "/admin/config/leagues", icon: ListTodo },
           { title: "Usuarios", href: "/admin/config/users", icon: Users },
           { title: "Feature Flags", href: "/admin/config/feature-flags", icon: Settings },
+          // Session 01 temp — delete after style decisions land
+          { title: "Design Preview", href: "/admin/design-preview", icon: Search },
         ],
       },
     ],
