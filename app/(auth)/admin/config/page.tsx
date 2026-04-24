@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { DollarSign, Flag, Globe, Trophy, Users } from "lucide-react";
 
 const settingsCards = [
@@ -45,12 +46,10 @@ const settingsCards = [
 export default function SettingsPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Configuracoes</h1>
-        <p className="text-muted-foreground">
-          Gerencie as configuracoes do sistema.
-        </p>
-      </div>
+      <PageHeader
+        title="Configuracoes"
+        description="Gerencie as configuracoes do sistema."
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
         {settingsCards.map((card) => (

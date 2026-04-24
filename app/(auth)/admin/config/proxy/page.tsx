@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Eye, EyeOff, Save, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 const proxySchema = z.object({
   port: z.number().int().min(1).max(65535),
@@ -111,10 +112,10 @@ export default function ProxySettingsPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Configuracoes
         </Button>
-        <h1 className="text-3xl font-bold">Proxy Global</h1>
-        <p className="text-muted-foreground">
-          Configuracao de proxy compartilhada entre os bots.
-        </p>
+        <PageHeader
+          title="Proxy Global"
+          description="Configuracao de proxy compartilhada entre os bots."
+        />
       </div>
 
       <Card className="max-w-lg">

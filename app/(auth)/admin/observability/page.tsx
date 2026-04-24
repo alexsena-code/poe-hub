@@ -3,6 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/ui/page-header";
 
 // Session 21 Track B — four operational routes (/logs, /llm-logs,
 // /analytics, /monitor) collapsed into this single admin dashboard.
@@ -33,12 +34,11 @@ export default function ObservabilityPage() {
 
   return (
     <div className="p-6 max-w-[1800px] mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Observability</h1>
-        <p className="text-sm text-muted-foreground">
-          Logs, LLM custos, analytics e monitor em tempo real
-        </p>
-      </div>
+      <PageHeader
+        title="Observability"
+        description="Logs, LLM custos, analytics e monitor em tempo real"
+        className="mb-6"
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)}>
         <TabsList>

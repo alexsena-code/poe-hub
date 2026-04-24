@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { PageHeader } from "@/components/ui/page-header";
 
 const API = '/api/engine';
 
@@ -146,10 +147,11 @@ export default function LogPage() {
       </header>
 
       <div className="mx-auto max-w-4xl px-6 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-1">Audit log</h1>
-        <p className="text-sm text-muted-foreground mb-6">
-          Timeline do pipeline que gerou este post. Cada evento mostra duração, tokens e custo.
-        </p>
+        <PageHeader
+          title="Audit log"
+          description="Timeline do pipeline que gerou este post. Cada evento mostra duração, tokens e custo."
+          className="mb-6"
+        />
 
         {/* Totals card */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">

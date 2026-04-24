@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { SaleForm } from "@/components/modules/sales/sale-form";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -37,7 +38,7 @@ export default async function EditSalePage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-3xl font-bold">Editar Venda</h1>
+      <PageHeader title="Editar Venda" />
       <SaleForm initialData={initialData} />
     </div>
   );

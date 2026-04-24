@@ -24,11 +24,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   ArrowUpDown,
-  BarChart3,
-  TrendingUp,
-  ShoppingCart,
   RefreshCw,
   History,
 } from "lucide-react";
@@ -332,7 +330,7 @@ export default function HardwareAnalyticsPage() {
   if (loading) {
     return (
       <div className="space-y-6 p-6">
-        <div><h1 className="text-2xl font-bold">Price Analytics</h1></div>
+        <PageHeader title="Price Analytics" />
         <Skeleton className="h-10 w-96" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -341,13 +339,10 @@ export default function HardwareAnalyticsPage() {
 
   return (
     <div className="space-y-4 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BarChart3 className="h-6 w-6" /> Price Analytics
-        </h1>
-        <p className="text-muted-foreground text-sm">Compare prices and track trends.</p>
-      </div>
+      <PageHeader
+        title="Price Analytics"
+        description="Compare prices and track trends."
+      />
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-border pb-0">

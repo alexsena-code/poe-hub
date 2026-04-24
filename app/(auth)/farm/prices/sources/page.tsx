@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DiscordSourceManager } from "@/components/modules/prices/discord-source-manager";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 
 export default function PriceSourcesPage() {
   return (
@@ -12,12 +13,10 @@ export default function PriceSourcesPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold">Discord Sources</h1>
-          <p className="text-muted-foreground">
-            Gerencie os canais do Discord monitorados para coleta de precos.
-          </p>
-        </div>
+        <PageHeader
+          title="Discord Sources"
+          description="Gerencie os canais do Discord monitorados para coleta de precos."
+        />
       </div>
       <DiscordSourceManager />
     </div>

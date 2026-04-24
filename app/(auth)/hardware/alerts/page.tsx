@@ -21,8 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import {
-  BellRing,
   ExternalLink,
   RefreshCw,
   ArrowUpDown,
@@ -197,14 +197,10 @@ export default function AlertsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BellRing className="h-6 w-6" /> Alertas de Desconto
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Deals abaixo do limite de preço, ordenados por % de desconto
-        </p>
-      </div>
+      <PageHeader
+        title="Alertas de Desconto"
+        description="Deals abaixo do limite de preço, ordenados por % de desconto"
+      />
 
       {/* Filters */}
       <Card>

@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ArrowLeft, Plus, Pencil, Trash2, Star, Info, X } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { useCurrency } from "@/hooks/use-currency";
 
 // --- Types ---
@@ -363,26 +364,26 @@ export default function CostConfigsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mb-2"
-            onClick={() => router.push("/admin/config")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Configuracoes
-          </Button>
-          <h1 className="text-3xl font-bold">Configuracoes de Custos</h1>
-          <p className="text-muted-foreground">
-            Gerencie os perfis de custo operacional usados nas simulacoes.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Configuracao
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-2"
+          onClick={() => router.push("/admin/config")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Configuracoes
         </Button>
+        <PageHeader
+          title="Configuracoes de Custos"
+          description="Gerencie os perfis de custo operacional usados nas simulacoes."
+          actions={
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Configuracao
+            </Button>
+          }
+        />
       </div>
 
       {/* Table */}

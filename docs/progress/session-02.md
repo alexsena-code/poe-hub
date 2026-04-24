@@ -225,14 +225,152 @@ antes), ou S02.d (se o hardware dash for dor aguda hoje).
 
 ## Changelog
 
-_(vazio — aguardando primeira fase)_
+### S02.b — BriefingForm split (2026-04-23)
+
+`components/engine/BriefingForm.tsx` 710L → 460L orquestrador.
+Nova pasta `components/engine/briefing/` com 8 sub-components + 1 módulo puro + types:
+
+- `stitch-notes.ts` — função pura `buildStitchedNotes()`, extraída e testada.
+- `stitch-notes.test.ts` — 9 testes Vitest (sem userNotes, com userNotes, null briefingText, empty secondaryKeywords, null cluster, empty titleEn, ordering).
+- `types.ts` — interface `BriefSource` compartilhada.
+- `template-selector.tsx` — dropdown de templates.
+- `topic-or-skill-fields.tsx` — conditional topic OR skill+ascendancy.
+- `league-field.tsx` — input de league.
+- `template-section-toggles.tsx` — checkboxes de seções do template.
+- `brief-source-summary.tsx` — card emerald quando `?briefId=X` hydrated.
+- `pob-importer.tsx` — URL input + botão Analisar + PobError + PobSummaryCard.
+- `notes-textarea.tsx` — textarea com placeholder contextual (com/sem briefSource).
+- `submit-button.tsx` — botão com spinner.
+
+Consumer único confirmado: `app/(auth)/workspace/new/page.tsx` — API externa preservada (`export default function BriefingForm()`).
+
+Validação:
+- `wc -l`: BriefingForm.tsx 460L, todos sub-components ≤81L.
+- `npx next build` — exit 0, zero erros.
+- `npx vitest run components/engine/briefing/stitch-notes` — 9/9 passed.
+- `npx vitest run` — 6 failed | 19 passed (idêntico ao baseline pré-existente, zero regressão).
+
+### S02.c — simulation-comparison split (2026-04-23)
+
+`components/modules/simulations/simulation-comparison.tsx` 1379L → removido.
+Nova pasta `components/modules/simulations/simulation-comparison/` com 11 arquivos:
+
+- `types.ts` (60L) — `CustomCost`, `CostConfigOption`, `Simulation`, `SimTotals`, `WeekTotals`. Re-exporta `SimulationWeek` de `week-editor` para evitar duplicação.
+- `helpers.ts` (213L) — funções puras: `resolveField`, `customPerBotDaily`, `customGlobalDaily`, `customOneTime`, `calcSimTotals`, `calcWeekTotals`. Zero imports React.
+- `use-comparison-state.ts` (268L) — hook `useComparisonState(ids)` com todo o estado + mutations (fetch, applyCostConfig, updateWeekDefault, updateSimCost, updateCustomCost, addCustomCost, removeCustomCost, saveSimulation).
+- `delta.tsx` (41L) — componente `Delta` — badge colorido com valor absoluto + percentagem.
+- `scenario-chart.tsx` (206L) — `ScenarioChart` — AreaChart de lucro cumulativo por dia com KPIs side-panel (lucro/dia, break-even, total).
+- `financial-summary.tsx` (141L) — `FinancialSummary` — tabela de totais + toggle para `ScenarioChart`.
+- `cost-panel.tsx` (287L) — `CostPanel` — custos fixos editáveis + custom costs + cost-config selector por simulação.
+- `week-params-table.tsx` (153L) — `WeekParamsTable` — tabela editável de defaults por semana (bots/div-hr/hrs-dia).
+- `week-results-table.tsx` (137L) — `WeekResultsTable` — resultados receita/custo/lucro por semana com delta column.
+- `daily-breakdown.tsx` (219L) — `DailyBreakdown` — Accordion com breakdown diário por semana, dias locked renderizados com opacity-40.
+- `index.tsx` (180L) — orquestrador; re-exporta tipos públicos; delega estado a `useComparisonState`; renderiza as 5 seções.
+
+Consumer único confirmado: `app/(auth)/farm/simulations/compare/page.tsx` — import `SimulationComparison` de `"@/components/modules/simulations/simulation-comparison"` continua válido (TS resolve `index.tsx` automaticamente).
+
+Validação:
+- `wc -l`: todos os arquivos ≤287L; maior é `cost-panel.tsx` (287L). Nenhum supera 300L.
+- Arquivo antigo `simulation-comparison.tsx` removido — `ls simulations/` confirma ausência.
+- `npx next build` — exit 0, zero erros de compilação.
+- `npx vitest run` — 6 failed | 19 passed (idêntico ao baseline pré-existente, zero regressão).
+
+### S02.a — PageHeader backfill + SEO accent sweep (2026-04-23)
+
+`components/ui/page-header.tsx` extendido com prop `accent?: string`.
+Quando presente aplica `border-l-2 pl-4` + `borderLeftColor` inline + `color` inline no h1 —
+sem CSS extra, sem variantes adicionais. Totalmente DRY.
+
+Arquivos tocados (12 pages/components):
+
+- `components/ui/page-header.tsx` — adicionada prop `accent?: string` + `CSSProperties`.
+- `app/(auth)/hardware/alerts/page.tsx` — substituído `<h1>` + `<p>` manual; removido import `BellRing` órfão.
+- `app/(auth)/hardware/recent/page.tsx` — substituído; removido import `Clock` órfão.
+- `app/(auth)/hardware/analytics/page.tsx` — substituído em 2 lugares (loading state + main render); removidos imports `BarChart3`, `TrendingUp`, `ShoppingCart` órfãos.
+- `app/(auth)/hardware/settings/page.tsx` — substituído; removido import `Settings` órfão.
+- `app/(auth)/farm/prices/page.tsx` — substituído `flex justify-between` wrapper; CTAs preservados no slot `actions`.
+- `app/(auth)/farm/simulations/annual/page.tsx` — substituído header com "Novo Plano" no slot `actions`.
+- `app/(auth)/admin/tasks/tasks-page-client.tsx` — substituído; toggle kanban/list + "Nova Tarefa" preservados no slot `actions`.
+- `app/(auth)/admin/observability/page.tsx` — substituído.
+- `app/(auth)/admin/config/page.tsx` — substituído.
+- `app/(auth)/admin/config/costs/page.tsx` — substituído; back button mantido fora do PageHeader; CTA "Nova Configuracao" no slot `actions`.
+
+Arquivos já tinham PageHeader (pré-existente, zero mudança):
+bots/{page,[id],new}, sales/{page,[id],new}, prices/sources, simulations/page,
+feature-flags, leagues, proxy, users, workspace/new, guides/[slug]/log,
+dashboard, seo/{research,analysis,opportunities,reddit,youtube,keybert}.
+
+Arquivos pulados (conforme instrução):
+- `hardware/page.tsx` e `hardware/builder/page.tsx` — S02.d vai refatorar do zero.
+- `hardware/vms/page.tsx` — apenas `redirect()`, sem header.
+- `admin/design-preview/page.tsx` — a ser deletado.
+- `admin/config/layout.tsx` — já usa PageHeader (explícito no brief).
+- `workspace/guides/[slug]/guide-content.tsx` — h1/h2 são título do post (conteúdo renderizado), não page header.
+
+SEO accent: 6 pages `/seo/*` receberam `accent="var(--color-seo)"` no PageHeader
+(e a prop foi adicionada ao tipo do componente). Cada página SEO também teve o
+header migrado do `<div flex justify-between><h1>...</h1><...></div>` manual
+para PageHeader com `actions` slot preservado.
+
+Validação:
+- `npx next build` — exit 0, "Compiled successfully in 4.8s", 92/92 páginas geradas.
+- `npx vitest run` — 6 failed | 19 passed (idêntico ao baseline pré-existente, zero regressão).
+
+### S02.d — hardware + hardware/builder split (2026-04-23)
+
+Dois god components em `app/(auth)/hardware/` decompostos em
+`components/modules/hardware/` com 10 sub-files + orchestrators enxutos.
+
+**Pages (orchestrators)**:
+- `app/(auth)/hardware/page.tsx` — 2403L → **360L**. PageHeader com
+  "Refresh / Scrape Now / Clear All" no slot `actions`. Orquestra
+  DealsTab + ManualPricesTab + ItemsTab + StorePricesTab.
+- `app/(auth)/hardware/builder/page.tsx` — 1346L → **529L**. PageHeader
+  com título/descrição. State de compatibility/totals permanece na page
+  (são interdependentes).
+
+**Sub-files em `components/modules/hardware/`**:
+
+- `types.ts` (141L) — Deal, SummaryItem, HardwareConfigItem, BuilderConfigItem, ManualPrice, StoreProduct, BuildConfig, BuildTotals, SavedBuild.
+- `helpers.ts` (123L) — `formatPriceBrl`, `formatDealDate`, `categoryLabel`, `generateKeywords`, `specsFieldsForCategory`, `SPEC_LABELS`.
+- `deal-image-carousel.tsx` (65L) — carousel para deals com múltiplas imagens.
+- `deals-tab.tsx` (555L) — filter bar, list/card toggle, tabela/grid paginado, ban/delete. **Levemente acima do target** (target 550L, atingiu 555L — 1% de margem).
+- `manual-prices-tab.tsx` (250L) — inline-edit de preços de referência por item.
+- `items-tab.tsx` (508L) — CRUD de scraper config items, suporta prefill cross-tab via `prefillRef`.
+- `store-prices-tab.tsx` (955L) — PCBuildWizard live prices, spec filters, pagination, sync. **Pré-existente**, flagged para futuro split (similar ao pipelines-tab.tsx).
+- `builder-component-picker.tsx` (410L) — selects de GPU/CPU/RAM/Mobo/PSU/SSD com filtros de compatibility.
+- `builder-vm-section.tsx` (316L) — calculadora VM com progress bars, profile inputs, cost-per-VM.
+- `builder-build-summary.tsx` (160L) — NEW — card "Build Summary" à direita: totals grid, breakdown, price comparison.
+
+Validação:
+- `npx next build` — exit 0, `/hardware` e `/hardware/builder` na route list.
+- `npx vitest run` — 6 failed | 19 passed (zero regressão).
+
+**Flag de carryover para session 03**: `store-prices-tab.tsx` (955L) e
+`deals-tab.tsx` (555L) ficam como candidatos a split futuro. Não foram
+divididos nesta fase porque o objetivo primário era encolher as pages
+orchestrator — missão cumprida (2403→360L e 1346→529L).
+
+### Final wrap (2026-04-23)
+
+- `app/(auth)/admin/design-preview/page.tsx` deletado (`git rm`).
+- `components/layout/sidebar.tsx`: entry "Design Preview" removida do
+  grupo Admin.
+- `docs/PROGRESS.md` atualizado com métricas novas.
+
+Validação final integrada (todos os 4 agents + cleanup):
+- `npx next build` — exit 0, 92/92 páginas, zero warnings.
+- `npx vitest run` — 6 failed | 19 passed (baseline pré-existente inalterado).
+- `npx vitest run components/engine/briefing` — 9/9 passed (testes novos de `stitch-notes`).
 
 ## Notas
 
-- `/admin/design-preview` continua acessível enquanto Phase 2 não
-  termina — delete em S02.a.
 - `pipelines-tab.tsx` (700L) continua flagged da session 01 —
   revisitar só se crescer.
+- `store-prices-tab.tsx` (955L) e `deals-tab.tsx` (555L) flagged
+  pra futuro split (carryover session 03).
 - Tipos compartilhados engine↔hub ainda pendentes (carryover
-  `docs/PROGRESS.md`) — não está no scope desta session, mas pode
-  surgir se B5 tocar na Briefing shape.
+  `docs/PROGRESS.md`) — não surgiu nesta fase.
+- `/seo/research` rearquitetura (S02.e planejado) não executada —
+  precisa de spec prévia com operator. Fica como fase inicial da
+  próxima session.

@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/ui/page-header";
 import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
 
 interface AnnualPlan {
@@ -111,18 +112,16 @@ export default function AnnualPlansIndexPage() {
             Voltar para Simulações
           </Link>
         </Button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Faturamento Anual</h1>
-            <p className="text-muted-foreground text-sm">
-              Agregue simulações de ligas (PoE1 + PoE2) em um plano anual. Adicione custos fixos do ano (VPS, eletricidade) no plano.
-            </p>
-          </div>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Plano
-          </Button>
-        </div>
+        <PageHeader
+          title="Faturamento Anual"
+          description="Agregue simulações de ligas (PoE1 + PoE2) em um plano anual. Adicione custos fixos do ano (VPS, eletricidade) no plano."
+          actions={
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Plano
+            </Button>
+          }
+        />
       </div>
 
       <Card>

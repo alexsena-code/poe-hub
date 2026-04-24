@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { PageHeader } from "@/components/ui/page-header";
 
 const API = '/api/engine';
 
@@ -95,15 +96,19 @@ export default function KeybertPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-foreground">KeyBERT Worker</h1>
-        <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${online ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-sm text-foreground font-medium">
-            {online ? 'Worker Online' : 'Worker Offline'}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title="KeyBERT Worker"
+        description="Extração de keywords via modelos de linguagem e semântica vetorial"
+        accent="var(--color-seo)"
+        actions={
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${online ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-sm text-foreground font-medium">
+              {online ? 'Worker Online' : 'Worker Offline'}
+            </span>
+          </div>
+        }
+      />
 
       {loading && <p className="text-muted-foreground text-sm">Carregando...</p>}
 

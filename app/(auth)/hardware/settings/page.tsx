@@ -27,8 +27,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/ui/page-header";
 import {
-  Settings,
   Wifi,
   WifiOff,
   Shield,
@@ -441,15 +441,10 @@ export default function HardwareSettingsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Settings className="h-6 w-6" /> Settings
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Manage scraper configuration, OLX categories, and proxies.
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Manage scraper configuration, OLX categories, and proxies."
+      />
 
       {/* Worker Status */}
       <Card>

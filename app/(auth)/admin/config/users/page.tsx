@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Plus, Pencil, Trash2, Loader2, Eye, EyeOff } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface User {
   id: string;
@@ -217,26 +218,26 @@ export default function UsersSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mb-2"
-            onClick={() => router.push("/admin/config")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Configuracoes
-          </Button>
-          <h1 className="text-3xl font-bold">Gerenciar Usuarios</h1>
-          <p className="text-muted-foreground">
-            Criar e gerenciar contas de usuario do sistema.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Usuario
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-2"
+          onClick={() => router.push("/admin/config")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Configuracoes
         </Button>
+        <PageHeader
+          title="Gerenciar Usuarios"
+          description="Criar e gerenciar contas de usuario do sistema."
+          actions={
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Usuario
+            </Button>
+          }
+        />
       </div>
 
       <div className="rounded-md border">

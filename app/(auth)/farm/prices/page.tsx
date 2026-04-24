@@ -7,6 +7,7 @@ import { PriceChart } from "@/components/modules/prices/price-chart";
 import { PriceHistoryTable } from "@/components/modules/prices/price-history-table";
 import { CrossLeaguePriceChart } from "@/components/modules/prices/cross-league-price-chart";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Settings, RefreshCw, Loader2, X, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import { useLeagues } from "@/hooks/use-leagues";
@@ -96,30 +97,28 @@ export default function PricesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Historico de Precos</h1>
-          <p className="text-muted-foreground">
-            Acompanhe a evolucao dos precos coletados do Discord.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleScrape} disabled={scraping}>
-            {scraping ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            {scraping ? "Scraping..." : "Atualizar Precos"}
-          </Button>
-          <Link href="/farm/prices/sources">
-            <Button variant="outline">
-              <Settings className="h-4 w-4 mr-2" />
-              Configurar Sources
+      <PageHeader
+        title="Historico de Precos"
+        description="Acompanhe a evolucao dos precos coletados do Discord."
+        actions={
+          <>
+            <Button onClick={handleScrape} disabled={scraping}>
+              {scraping ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {scraping ? "Scraping..." : "Atualizar Precos"}
             </Button>
-          </Link>
-        </div>
-      </div>
+            <Link href="/farm/prices/sources">
+              <Button variant="outline">
+                <Settings className="h-4 w-4 mr-2" />
+                Configurar Sources
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {showLogs && (
         <div className="rounded-lg border bg-zinc-950 text-zinc-100 overflow-hidden">

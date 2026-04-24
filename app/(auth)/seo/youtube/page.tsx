@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { PageHeader } from "@/components/ui/page-header";
 
 const API_URL = '/api/engine';
 
@@ -427,16 +428,13 @@ export default function YouTubeTrendsPage() {
   return (
     <div className="flex flex-col h-full max-w-[1800px] mx-auto">
       <div className="shrink-0 pb-4">
-      {/* Header + Stats + Actions */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">YouTube Trends</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Monitor PoE content creators and discover trending topics
-          </p>
-        </div>
-        <div />
-      </div>
+      {/* Header */}
+      <PageHeader
+        title="YouTube Trends"
+        description="Monitor PoE content creators and discover trending topics"
+        accent="var(--color-seo)"
+        className="mb-4"
+      />
 
       {/* Stats bar + Actions */}
       <div className="flex items-center gap-6 mb-4">

@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 02 kicked off — Track B continuation).
+Last updated: 2026-04-23 (session 02 landed — 4 parallel refactors).
 
 ## Current status
 
@@ -13,16 +13,26 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(~373 tests) + Playwright (32 E2E).
+(~382 tests, +9 novos em `stitch-notes.test.ts`) + Playwright (32 E2E).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
 engine-config split (1944L → 182L + 9 tabs), style Phase 1 (neutral +
 semantic colors + typography scale + linear charts).
 
-**Active session:** [session-02](progress/session-02.md) — Track B
-continuation: god component decomposition (BriefingForm, simulation-
-comparison, hardware), Phase 2 style (PageHeader backfill, SEO accent
-sweep), B4 `/seo/research` rearquitetura.
+Session 02 landed (4 parallel refactors):
+- **S02.a** — PageHeader backfill + SEO accent sweep (PageHeader ganhou
+  prop `accent?: string`; ~17 pages tocadas).
+- **S02.b** — BriefingForm 710L → 460L orchestrator + 10 sub-files em
+  `components/engine/briefing/` + teste puro `stitch-notes.test.ts`.
+- **S02.c** — simulation-comparison 1379L → 11 sub-files em
+  `components/modules/simulations/simulation-comparison/` (maior 287L).
+- **S02.d** — hardware 2403L → 360L orchestrator + builder 1346L → 529L
+  orchestrator + 10 sub-files em `components/modules/hardware/`.
+- **Wrap** — `/admin/design-preview` deletado, sidebar entry removida.
+
+Carryover para session 03: `/seo/research` rearquitetura (B4, spec
+needed), `store-prices-tab.tsx` (955L) e `deals-tab.tsx` (555L) split,
+Server Components audit.
 
 ## Working agreement
 
@@ -46,7 +56,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
-| [02](progress/session-02.md) | 2026-04-23 | **active** — god component decomposition (BriefingForm/simulation-comparison/hardware) + Phase 2 style + B4 rearquitetura |
+| [02](progress/session-02.md) | 2026-04-23 | 4 parallel refactors: BriefingForm/simulation-comparison/hardware splits + Phase 2 style (PageHeader backfill + SEO accent) |
 | [01](progress/session-01.md) | 2026-04-23 | IA rework (5 domains) + admin/config fusion + engine-config split + style Phase 1 |
 
 Pre-session history (flat, phase-by-phase) is preserved in
@@ -58,15 +68,15 @@ new work lives in numbered sessions.
 
 | Metric | Value | Since session 01 |
 |---|---:|---|
-| TS/TSX files | ~340 | +9 engine tabs, +2 UI components, +placeholders |
-| Routes | 71 | stable (5-domain IA, /llm deleted) |
-| `'use client'` pages | 147 (Server Components: 0) | unchanged — RSC migration in session 02 B7 |
-| Vitest tests | ~373 | unchanged |
-| Playwright E2E | 32 | unchanged (URLs updated in B1) |
-| God files >1000L | 4 | was 5 — engine-config 1944L → 182L split |
-| God files 500-1000L | 2 (BriefingForm 710, pipelines-tab 700) | SectionEditor already split pre-session; pipelines-tab flagged from S01.d |
-| Sidebar top-level | 6 (was 25+ flat) | Dashboard + Workspace + SEO + Farm + Admin + Hardware, target ≤15 met |
-| Theme base | neutral (was zinc) | session 01 S01.f, operator preference |
+| TS/TSX files | ~373 | +32 sub-components (briefing/simulation-comparison/hardware), -1 simulation-comparison monolito, -1 design-preview |
+| Routes | 70 | -1 (/admin/design-preview deleted) |
+| `'use client'` pages | 147 (Server Components: 0) | unchanged — RSC migration carryover |
+| Vitest tests | ~382 | +9 novos (`stitch-notes.test.ts`) |
+| Playwright E2E | 32 | unchanged |
+| God files >1000L | 2 (seo/youtube 2120, seo/research 1289) | was 4 — hardware 2403→360, hardware/builder 1346→529, simulation-comparison 1379→split |
+| God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
+| Sidebar top-level | 6 (was 25+ flat) | stable |
+| Theme base | neutral | stable |
 
 ## Architecture reference
 

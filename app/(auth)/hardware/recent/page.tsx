@@ -22,8 +22,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/ui/page-header";
 import {
-  Clock,
   ExternalLink,
   Search,
   RefreshCw,
@@ -181,14 +181,10 @@ export default function RecentDealsPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Clock className="h-6 w-6" /> Deals Recentes
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Anúncios encontrados nas últimas horas
-        </p>
-      </div>
+      <PageHeader
+        title="Deals Recentes"
+        description="Anúncios encontrados nas últimas horas"
+      />
 
       {/* Filters */}
       <Card>

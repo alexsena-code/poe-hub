@@ -6,6 +6,7 @@ import { RecentSales } from "@/components/modules/dashboard/recent-sales";
 import { PriceCharts } from "@/components/modules/dashboard/price-charts";
 import { TaskSummary } from "@/components/modules/dashboard/task-summary";
 import { Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface DashboardData {
   activeBots: number;
@@ -54,7 +55,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <PageHeader title="Dashboard" />
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
           {error}
         </div>
@@ -65,7 +66,7 @@ export default function DashboardPage() {
   if (!data) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <PageHeader title="Dashboard" />
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -75,7 +76,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+      <PageHeader title="Dashboard" />
 
       <KpiCards data={data} />
 

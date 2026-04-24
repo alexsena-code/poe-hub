@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { PageHeader } from "@/components/ui/page-header";
 
 const API_URL = '/api/engine';
 
@@ -480,14 +481,13 @@ export default function RedditDashboardPage() {
   return (
     <div className="flex flex-col h-full max-w-[1800px] mx-auto">
       <div className="shrink-0 pb-4">
-      {/* Header + Actions */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Reddit Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Top posts, trending topics, and build discussions</p>
-        </div>
-        <div />
-      </div>
+      {/* Header */}
+      <PageHeader
+        title="Reddit Dashboard"
+        description="Top posts, trending topics, and build discussions"
+        accent="var(--color-seo)"
+        className="mb-4"
+      />
 
       {/* Stats bar + Actions */}
       <div className="flex items-center gap-6 mb-4">

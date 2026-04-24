@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { BotForm } from "@/components/modules/bots/bot-form";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -34,7 +35,7 @@ export default async function EditBotPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-3xl font-bold">Editar Bot: {bot.nick}</h1>
+      <PageHeader title={`Editar Bot: ${bot.nick}`} />
       <BotForm initialData={initialData} />
     </div>
   );

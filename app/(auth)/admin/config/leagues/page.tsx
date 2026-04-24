@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ArrowLeft, Plus, Pencil, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface League {
   id: string;
@@ -195,26 +196,26 @@ export default function LeaguesSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mb-2"
-            onClick={() => router.push("/admin/config")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Configuracoes
-          </Button>
-          <h1 className="text-3xl font-bold">Gerenciar Ligas</h1>
-          <p className="text-muted-foreground">
-            Adicionar, editar e controlar ligas ativas de Path of Exile.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Liga
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-2"
+          onClick={() => router.push("/admin/config")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Configuracoes
         </Button>
+        <PageHeader
+          title="Gerenciar Ligas"
+          description="Adicionar, editar e controlar ligas ativas de Path of Exile."
+          actions={
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Liga
+            </Button>
+          }
+        />
       </div>
 
       <div className="rounded-md border">

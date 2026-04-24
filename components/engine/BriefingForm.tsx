@@ -6,10 +6,21 @@ import { nanoid } from 'nanoid';
 import { generateOutline, proposeOutline, fetchSkimCollections, analyzePob } from '@/lib/content-api';
 import { usePostStore } from '@/lib/engine-store';
 import type { Briefing, CustomSection, ProposedOutline, PobSummary } from '@/lib/engine-types';
+
 import PlanPreview from './PlanPreview';
 import OutlineEditor from './OutlineEditor';
 import SkimCollectionsSelector from './SkimCollectionsSelector';
-import PobSummaryCard from './PobSummaryCard';
+
+import { buildStitchedNotes } from './briefing/stitch-notes';
+import type { BriefSource } from './briefing/types';
+import { TemplateSelector } from './briefing/template-selector';
+import { TopicOrSkillFields } from './briefing/topic-or-skill-fields';
+import { LeagueField } from './briefing/league-field';
+import { TemplateSectionToggles } from './briefing/template-section-toggles';
+import { BriefSourceSummary } from './briefing/brief-source-summary';
+import { PobImporter } from './briefing/pob-importer';
+import { NotesTextarea } from './briefing/notes-textarea';
+import { SubmitButton } from './briefing/submit-button';
 
 const API_URL = '/api/engine';
 
@@ -23,70 +34,6 @@ const TOPIC_TEMPLATES = [
   'qa_page', 'atlas_guide', 'league_start', 'crafting_guide', 'tier_list',
   'meta_report', 'comparison',
 ];
-
-// Stitches the structured brief (rationale + expanded briefing + keywords)
-// with the user's free-form notes into a single Briefing.notes payload.
-// User notes come last as "Additional guidance" — writers are told to
-// treat them as addenda, not to replace the structured context.
-function buildStitchedNotes(
-  brief: {
-    title: string;
-    titleEn: string;
-    primaryKeyword: string;
-    secondaryKeywords: string[];
-    cluster: string | null;
-    rationale: string;
-    briefingText: string | null;
-    effort: string;
-    urgency: string;
-    score: number;
-  },
-  userNotes: string,
-): string {
-  const parts: string[] = [
-    `## Content Brief`,
-    `Title (PT-BR): ${brief.title}`,
-    brief.titleEn ? `Title (EN): ${brief.titleEn}` : '',
-    `Primary Keyword: ${brief.primaryKeyword}`,
-    brief.secondaryKeywords.length > 0
-      ? `Secondary Keywords: ${brief.secondaryKeywords.join(', ')}`
-      : '',
-    brief.cluster ? `Cluster/Theme: ${brief.cluster}` : '',
-    '',
-    `## Why This Topic`,
-    brief.rationale,
-    '',
-  ];
-  if (brief.briefingText) {
-    parts.push(`## Expanded Briefing`, brief.briefingText, '');
-  }
-  parts.push(
-    `## Editorial Guidance`,
-    `Effort Level: ${brief.effort}`,
-    `Urgency: ${brief.urgency}`,
-    `Priority Score: ${brief.score}/100`,
-  );
-  const trimmed = userNotes.trim();
-  if (trimmed) {
-    parts.push('', `## Additional guidance from the editor`, trimmed);
-  }
-  return parts.filter((p) => p !== null && p !== undefined).join('\n');
-}
-
-interface BriefSource {
-  id: number;
-  title: string;
-  titleEn: string;
-  templateType: string;
-  primaryKeyword: string;
-  secondaryKeywords: string[];
-  rationale: string;
-  briefingText: string | null;
-  cluster: string | null;
-  urgency: string;
-  effort: string;
-  score: number;
-}
 
 export default function BriefingForm() {
   const router = useRouter();
@@ -105,9 +52,7 @@ export default function BriefingForm() {
   // opt out of any section before generation. Keyed by section id →
   // boolean (true = keep). We only ever add to this map, never clobber,
   // so user choices persist across template edits.
-  const [templateSections, setTemplateSections] = useState<
-    Array<{ id: string; title: string }>
-  >([]);
+  const [templateSections, setTemplateSections] = useState<Array<{ id: string; title: string }>>([]);
   const [keptSections, setKeptSections] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState<Briefing>({
     skill: searchParams.get('topic') || '',
@@ -127,9 +72,7 @@ export default function BriefingForm() {
   // no backend. Um valor diferente do default viaja como
   // briefing.skimCollections ao gerar o outline.
   const [skimCollections, setSkimCollections] = useState<string[]>([]);
-  const [skimDefaultsByTemplate, setSkimDefaultsByTemplate] = useState<
-    Record<string, string[]>
-  >({});
+  const [skimDefaultsByTemplate, setSkimDefaultsByTemplate] = useState<Record<string, string[]>>({});
   // PoB analysis state — card shows decoded class/ascendancy/loadouts
   // immediately after clicking "Analisar", before the user generates.
   const [pobSummary, setPobSummary] = useState<PobSummary | null>(null);
@@ -151,8 +94,7 @@ export default function BriefingForm() {
   }, []);
 
   // Fetch o catálogo de skim collections uma vez (é pequeno e mudam raro).
-  // Também reseta a seleção pro default do template assim que o mapa
-  // chega.
+  // Também reseta a seleção pro default do template assim que o mapa chega.
   useEffect(() => {
     let cancelled = false;
     fetchSkimCollections()
@@ -168,9 +110,7 @@ export default function BriefingForm() {
         // Backend offline / sem endpoint? Mantemos vazio e o backend
         // cai no default por template (no-op prática pro autor).
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -200,7 +140,7 @@ export default function BriefingForm() {
         if (cancelled) return;
         const raw = Array.isArray(data?.sections) ? data.sections : [];
         const normalized = raw
-          .map((s: any) => ({
+          .map((s: { id?: string; sectionId?: string; title?: string }) => ({
             id: String(s.id || s.sectionId || ''),
             title: String(s.title || s.id || ''),
           }))
@@ -219,13 +159,6 @@ export default function BriefingForm() {
       });
     return () => { cancelled = true; };
   }, [form.templateName]);
-
-  const toggleSection = (id: string) => {
-    setKeptSections((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-  const excludedSectionIds = templateSections
-    .filter((s) => !keptSections[s.id])
-    .map((s) => s.id);
 
   // Hydrate form from the full brief when arriving via /new?briefId=X.
   // We only seed the identifying fields (topic, template); the expanded
@@ -260,6 +193,33 @@ export default function BriefingForm() {
 
   function updateField<K extends keyof Briefing>(key: K, value: Briefing[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const excludedSectionIds = templateSections
+    .filter((s) => !keptSections[s.id])
+    .map((s) => s.id);
+
+  function toggleSection(id: string) {
+    setKeptSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  async function handleAnalyzePob() {
+    const url = (form.pobUrl ?? '').trim();
+    if (!url) {
+      setPobError('Cole a URL ou o código do PoB primeiro.');
+      return;
+    }
+    setPobAnalyzing(true);
+    setPobError(null);
+    try {
+      const summary = await analyzePob(url);
+      setPobSummary(summary);
+    } catch (e) {
+      setPobError(e instanceof Error ? e.message : 'Erro ao analisar');
+      setPobSummary(null);
+    } finally {
+      setPobAnalyzing(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -314,9 +274,7 @@ export default function BriefingForm() {
       setOutlineProposal(proposal);
       setStep('outline');
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Erro ao propor outline.',
-      );
+      setError(err instanceof Error ? err.message : 'Erro ao propor outline.');
     } finally {
       setLoading(false);
     }
@@ -333,10 +291,7 @@ export default function BriefingForm() {
 
     try {
       const postId = nanoid(10);
-      const finalBriefing: Briefing = {
-        ...pipelineBriefing,
-        customOutline: sections,
-      };
+      const finalBriefing: Briefing = { ...pipelineBriefing, customOutline: sections };
       const outline = await generateOutline(finalBriefing);
 
       setPostId(postId);
@@ -356,10 +311,7 @@ export default function BriefingForm() {
         sectionId: s.sectionId || s.id || nanoid(6),
         title: s.title,
         requiresHumanInput:
-          s.requiresHumanInput ??
-          s.requires_human_input ??
-          s.pendingHumanInput ??
-          false,
+          s.requiresHumanInput ?? s.requires_human_input ?? s.pendingHumanInput ?? false,
         humanInputGuidance: s.humanInputGuidance,
       }));
 
@@ -422,239 +374,61 @@ export default function BriefingForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {/* Template */}
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">
-          Template
-        </label>
-        <select
-          value={form.templateName || 'mechanic_guide'}
-          onChange={(e) => updateField('templateName', e.target.value)}
-          className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-        >
-          {templates.map((t) => (
-            <option key={t.file} value={t.file}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <TemplateSelector
+        templates={templates}
+        value={form.templateName || 'mechanic_guide'}
+        onChange={(v) => updateField('templateName', v)}
+      />
 
       {/* Topic (for mechanic_guide, qa_page) OR Skill+Ascendancy (for build_guide, tier_list, etc) */}
-      {isTopicMode ? (
-        <div>
-          <label className="block text-sm font-medium text-muted-foreground mb-1">
-            Topic
-          </label>
-          <input
-            type="text"
-            placeholder="Ex: Delirium, Righteous Fire, Harvest Crafting"
-            value={form.topic || ''}
-            onChange={(e) => updateField('topic', e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">
-              Skill
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Righteous Fire"
-              value={form.skill}
-              onChange={(e) => updateField('skill', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-1">
-              Ascendancy
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Chieftain"
-              value={form.ascendancy}
-              onChange={(e) => updateField('ascendancy', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-          </div>
-        </div>
-      )}
+      <TopicOrSkillFields form={form} updateField={updateField} isTopicMode={isTopicMode} />
 
-      {/* League */}
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">
-          League
-        </label>
-        <input
-          type="text"
-          placeholder="Ex: 3.24"
-          value={form.league}
-          onChange={(e) => updateField('league', e.target.value)}
-          className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-      </div>
+      <LeagueField
+        value={form.league}
+        onChange={(v) => updateField('league', v)}
+      />
 
       {/* Section selector — opt out of template sections for this post.
           All sections start enabled; unchecking flows through to
           Briefing.excludedSections and the research node filters them
           out before write. */}
-      {templateSections.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              Seções do template
-            </label>
-            <span className="text-[10px] text-muted-foreground/70">
-              {excludedSectionIds.length === 0
-                ? `${templateSections.length} seções — todas ativas`
-                : `${templateSections.length - excludedSectionIds.length}/${templateSections.length} ativas`}
-            </span>
-          </div>
-          <div className="rounded-lg border border-border bg-surface p-3 space-y-1.5">
-            {templateSections.map((s) => {
-              const kept = !!keptSections[s.id];
-              return (
-                <label
-                  key={s.id}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                    kept ? 'hover:bg-background/50' : 'opacity-50 hover:opacity-75'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={kept}
-                    onChange={() => toggleSection(s.id)}
-                    className="h-3.5 w-3.5 rounded border-border"
-                  />
-                  <span className="text-[11px] font-mono text-muted-foreground/70 w-32 truncate">
-                    {s.id}
-                  </span>
-                  <span className={`text-sm ${kept ? 'text-foreground' : 'text-muted-foreground line-through'}`}>
-                    {s.title}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <TemplateSectionToggles
+        sections={templateSections}
+        keptSections={keptSections}
+        toggleSection={toggleSection}
+        excludedCount={excludedSectionIds.length}
+      />
 
       {/* Loaded brief summary (only when ?briefId=X) */}
-      {briefLoading && (
-        <div className="rounded-lg border border-border bg-surface px-4 py-3 text-xs text-muted-foreground">
-          Carregando brief #{briefIdParam}...
-        </div>
-      )}
-      {briefSource && (
-        <div className="rounded-lg border border-emerald-700/40 bg-emerald-950/20 px-4 py-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-emerald-200">
-              Brief #{briefSource.id} carregado
-            </span>
-            <span className="text-[10px] text-emerald-200/60">
-              será injetado automaticamente no briefing
-            </span>
-          </div>
-          {briefSource.briefingText ? (
-            <details className="text-xs text-emerald-100/80">
-              <summary className="cursor-pointer select-none text-emerald-200/80 hover:text-emerald-100">
-                Ver briefing expandido
-              </summary>
-              <pre className="mt-2 whitespace-pre-wrap text-[11px] leading-relaxed text-emerald-100/70">
-                {briefSource.briefingText}
-              </pre>
-            </details>
-          ) : (
-            <p className="text-[11px] text-emerald-200/60">
-              (Este brief não tem briefing expandido; só rationale + keywords serão usados.)
-            </p>
-          )}
-        </div>
-      )}
+      <BriefSourceSummary
+        briefIdParam={briefIdParam}
+        briefLoading={briefLoading}
+        briefSource={briefSource}
+      />
 
       {/* PoB import — decoded server-side, virá injetado em briefing.notes
           como "## BUILD SNAPSHOT" (e "## BUILD VARIANTS" se o arquivo
           tiver múltiplos loadouts). */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-muted-foreground mb-1">
-          PoB URL <span className="text-xs text-muted-foreground/70">(opcional — pobb.in / pastebin / código cru base64)</span>
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="url"
-            placeholder="https://pobb.in/..."
-            value={form.pobUrl ?? ''}
-            onChange={(e) => {
-              updateField('pobUrl', e.target.value);
-              // Limpa análise anterior se o autor muda a URL.
-              if (pobSummary) setPobSummary(null);
-              if (pobError) setPobError(null);
-            }}
-            className="flex-1 rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-          <button
-            type="button"
-            onClick={async () => {
-              const url = (form.pobUrl ?? '').trim();
-              if (!url) {
-                setPobError('Cole a URL ou o código do PoB primeiro.');
-                return;
-              }
-              setPobAnalyzing(true);
-              setPobError(null);
-              try {
-                const summary = await analyzePob(url);
-                setPobSummary(summary);
-              } catch (e) {
-                setPobError(e instanceof Error ? e.message : 'Erro ao analisar');
-                setPobSummary(null);
-              } finally {
-                setPobAnalyzing(false);
-              }
-            }}
-            disabled={pobAnalyzing || !(form.pobUrl ?? '').trim()}
-            className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-medium text-accent hover:bg-accent/20 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {pobAnalyzing ? 'Analisando…' : 'Analisar PoB'}
-          </button>
-        </div>
-        <p className="text-[11px] text-muted-foreground/80">
-          Todos os items, passives, auras e loadouts alternativos do PoB entram no contexto do writer.
-          Clique em <strong>Analisar PoB</strong> pra ver o que foi decodificado antes de gerar.
-        </p>
-        {pobError && (
-          <div className="rounded-lg border border-red-700/50 bg-red-950/20 px-3 py-2 text-xs text-red-300">
-            {pobError}
-          </div>
-        )}
-        {pobSummary && (
-          <PobSummaryCard
-            summary={pobSummary}
-            onDismiss={() => setPobSummary(null)}
-          />
-        )}
-      </div>
+      <PobImporter
+        pobUrl={form.pobUrl ?? ''}
+        onPobUrlChange={(url) => {
+          updateField('pobUrl', url);
+          // Limpa análise anterior se o autor muda a URL.
+          if (pobSummary) setPobSummary(null);
+          if (pobError) setPobError(null);
+        }}
+        pobSummary={pobSummary}
+        pobAnalyzing={pobAnalyzing}
+        pobError={pobError}
+        onAnalyze={handleAnalyzePob}
+        onDismiss={() => setPobSummary(null)}
+      />
 
-      {/* Notes */}
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">
-          Notas {briefSource && <span className="text-xs text-muted-foreground/70">(adendo do editor — opcional)</span>}
-        </label>
-        <textarea
-          rows={3}
-          placeholder={
-            briefSource
-              ? 'Opcional: adendo seu — ex.: "foque no público casual de 15 div/hora", "evite falar de TFT", "priorize screenshots do poe.ninja"... Vai ser somado ao briefing do brief, não substituir.'
-              : 'Adendos, ângulo, restrições ou referências que o autor precisa considerar.'
-          }
-          value={form.notes}
-          onChange={(e) => updateField('notes', e.target.value)}
-          className="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent resize-none"
-        />
-      </div>
+      <NotesTextarea
+        value={form.notes}
+        onChange={(v) => updateField('notes', v)}
+        hasBriefSource={!!briefSource}
+      />
 
       {/* Skim collections — quais fontes do Qdrant alimentam o outline proposer */}
       <SkimCollectionsSelector
@@ -680,31 +454,7 @@ export default function BriefingForm() {
         </div>
       )}
 
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={loading}
-        className="inline-flex h-12 items-center justify-center gap-2 self-end rounded-lg bg-accent px-8 text-sm font-semibold text-background shadow-lg shadow-accent/20 ring-1 ring-accent/40 transition-all hover:bg-accent-hover hover:shadow-accent/40 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <>
-            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            <span>Gerando outline…</span>
-          </>
-        ) : (
-          <>
-            <span>Gerar outline</span>
-            <span aria-hidden>→</span>
-          </>
-        )}
-      </button>
+      <SubmitButton loading={loading} />
     </form>
   );
 }
