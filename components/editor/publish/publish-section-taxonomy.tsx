@@ -16,8 +16,16 @@ import { useFormContext, Controller } from 'react-hook-form';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuthors, useCategories } from '../hooks/use-sanity-refs';
 import type { EditorMetaForm } from '../editor-meta-schema';
+import { CreateCategoryDialog } from './create-category-dialog';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -124,20 +132,28 @@ export function PublishSectionTaxonomy() {
           name="categoryId"
           control={control}
           render={({ field }) => (
-            <select
-              {...field}
-              disabled={catsLoading}
-              className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm text-foreground disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="">
-                {catsLoading ? 'Carregando…' : 'Selecionar categoria'}
-              </option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.title ?? c.tagname}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <Select
+                value={field.value || undefined}
+                onValueChange={field.onChange}
+                disabled={catsLoading}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={catsLoading ? 'Carregando…' : 'Selecionar categoria'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c._id} value={c._id}>
+                      {c.title ?? c.tagname}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <CreateCategoryDialog
+                language={language}
+                onCreated={(newId) => field.onChange(newId)}
+              />
+            </div>
           )}
         />
       </FieldRow>
@@ -147,20 +163,22 @@ export function PublishSectionTaxonomy() {
           name="authorId"
           control={control}
           render={({ field }) => (
-            <select
-              {...field}
+            <Select
+              value={field.value || undefined}
+              onValueChange={field.onChange}
               disabled={authorsLoading}
-              className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm text-foreground disabled:opacity-50 focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              <option value="">
-                {authorsLoading ? 'Carregando…' : 'Selecionar autor'}
-              </option>
-              {authors.map((a) => (
-                <option key={a._id} value={a._id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={authorsLoading ? 'Carregando…' : 'Selecionar autor'} />
+              </SelectTrigger>
+              <SelectContent>
+                {authors.map((a) => (
+                  <SelectItem key={a._id} value={a._id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         />
       </FieldRow>
