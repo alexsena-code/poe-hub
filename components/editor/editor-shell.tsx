@@ -24,6 +24,7 @@ import type { JSONContent } from '@tiptap/core';
 import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
 import type { PortableTextContent } from '@/lib/sanity/types';
 import { EditorProvider } from './editor-context';
+import { EditorTitleBar } from './editor-title-bar';
 import { EditorToolbar } from './editor-toolbar';
 import { EditorBody } from './editor-body';
 import { RightRail } from './right-rail';
@@ -161,7 +162,8 @@ export function EditorShell({
   return (
     <EditorProvider value={contextValue}>
       <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden">
-        {/* Toolbar — inline title + formatting + autosave + Prosseguir */}
+        {/* Title bar (discreet, above toolbar) + formatting toolbar */}
+        <EditorTitleBar />
         <EditorToolbar
           phase={phase}
           onPhaseToggle={togglePhase}

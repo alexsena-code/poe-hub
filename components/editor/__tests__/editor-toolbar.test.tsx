@@ -73,8 +73,6 @@ vi.mock('../editor-context', () => ({
   useEditorContext: () => ({
     editor: fakeEditor,
     draftId: 'draft-test-id',
-    meta: { title: '', language: 'pt-br' },
-    setMeta: vi.fn(),
   }),
 }));
 
