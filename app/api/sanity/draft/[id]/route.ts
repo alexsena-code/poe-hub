@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getSanityClient } from "@/lib/sanity/client";
 import { deleteDraft } from "@/lib/sanity/publish";
 import { sanityPostToEditorMeta } from "@/lib/sanity/transform";
-import { editorMetaSchema } from "@/components/editor/editor-meta-schema";
+import { editorDraftMetaSchema } from "@/components/editor/editor-meta-schema";
 import type { SanityReference, SanityImageRef } from "@/lib/sanity/types";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,16 +15,16 @@ type RouteContext = { params: Promise<{ id: string }> };
 /**
  * Partial meta schema for draft saves.
  *
- * `language` is the only required field — it disambiguates PT-BR vs EN drafts.
- * All other fields are optional because Sanity drafts tolerate partial state.
+ * Uses `editorDraftMetaSchema` (lenient — accepts empty strings/arrays) so
+ * imported guides and fresh /new drafts can be persisted before the operator
+ * fills required fields like categoryId/authorId/tags. Strict validation
+ * still happens at publish time via `editorMetaSchema`.
  *
- * Session 10.c: switched from accepting a raw SanityPost (which the caller had
- * to pre-shape) to accepting editor-native fields (IDs instead of references).
+ * Session 10 hotfix (post-S10.e): autosave was 400'ing on imported drafts
+ * because the strict schema rejected empty IDs.
  */
 const draftPutSchema = z.object({
-  meta: editorMetaSchema.partial().extend({
-    language: z.enum(["pt-br", "en"]),
-  }),
+  meta: editorDraftMetaSchema,
   body: z.array(z.unknown()).optional(),
 });
 

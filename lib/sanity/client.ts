@@ -33,8 +33,14 @@ function getSanityConfig() {
 
 /**
  * Server-only Sanity client with write token.
- * perspective=published + useCdn=false ensures we always read the latest
- * committed data (no CDN cache), which matters when we read-back after writes.
+ *
+ * perspective=raw: returns BOTH `drafts.<id>` documents AND published ones
+ * without filtering or substitution. The hub's queries filter draft vs
+ * published explicitly via `_id in path("drafts.**")` so we need raw access.
+ * `published` would silently strip drafts and break LIST_DRAFTS_QUERY.
+ *
+ * useCdn=false: read latest committed state, important for read-after-write
+ * (e.g. reading back a draft we just createOrReplace'd).
  *
  * Lazily initialised so env validation only runs on first import in a
  * request context (not at build time when vars may be absent).
@@ -52,7 +58,7 @@ export function getSanityClient(): SanityClient {
     apiVersion,
     token,
     useCdn: false,
-    perspective: "published",
+    perspective: "raw",
   });
 
   return _serverClient;

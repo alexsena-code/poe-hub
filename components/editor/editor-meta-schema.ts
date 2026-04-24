@@ -70,6 +70,32 @@ export const editorMetaSchema = z.object({
 /** Inferred TypeScript type for the form values. */
 export type EditorMetaForm = z.infer<typeof editorMetaSchema>;
 
+/**
+ * Lenient variant for autosave / draft persistence.
+ *
+ * Why: drafts created via the importer (/api/sanity/draft-from-guide) and
+ * fresh drafts from /workspace/blog/new have empty `categoryId`, `authorId`
+ * and `tags` until the operator fills them on the /publish page. The strict
+ * `editorMetaSchema` would reject these with `min(1)` violations and the
+ * autosave PUT would 400 on every keystroke. This schema accepts empty
+ * strings and arrays — strict validation only happens at publish time.
+ *
+ * `language` stays required since it disambiguates the PT-BR vs EN draft
+ * documents in Sanity (one draft per language).
+ */
+export const editorDraftMetaSchema = z.object({
+  title: z.string().max(200).optional(),
+  metadata: z.string().max(160).optional(),
+  slug: z.string().regex(/^[a-z0-9-]*$/, "Slug: apenas lowercase, números e hífens").optional(),
+  gameVersion: z.enum(["path-of-exile-1", "path-of-exile-2"]).optional(),
+  categoryId: z.string().optional(),
+  authorId: z.string().optional(),
+  tags: z.array(z.string()).max(8).optional(),
+  mainImageAssetId: z.string().optional(),
+  publishedAt: z.string().optional(),
+  language: z.enum(["pt-br", "en"]),
+});
+
 /** Default values — initialise the form with safe empty state. */
 // datetime-local input expects "yyyy-MM-ddTHH:mm" (no Z, no ms) — slice the
 // ISO string so the browser doesn't warn about format mismatch on first paint.
