@@ -16,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { ModelPricingCard } from "./model-pricing-card";
+import { PresetBar } from "./preset-bar";
 import type { IdeationBenchmarkRequest } from "@/lib/benchmark-types";
 
 const ideationSchema = z.object({
@@ -23,13 +25,14 @@ const ideationSchema = z.object({
   // Comma-separated list stored as string; parsed to string[] on submit.
   templateFilterRaw: z.string().optional(),
   modelOverride: z.string().optional(),
+  modelOverrides: z.object({ write: z.string().optional() }).optional(),
 });
 
 type IdeationFormValues = z.infer<typeof ideationSchema>;
 
 interface IdeationBenchmarkFormProps {
   loading: boolean;
-  onRun: (body: IdeationBenchmarkRequest) => void;
+  onRun: (body: IdeationBenchmarkRequest, presetId?: string) => void;
 }
 
 /**
@@ -40,8 +43,21 @@ interface IdeationBenchmarkFormProps {
 export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormProps) {
   const form = useForm<IdeationFormValues>({
     resolver: zodResolver(ideationSchema),
-    defaultValues: { editorialBriefing: "", templateFilterRaw: "", modelOverride: "" },
+    defaultValues: {
+      editorialBriefing: "",
+      templateFilterRaw: "",
+      modelOverride: "",
+      modelOverrides: { write: "" },
+    },
   });
+
+  const modelOverride = form.watch("modelOverride");
+  const writeOverride = form.watch("modelOverrides.write");
+
+  function handleLoad(payload: unknown, presetId: string) {
+    form.reset(payload as IdeationFormValues);
+    form.setValue("__presetId" as never, presetId as never);
+  }
 
   function handleSubmit(values: IdeationFormValues) {
     const body: IdeationBenchmarkRequest = {};
@@ -57,16 +73,25 @@ export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormP
         .filter(Boolean);
     }
 
-    if (values.modelOverride?.trim()) {
-      body.modelOverride = values.modelOverride.trim();
+    if (values.modelOverride?.trim()) body.modelOverride = values.modelOverride.trim();
+
+    if (values.modelOverrides?.write?.trim()) {
+      (body as IdeationBenchmarkRequest & { modelOverrides?: Record<string, string> }).modelOverrides = {
+        write: values.modelOverrides.write.trim(),
+      };
     }
 
-    onRun(body);
+    const presetId = (form.getValues() as Record<string, unknown>)["__presetId"] as
+      | string
+      | undefined;
+    onRun(body, presetId);
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <PresetBar type="ideation" currentValues={form.getValues()} onLoad={handleLoad} />
+
         <FormField
           control={form.control}
           name="editorialBriefing"
@@ -111,7 +136,7 @@ export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormP
             name="modelOverride"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Model Override (opcional)</FormLabel>
+                <FormLabel>Override global (todos os nodes)</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: openai/gpt-4o" {...field} />
                 </FormControl>
@@ -120,6 +145,28 @@ export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormP
             )}
           />
         </div>
+
+        {modelOverride && <ModelPricingCard modelId={modelOverride} />}
+
+        <FormField
+          control={form.control}
+          name="modelOverrides.write"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Writer model (só aplica ao node <code>write</code>)</FormLabel>
+              <FormControl>
+                <Input placeholder="Ex: anthropic/claude-opus-4-5" {...field} />
+              </FormControl>
+              <FormDescription>
+                Isola a troca no <code>write</code> node sem afetar{" "}
+                <code>critique</code>, <code>summarize</code>, etc.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {writeOverride && <ModelPricingCard modelId={writeOverride} />}
 
         <Button type="submit" disabled={loading} className="w-full md:w-auto">
           {loading && <Spinner size="sm" className="mr-2" />}

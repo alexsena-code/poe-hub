@@ -9,6 +9,7 @@ import {
   FormItem,
   FormLabel,
   FormControl,
+  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { ModelPricingCard } from "./model-pricing-card";
+import { PresetBar } from "./preset-bar";
 import type { QaBenchmarkRequest } from "@/lib/benchmark-types";
 
 const qaSchema = z.object({
@@ -29,13 +32,14 @@ const qaSchema = z.object({
   queryType: z.string().optional(),
   language: z.enum(["pt", "en", "auto"]).default("auto"),
   modelOverride: z.string().optional(),
+  modelOverrides: z.object({ write: z.string().optional() }).optional(),
 });
 
 type QaFormValues = z.infer<typeof qaSchema>;
 
 interface QaBenchmarkFormProps {
   loading: boolean;
-  onRun: (body: QaBenchmarkRequest) => void;
+  onRun: (body: QaBenchmarkRequest, presetId?: string) => void;
 }
 
 /**
@@ -46,22 +50,47 @@ interface QaBenchmarkFormProps {
 export function QaBenchmarkForm({ loading, onRun }: QaBenchmarkFormProps) {
   const form = useForm<QaFormValues>({
     resolver: zodResolver(qaSchema),
-    defaultValues: { question: "", queryType: "", language: "auto", modelOverride: "" },
+    defaultValues: {
+      question: "",
+      queryType: "",
+      language: "auto",
+      modelOverride: "",
+      modelOverrides: { write: "" },
+    },
   });
 
+  const modelOverride = form.watch("modelOverride");
+  const writeOverride = form.watch("modelOverrides.write");
+
+  function handleLoad(payload: unknown, presetId: string) {
+    form.reset(payload as QaFormValues);
+    // presetId forwarded via closure on next submit — stored in form state
+    // by resetting so we can read it back in handleSubmit if needed.
+    // The parent receives it through onRun's second argument.
+    form.setValue("__presetId" as never, presetId as never);
+  }
+
   function handleSubmit(values: QaFormValues) {
-    const body: QaBenchmarkRequest = {
-      question: values.question,
-      language: values.language,
-    };
+    const body: QaBenchmarkRequest = { question: values.question, language: values.language };
     if (values.queryType?.trim()) body.queryType = values.queryType.trim();
     if (values.modelOverride?.trim()) body.modelOverride = values.modelOverride.trim();
-    onRun(body);
+    if (values.modelOverrides?.write?.trim()) {
+      (body as QaBenchmarkRequest & { modelOverrides?: Record<string, string> }).modelOverrides = {
+        write: values.modelOverrides.write.trim(),
+      };
+    }
+    // __presetId is a hidden field we stuffed in via setValue above (ignored by zod).
+    const presetId = (form.getValues() as Record<string, unknown>)["__presetId"] as
+      | string
+      | undefined;
+    onRun(body, presetId);
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <PresetBar type="qa" currentValues={form.getValues()} onLoad={handleLoad} />
+
         <FormField
           control={form.control}
           name="question"
@@ -123,7 +152,7 @@ export function QaBenchmarkForm({ loading, onRun }: QaBenchmarkFormProps) {
             name="modelOverride"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Model Override (opcional)</FormLabel>
+                <FormLabel>Override global (todos os nodes)</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: openai/gpt-4o" {...field} />
                 </FormControl>
@@ -132,6 +161,28 @@ export function QaBenchmarkForm({ loading, onRun }: QaBenchmarkFormProps) {
             )}
           />
         </div>
+
+        {modelOverride && <ModelPricingCard modelId={modelOverride} />}
+
+        <FormField
+          control={form.control}
+          name="modelOverrides.write"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Writer model (só aplica ao node <code>write</code>)</FormLabel>
+              <FormControl>
+                <Input placeholder="Ex: anthropic/claude-opus-4-5" {...field} />
+              </FormControl>
+              <FormDescription>
+                Isola a troca no <code>write</code> node sem afetar{" "}
+                <code>critique</code>, <code>summarize</code>, etc.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {writeOverride && <ModelPricingCard modelId={writeOverride} />}
 
         <Button type="submit" disabled={loading} className="w-full md:w-auto">
           {loading && <Spinner size="sm" className="mr-2" />}

@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 12 — carryovers da session 11 liquidados. 4 implementados (TS fix + vi.mock fix + smoke Sanity opt-in + side panel Items/Gems/Passives com engine `/api/items/list` novo + 6º widget no right rail), 3 arquivados com justification (BriefingForm no-op, diff versioning sem spec, section workflow tied-to-retired-pipeline). **696 tests verdes** (+12 vs S11). Engine: 40 Jest tests em item-raw-text (+9).).
+Last updated: 2026-04-24 (session 13 — benchmark infra (presets + history + compare + LLM-as-judge). 3 waves paralelizadas com 10 agents: engine ganhou `modelOverrides: Record<string, string>` per-node (scalar legado continua válido); hub ganhou Prisma `BenchmarkPreset/Run/Evaluation`, 7 rotas API, 2 páginas (/admin/benchmark/history + /compare), preset bar + writer-node override + live OpenRouter pricing card nos 3 forms, Sonnet 4.6 como juiz default. **826 tests hub** (+120 vs S12) + **40 engine benchmark tests** (+12).).
 
 ## Current status
 
@@ -13,7 +13,7 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(**696 passing, 0 falhos**, 1 skipped smoke Sanity) + Playwright (32 E2E,
+(**826 passing, 0 falhos**, 1 skipped smoke Sanity) + Playwright (32 E2E,
 rodando fora do Vitest glob).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
@@ -122,6 +122,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [13](progress/session-13.md) | 2026-04-24 | benchmark infra — engine `modelOverrides` per-node + hub Prisma (Preset/Run/Evaluation) + 7 rotas API + OpenRouter live pricing + preset bar nos 3 forms + /history + /compare + Sonnet 4.6 judge (5 dimensions). 3 waves paralelizadas com 10 agents. +120 tests hub, +12 engine |
 | [12](progress/session-12.md) | 2026-04-24 | carryovers da S11 liquidados — TS fix simulation-diff + monitor.factory, vi.mock sonner dedup, smoke E2E Sanity opt-in (`SMOKE_SANITY=1`), side panel Items/Gems/Passives com novo `/api/items/list` no engine (+ 6º widget no right rail), arquival justificado de BriefingForm/diff-versioning/section-workflow |
 | [11](progress/session-11.md) | 2026-04-24 | dívida técnica S10 liquidada — schema zod estrito pro body (discriminated union dos 5 tipos Sanity) + converter Markdown via `@portabletext/block-tools` canônico (marked + jsdom + schema compilado). Dupla defesa contra silent drops tipo body=Empty |
 | [10](progress/session-10.md) | 2026-04-24 | editor UI/UX overhaul — wizard Edit→Publish (rota /publish nova) + right rail de 5 widgets (Score/Slang/Q&A/Assets/Slang Lookup) + fix publish blocker (transform IDs→refs + slug collision per language) + importar guide LLM (markdown→Portable Text, 2 drafts PT-BR+EN automáticos) + toolbar completa (Undo/Redo, alignment, HR, table) + Spinner/EmptyState polish |
