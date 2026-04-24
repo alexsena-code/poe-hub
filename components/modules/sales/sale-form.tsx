@@ -168,7 +168,7 @@ export function SaleForm({ initialData }: SaleFormProps) {
     }
 
     toast.success(isEditing ? "Venda atualizada!" : "Venda registrada!");
-    router.push("/sales");
+    router.push("/farm/sales");
     router.refresh();
   }
 
@@ -389,7 +389,7 @@ export function SaleForm({ initialData }: SaleFormProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push("/sales")}
+                onClick={() => router.push("/farm/sales")}
               >
                 Cancelar
               </Button>

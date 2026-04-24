@@ -208,7 +208,7 @@ function BotsTableInner() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => router.push(`/bots/${bot.id}`)}
+                        onClick={() => router.push(`/farm/bots/${bot.id}`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>

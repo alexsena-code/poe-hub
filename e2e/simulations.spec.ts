@@ -5,7 +5,7 @@ import { login } from "./helpers/auth";
 const SIM_NAME = `E2E Test Sim ${Date.now()}`;
 
 async function openSimulationsPage(page: Page): Promise<void> {
-  await page.goto("/simulations");
+  await page.goto("/farm/simulations");
   // Wait for the table/skeleton to settle
   await page.waitForLoadState("networkidle");
 }
@@ -137,7 +137,7 @@ test.describe("Simulations CRUD", () => {
 
     // After redirect go back to the list
     await page.waitForURL(/\/simulations\/[^/]+$/, { timeout: 15_000 });
-    await page.goto("/simulations");
+    await page.goto("/farm/simulations");
     await page.waitForLoadState("networkidle");
 
     // Find the row for the simulation we just created

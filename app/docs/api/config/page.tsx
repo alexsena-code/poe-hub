@@ -41,9 +41,9 @@ export default function ConfigApiPage() {
 
       <H2>Slang & People</H2>
       <EndpointGroup title="Community Data">
-        <Endpoint method="GET" path="/slang" description="Lista slang candidates" />
-        <Endpoint method="POST" path="/slang/extract" description="Extrair slangs de fontes" />
-        <Endpoint method="PUT" path="/slang/:id/approve" description="Aprovar slang" />
+        <Endpoint method="GET" path="/workspace/slang" description="Lista slang candidates" />
+        <Endpoint method="POST" path="/workspace/slang/extract" description="Extrair slangs de fontes" />
+        <Endpoint method="PUT" path="/workspace/slang/:id/approve" description="Aprovar slang" />
         <Endpoint method="GET" path="/seo/people" description="Lista PoE People" />
         <Endpoint method="POST" path="/seo/people" description="Adicionar pessoa" />
         <Endpoint method="POST" path="/seo/people/seed" description="Seed de config + YouTube channels" />

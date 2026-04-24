@@ -116,7 +116,7 @@ export function SimulationCreateDialog() {
         setOpen(false);
         reset();
         setBaseSimId("");
-        router.push(`/simulations/compare?ids=${baseSimId},${dup.id}`);
+        router.push(`/farm/simulations/compare?ids=${baseSimId},${dup.id}`);
       } else {
         const { costConfigId, ...rest } = data;
         const payload = {
@@ -136,7 +136,7 @@ export function SimulationCreateDialog() {
         toast.success("Simulacao criada com sucesso");
         setOpen(false);
         reset();
-        router.push(`/simulations/${sim.id}`);
+        router.push(`/farm/simulations/${sim.id}`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar simulacao");
@@ -237,7 +237,7 @@ export function SimulationCreateDialog() {
                 <div className="flex items-center justify-between">
                   <Label>Setup de custos</Label>
                   <a
-                    href="/settings/costs"
+                    href="/admin/config/costs"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"

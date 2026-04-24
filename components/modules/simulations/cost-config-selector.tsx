@@ -92,7 +92,7 @@ export function CostConfigSelector({
         </Select>
       </div>
       <Button variant="ghost" size="icon" asChild>
-        <Link href="/settings/costs">
+        <Link href="/admin/config/costs">
           <Settings2 className="h-4 w-4" />
         </Link>
       </Button>

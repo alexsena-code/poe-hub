@@ -333,7 +333,7 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
     return (
       <div className="space-y-4">
         <p className="text-muted-foreground">Simulacao nao encontrada.</p>
-        <Button variant="outline" onClick={() => router.push("/simulations")}>
+        <Button variant="outline" onClick={() => router.push("/farm/simulations")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Voltar
         </Button>
@@ -355,7 +355,7 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
             variant="ghost"
             size="sm"
             className="mb-2"
-            onClick={() => router.push("/simulations")}
+            onClick={() => router.push("/farm/simulations")}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar

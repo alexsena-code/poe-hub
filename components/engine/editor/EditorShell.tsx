@@ -173,7 +173,7 @@ export default function EditorShell({ postId }: { postId: string }) {
 
   function handleNewPost() {
     reset();
-    router.push('/new');
+    router.push('/workspace/new');
   }
 
   function handleDelete() {

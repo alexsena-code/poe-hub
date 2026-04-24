@@ -372,7 +372,7 @@ function SalesTableInner() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => router.push(`/sales/${sale.id}`)}
+                        onClick={() => router.push(`/farm/sales/${sale.id}`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>

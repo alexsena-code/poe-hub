@@ -4,7 +4,7 @@ import { login } from "./helpers/auth";
 test.describe("Prices page", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await page.goto("/prices");
+    await page.goto("/farm/prices");
     await page.waitForLoadState("networkidle");
   });
 

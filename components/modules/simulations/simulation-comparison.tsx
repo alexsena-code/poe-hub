@@ -568,7 +568,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
     return (
       <div className="space-y-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/simulations">
+          <Link href="/farm/simulations">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Link>
@@ -577,7 +577,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
           Selecione pelo menos 2 simulacoes para comparar.
         </p>
         <Button asChild variant="outline">
-          <Link href="/simulations">Ir para Simulacoes</Link>
+          <Link href="/farm/simulations">Ir para Simulacoes</Link>
         </Button>
       </div>
     );
@@ -595,7 +595,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
     return (
       <div className="space-y-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/simulations">
+          <Link href="/farm/simulations">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Link>
@@ -609,7 +609,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
     return (
       <div className="space-y-4">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/simulations">
+          <Link href="/farm/simulations">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Link>
@@ -644,7 +644,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
       {/* Header */}
       <div className="space-y-1">
         <Button variant="ghost" size="sm" className="mb-1" asChild>
-          <Link href="/simulations">
+          <Link href="/farm/simulations">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Link>
@@ -882,7 +882,7 @@ export function SimulationComparison({ ids }: SimulationComparisonProps) {
               </p>
             </div>
             <Link
-              href="/settings/costs"
+              href="/admin/config/costs"
               className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
             >
               Gerenciar setups

@@ -267,7 +267,7 @@ function SimulationListInner() {
           <Button
             size="sm"
             onClick={() =>
-              router.push(`/simulations/compare?ids=${Array.from(selectedIds).join(",")}`)
+              router.push(`/farm/simulations/compare?ids=${Array.from(selectedIds).join(",")}`)
             }
           >
             <GitCompareArrows className="h-4 w-4 mr-2" />
@@ -318,7 +318,7 @@ function SimulationListInner() {
                 <TableRow
                   key={sim.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/simulations/${sim.id}`)}
+                  onClick={() => router.push(`/farm/simulations/${sim.id}`)}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox
@@ -390,7 +390,7 @@ function SimulationListInner() {
                         size="icon"
                         className="h-8 w-8"
                         title="Editar"
-                        onClick={() => router.push(`/simulations/${sim.id}`)}
+                        onClick={() => router.push(`/farm/simulations/${sim.id}`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>

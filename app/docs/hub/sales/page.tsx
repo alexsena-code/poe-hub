@@ -53,7 +53,7 @@ export default function SalesPage() {
           ['Override por dia', 'Ajustar bots ou preco para dias especificos'],
           ['Import de precos', 'Importar precos reais de um periodo para preencher simulacao'],
           ['Duplicar', 'Clonar simulacao existente para experimentar'],
-          ['Comparar', '/simulations/compare mostra side-by-side entre simulacoes'],
+          ['Comparar', '/farm/simulations/compare mostra side-by-side entre simulacoes'],
           ['AI projections', 'POST /simulations/create-projected gera projecoes automaticas'],
         ]}
       />

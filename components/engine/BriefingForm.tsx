@@ -365,7 +365,7 @@ export default function BriefingForm() {
 
       initSections(uiSections);
       setPhase('writing');
-      router.push(`/editor/${postId}`);
+      router.push(`/workspace/editor/${postId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao gerar o post.');
     } finally {

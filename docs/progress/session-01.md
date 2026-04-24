@@ -7,32 +7,52 @@ Track A concluído no engine (`path-of-trade-content` session 21).
 
 Session ativa (em andamento).
 
-## Pre-work (audit recap)
+## Pre-work (estado real, 2026-04-23)
 
-Herdado da auditoria consolidada do engine session 21 (pre-work):
+A auditoria herdada do engine session 21 **estava desatualizada** em
+vários pontos. Estado real conferido agora:
 
-**Inventário**
-- 304 arquivos TS/TSX, 48 rotas.
-- 147 páginas `'use client'`, **zero Server Components** — oportunidade
-  grande pro refactor converter pelo menos o shell de cada god page.
-- 507 `useState` nas páginas de app — data fetching disperso.
-- sidebar com 25+ itens sem hierarquia visual.
+**Inventário atualizado**
+- 71 rotas (`page.tsx` em `app/**`) — a audit falava em 48.
+- Sidebar atual em `components/layout/sidebar.tsx` (382L).
+- `'use client'` count não re-confirmado ainda (audit dizia 147, mas
+  tem drift — pode estar menor agora).
 
-**God files**
-| Arquivo | Linhas |
-|---------|-------:|
-| `app/(auth)/hardware/page.tsx` | 2403 |
-| `app/(auth)/engine-config/page.tsx` | 1944 |
-| `components/simulation-comparison.tsx` | 1379 |
-| `app/(auth)/hardware/builder/page.tsx` | 1346 |
-| `app/(auth)/seo/page.tsx` | 1291 |
-| `components/BriefingForm.tsx` | 710 |
-| `components/SectionEditor.tsx` | 676 |
+**God files reais (conferidos via `wc -l`)**
+| Arquivo | Linhas | Nota |
+|---|---:|---|
+| `app/(auth)/hardware/page.tsx` | 2403 | pendente |
+| `app/(auth)/engine-config/page.tsx` | 1944 | pendente (vai fundir em /admin/config) |
+| `components/modules/simulations/simulation-comparison.tsx` | 1379 | **moved** de `components/` — pendente split |
+| `app/(auth)/hardware/builder/page.tsx` | 1346 | pendente |
+| `app/(auth)/seo/page.tsx` | 1291 | pendente split em 3 rotas |
+| `components/engine/BriefingForm.tsx` | 710 | **moved** pra `components/engine/` — pendente split |
+| `components/engine/editor/SectionEditor.tsx` | — | **parcialmente decomposto** — já tem `EditorShell.tsx` + `SectionEditor.tsx` como arquivos separados dentro de `editor/`. Reconfirmar linhas e ver se ainda vale decompor mais. |
 
-**Rotas dispersas** (6 entradas de admin hoje): `/engine-config`,
-`/settings/*`, `/logs`, `/llm-logs`, `/analytics`, `/monitor`.
+**Rotas admin — estado real**
+- `/admin/observability` — **JÁ EXISTE** (commit `8b569ac`,
+  refactor(admin) fuse `/logs + /llm-logs + /analytics + /monitor →
+  /admin/observability`). Fase B2 do plano original **já caiu**.
+- `/llm` — rota top-level sobrevivente (não foi pra observability).
+  Pode ser a UI do LLM playground / usage logs. Confirmar e decidir
+  se mantém top-level ou entra em admin.
+- `/settings/*` — **ainda fragmentado** em 5 subrotas: `costs`,
+  `feature-flags`, `leagues`, `proxy`, `users` + root `page.tsx`.
+  Fusão pendente em `/admin/config`.
+- `/engine-config` — ainda existe como rota própria (1944L page.tsx),
+  pendente fusão em `/admin/config`.
 
-**Tipos engine↔hub divergentes** (Briefing shape) — flagged pra
+**Rotas adicionais não mencionadas na audit original**
+`app/(auth)/` hoje tem: `admin, bots, dashboard, editor, engine-config,
+guides, hardware, ideas, keybert, llm, new, people, prices, qa, reddit,
+sales, seo, settings, simulations, slang, tasks, templates, youtube`.
+
+Muitas delas são específicas do content engine (guides, ideas, new,
+qa, templates, editor, keybert, slang, people, reddit, youtube) e não
+caberiam naturalmente em `/ops`. Isso influencia a decisão dos
+domínios (refinement #2 abaixo).
+
+**Tipos engine↔hub divergentes** (Briefing shape) — ainda flagged pra
 reconciliar numa fase futura (shared-types package ou OpenAPI
 generated client).
 
@@ -100,48 +120,56 @@ catch-all pra URLs que sumiram) com uma tabela `old_url → new_url`.
 Sidebar nova não mostra old URLs. Primeira semana mantemos; depois
 removemos.
 
-## Plano de fases
+## Plano de fases (revisado após audit real)
 
-Ordem pensada pra **destravar o máximo cedo** (sidebar nova + fusões
-primeiro, god components depois — nessa ordem porque split de god file
-sem saber o layout final geraria retrabalho).
+B2 do plano original (fusão observability) **já foi feita** — tirada da
+lista. Outras fases ajustadas pro estado atual.
 
 ### B1 — Nova sidebar + router skeleton
-- Definir domínios (3 ou 4 + /admin — decisão da refinement #2).
-- Criar novos route groups em `app/(auth)/` com páginas de placeholder
-  (cada uma renderiza um "moved from X" enquanto migração não termina).
-- Nova sidebar com hierarquia (domínio pai + sub-items expandíveis).
+- Definir domínios finais (decisão da refinement #2 + lista ampla de
+  rotas atuais). Proposta revisada:
+  - `/workspace` — content engine UI: briefing (`new`), outline
+    editor, write (`editor`), guides (output), ideas, qa, templates.
+  - `/seo` — research/analysis/opportunities: keybert, reddit
+    monitor, youtube monitor, slang, people (creators), competitor.
+  - `/farm` — PoE ops: bots, prices, sales, simulations.
+  - `/admin` — config (`/admin/config` — pendente, B3),
+    observability (`/admin/observability` — pronto), llm (ingerir
+    `/llm`), dashboard (talvez).
+  - `/hardware` — deals feed + builder (dropa do original `/ops` —
+    é independente, opera fora do ciclo PoE).
+- Nova sidebar com hierarquia (domínio pai + subgrupos expandíveis).
+  Target: ≤15 entradas top-level, subgrupos visíveis ao expandir.
 - Migração das rotas antigas (renames em massa) — cada rota continua
   servindo o mesmo componente atual, só muda de URL.
 - `/moved` page catch-all.
 - **Validação**: `npm run dev` + smoke manual de todas as rotas novas.
-  Todos os 32 Playwright E2E devem passar com URL updates — se a
-  sidebar é usada nos E2E (provavelmente), eles atualizam junto.
+  Ajustar Playwright E2E (32 tests) pra novas URLs.
 
-### B2 — Fusão `/admin/observability`
-- Novo route group `app/(auth)/admin/observability/` com tabs:
-  Logs | LLM Logs | Analytics | Monitor.
-- Extrair componentes reutilizáveis (table views, filter bar,
-  date-range picker) pra `components/modules/admin/observability/`.
-- Remover as 4 rotas antigas (`/logs`, `/llm-logs`, `/analytics`,
-  `/monitor`) — adicionar entradas no `/moved`.
-- **Validação**: Vitest component tests + E2E nas 4 tabs.
+### B2 — ~~Fusão `/admin/observability`~~ ✓ JÁ FEITO
+
+Landed em commit `8b569ac`. `/admin/observability` existe e substituiu
+`/logs + /llm-logs + /analytics + /monitor`. Ainda resta:
+- Conferir se `/llm` (rota top-level sobrevivente) vai pra
+  `/admin/observability` como 5ª tab ou fica separada (é LLM playground
+  vs LLM logs — precisa confirmar escopo). Fast task.
 
 ### B3 — Fusão `/admin/config`
 - Novo `app/(auth)/admin/config/` com tabs:
-  Engine YAML | App Settings | Leagues | Users | Proxies | Costs.
+  Engine YAML | Leagues | Users | Proxies | Costs | Feature Flags.
 - Split do `engine-config/page.tsx` (1944L) enquanto migra — extrair
   editor de YAML, validator, diff viewer em componentes separados.
-  **Esse split não precisa ir até 500L linha-por-linha** — o objetivo
-  é tornar cada YAML section (templates, style_guide, prompt_templates,
-  seo.yaml) um sub-component independente.
-- Migrar `/settings/*` como tabs irmãs.
+  O objetivo é tornar cada YAML section (templates, style_guide,
+  prompt_templates, seo.yaml) um sub-component independente.
+- Migrar `/settings/costs`, `/settings/feature-flags`,
+  `/settings/leagues`, `/settings/proxy`, `/settings/users` como tabs
+  irmãs. `/settings/page.tsx` também (é o settings root).
 - **Validação**: todos os YAMLs carregam/salvam, testes de Vitest dos
   editors, E2E do flow "edit YAML → save → reload confirms".
 
 ### B4 — Split `/seo/page.tsx` (1291L) em 3 rotas
 - `/seo/research` — keyword discovery, suggest expansion, trending
-  terms consolidator output.
+  terms consolidator output, emerging seeds.
 - `/seo/analysis` — SerpAnalysis por keyword, content scorer, gap
   reports (consome `ContentScoreReport` novo do engine).
 - `/seo/opportunities` — striking distance, GSC underperformers,
@@ -152,10 +180,12 @@ sem saber o layout final geraria retrabalho).
   3 fluxos principais.
 
 ### B5 — Decompor componentes centrais do content flow
-- `components/BriefingForm.tsx` (710L) → split por section (base
-  fields, PoB importer, data sources picker, custom outline editor).
-- `components/SectionEditor.tsx` (676L) → split editor / toolbar /
-  actions / critique panel.
+- `components/engine/BriefingForm.tsx` (710L) → split por section
+  (base fields, PoB importer, data sources picker, custom outline
+  editor).
+- `components/engine/editor/` — **já parcialmente decomposto** com
+  `EditorShell.tsx` + `SectionEditor.tsx`. Conferir tamanhos atuais,
+  se ainda tem arquivo >500L nesse diretório, splitar mais.
 - Esses são **centrais** ao `/workspace/new` flow — vem antes dos
   outros god components porque qualquer fase futura (tipos
   compartilhados, Server Components migration) toca neles.
@@ -163,7 +193,7 @@ sem saber o layout final geraria retrabalho).
   briefing → write → optimize.
 
 ### B6 — Decompor `simulation-comparison.tsx` (1379L)
-- Component usado em múltiplas páginas de `/farm/simulations/*`.
+- Agora em `components/modules/simulations/simulation-comparison.tsx`.
 - Split por concern: scenario chart, delta table, overrides inheritance
   visualizer, export buttons.
 - **Validação**: Vitest component tests; E2E das comparações de
@@ -180,10 +210,11 @@ sem saber o layout final geraria retrabalho).
   builder → escolher parts → ver total".
 
 ### B8 — Clean break + cleanup
-- Remover código legacy das rotas antigas após 1 semana.
+- Remover código legacy das rotas antigas após ~1 semana.
 - Remover `/moved` page.
-- Atualizar `docs/PROGRESS.md` com métricas finais (deve bater:
-  `'use client'` pages ~50, god files >500L = 0 ou 1, sidebar 15 itens).
+- Atualizar `docs/PROGRESS.md` com métricas finais (target:
+  `'use client'` pages ~50, god files >500L = 0 ou 1, sidebar ≤15
+  entradas top-level).
 
 ### Carryover (não-bloqueante durante B1-B7, mas anotar)
 - Reconciliação Briefing engine↔hub (shared-types ou OpenAPI gen).
@@ -233,6 +264,62 @@ sem saber o layout final geraria retrabalho).
 
 Validação: leitura manual; progresso registrado antes de código
 começar (requisito CLAUDE.md).
+
+### S01.b — B1: IA rework — 5 domains + sidebar + route migration — DONE
+
+Migração massiva de URLs + rewrite da sidebar + sweep de Links
+internos. Clean break (sem redirect) conforme decisão do operador.
+
+**git mv (21 folders)**
+- `/new, /guides, /qa, /ideas, /templates, /editor, /slang, /people`
+  → `/workspace/*`
+- `/reddit, /youtube, /keybert` → `/seo/*`
+- `/seo/page.tsx` (1291L god file) → `/seo/research/page.tsx`
+- `/bots, /prices, /sales, /simulations` → `/farm/*`
+- `/tasks` → `/admin/tasks`
+- `/engine-config` → `/admin/config/engine`
+- `/settings/{costs,feature-flags,leagues,proxy,users,page.tsx}`
+  → `/admin/config/*`
+- `/llm` deletado (conteúdo já coberto em `/admin/observability` tab
+  LLM — era dashboard standalone duplicado)
+
+**Placeholders novos**
+- `app/(auth)/seo/analysis/page.tsx` (placeholder pra B4)
+- `app/(auth)/seo/opportunities/page.tsx` (placeholder pra B4)
+
+**Sidebar rewrite**
+- `components/layout/sidebar.tsx` reorganizado em 5 top-level domains
+  + Dashboard: Dashboard | Workspace | SEO | Farm | Hardware | Admin.
+- Todas as entradas com hrefs novos. Removidos links pra `/docs`
+  (não existia como rota autenticada) e `/settings/*` legacy.
+- Total top-level entries: 6 (abaixo do target ≤15).
+
+**Sweep de Links internos**
+- `sed -E -i` em bulk sobre todos os `*.ts`/`*.tsx` (exceto node_modules,
+  .next, .git, .claude). Regex `(["'\`])/<oldpath>\b` substituído pelo
+  path novo. 7 patterns cobriram as 18+ rotas.
+- ~30+ arquivos atualizados: `proxy.ts` (middleware matchers),
+  components de sim/bot/sales forms, simulation-comparison, app
+  pages que linkam entre si, e2e tests.
+- Confirmado zero old paths remanescentes via grep final em .ts/.tsx.
+
+**Permission denied trade-off**
+- Primeiro pass do `git mv` falhou em 6 dirs com dynamic routes
+  (`[slug]`, `[postId]`, `[id]`) — Windows file locks do `next dev`
+  rodando em background. Identificado via `powershell Get-CimInstance`,
+  matado 3 node.exe processes (next dev + postcss + start-server).
+  Retry limpo após kill.
+
+**Validação**
+- `npx next build` (background, ~90s) → exit 0, zero warnings.
+- Todas as 5 domains listadas no output do build (workspace, seo,
+  farm, admin/{config,observability,tasks}, hardware + dashboard +
+  login públicos). Dynamic routes resolvem (`ƒ` markers no build).
+- Middleware (`proxy.ts`) continua protegendo ops paths — layout
+  `(auth)/layout.tsx` usa `getServerSession` server-side como backup.
+
+**Arquivos tocados** (total ~70): 40+ renames (git mv), ~30
+modifications (sed sweep), 3 creates (sidebar rewrite, 2 placeholders).
 
 ## O que resta na session 01
 

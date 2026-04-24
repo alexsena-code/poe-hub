@@ -54,21 +54,53 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return "children" in entry;
 }
 
+// Session 01 IA rework: 5 top-level domains + Dashboard.
+//   /workspace — content engine (briefing, write, critique)
+//   /seo       — research/analysis/opportunities
+//   /farm      — PoE ops (bots, prices, sales, simulations)
+//   /admin     — config, observability, tasks
+//   /hardware  — deals feed + builder (standalone, not tied to PoE cycle)
 const navSections: { label: string; items: NavEntry[] }[] = [
   {
     label: "",
     items: [
       { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
       {
-        title: "Operacoes",
+        title: "Workspace",
+        icon: PenTool,
+        children: [
+          { title: "Novo Post", href: "/workspace/new", icon: PenTool },
+          { title: "Guides", href: "/workspace/guides", icon: BookOpen },
+          { title: "Q&A", href: "/workspace/qa", icon: MessageSquare },
+          { title: "Ideas", href: "/workspace/ideas", icon: Lightbulb },
+          { title: "Templates", href: "/workspace/templates", icon: FileText },
+          { title: "Slang", href: "/workspace/slang", icon: BookOpenCheck },
+          { title: "People", href: "/workspace/people", icon: Users },
+        ],
+      },
+      {
+        title: "SEO",
+        icon: Search,
+        children: [
+          // /seo/research is the renamed legacy /seo page (god file, split in B4).
+          // /seo/analysis and /seo/opportunities are B4 placeholders.
+          { title: "Research", href: "/seo/research", icon: Search },
+          { title: "Analysis", href: "/seo/analysis", icon: BarChart3 },
+          { title: "Opportunities", href: "/seo/opportunities", icon: TrendingUp },
+          { title: "Reddit", href: "/seo/reddit", icon: ScrollText },
+          { title: "YouTube", href: "/seo/youtube", icon: BarChart3 },
+          { title: "KeyBERT", href: "/seo/keybert", icon: Search },
+        ],
+      },
+      {
+        title: "Farm",
         icon: Bot,
         children: [
-          { title: "Bots", href: "/bots", icon: Bot },
-          { title: "Tarefas", href: "/tasks", icon: ListTodo },
-          { title: "Vendas", href: "/sales", icon: DollarSign },
-          { title: "Precos", href: "/prices", icon: TrendingUp },
-          { title: "Simulacoes", href: "/simulations", icon: Calculator },
-          { title: "Faturamento Anual", href: "/simulations/annual", icon: Calculator },
+          { title: "Bots", href: "/farm/bots", icon: Bot },
+          { title: "Vendas", href: "/farm/sales", icon: DollarSign },
+          { title: "Precos", href: "/farm/prices", icon: TrendingUp },
+          { title: "Simulacoes", href: "/farm/simulations", icon: Calculator },
+          { title: "Faturamento Anual", href: "/farm/simulations/annual", icon: Calculator },
         ],
       },
       {
@@ -82,57 +114,18 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Analytics", href: "/hardware/analytics", icon: BarChart3 },
         ],
       },
-    ],
-  },
-  {
-    label: "Content Engine",
-    items: [
-      { title: "Novo Post", href: "/new", icon: PenTool },
-      { title: "Guides", href: "/guides", icon: BookOpen },
-      { title: "Q&A", href: "/qa", icon: MessageSquare },
       {
-        title: "SEO",
-        icon: Search,
-        children: [
-          { title: "Keywords", href: "/seo", icon: Search },
-          { title: "Reddit", href: "/reddit", icon: ScrollText },
-          { title: "YouTube", href: "/youtube", icon: BarChart3 },
-        ],
-      },
-      {
-        title: "Conteudo",
-        icon: FileText,
-        children: [
-          { title: "Templates", href: "/templates", icon: FileText },
-          { title: "Ideas", href: "/ideas", icon: Lightbulb },
-          { title: "Slang", href: "/slang", icon: BookOpenCheck },
-          { title: "People", href: "/people", icon: Users },
-        ],
-      },
-      { title: "Engine Config", href: "/engine-config", icon: Wrench },
-      { title: "Docs", href: "/docs", icon: BookOpen },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      // Session 21 Track B: fused /logs + /llm-logs + /analytics + /monitor
-      // into a single tabbed observability dashboard.
-      { title: "Observability", href: "/admin/observability", icon: Activity },
-    ],
-  },
-  {
-    label: "",
-    items: [
-      {
-        title: "Configuracoes",
+        title: "Admin",
         icon: Settings,
         children: [
-          { title: "Hardware", href: "/hardware/settings", icon: Monitor },
-          { title: "Custos", href: "/settings/costs", icon: DollarSign },
-          { title: "Proxy", href: "/settings/proxy", icon: Wrench },
-          { title: "Ligas", href: "/settings/leagues", icon: ListTodo },
-          { title: "Usuarios", href: "/settings/users", icon: Users },
+          { title: "Observability", href: "/admin/observability", icon: Activity },
+          { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
+          { title: "Engine Config", href: "/admin/config/engine", icon: Wrench },
+          { title: "Custos", href: "/admin/config/costs", icon: DollarSign },
+          { title: "Proxy", href: "/admin/config/proxy", icon: Wrench },
+          { title: "Ligas", href: "/admin/config/leagues", icon: ListTodo },
+          { title: "Usuarios", href: "/admin/config/users", icon: Users },
+          { title: "Feature Flags", href: "/admin/config/feature-flags", icon: Settings },
         ],
       },
     ],

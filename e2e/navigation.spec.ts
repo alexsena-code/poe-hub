@@ -7,12 +7,12 @@ import { login } from "./helpers/auth";
  */
 const NAV_ITEMS = [
   { label: "Dashboard", urlSegment: "/dashboard" },
-  { label: "Bots", urlSegment: "/bots" },
-  { label: "Tarefas", urlSegment: "/tasks" },
-  { label: "Vendas", urlSegment: "/sales" },
-  { label: "Precos", urlSegment: "/prices" },
-  { label: "Simulacoes", urlSegment: "/simulations" },
-  { label: "Configuracoes", urlSegment: "/settings" },
+  { label: "Bots", urlSegment: "/farm/bots" },
+  { label: "Tarefas", urlSegment: "/admin/tasks" },
+  { label: "Vendas", urlSegment: "/farm/sales" },
+  { label: "Precos", urlSegment: "/farm/prices" },
+  { label: "Simulacoes", urlSegment: "/farm/simulations" },
+  { label: "Configuracoes", urlSegment: "/admin/config" },
 ];
 
 test.describe("Navigation", () => {

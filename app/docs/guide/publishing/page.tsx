@@ -72,7 +72,7 @@ export default function GuidePublishingPage() {
       <Table
         headers={['Acao', 'Como']}
         rows={[
-          ['Ver todos', '/guides no dashboard (filtro all/draft/published)'],
+          ['Ver todos', '/workspace/guides no dashboard (filtro all/draft/published)'],
           ['Editar', 'Clique em qualquer post para reabrir no co-writer'],
           ['Despublicar', 'PUT /content/posts/:slug com status: "draft"'],
           ['Deletar', 'DELETE /content/posts/:slug'],

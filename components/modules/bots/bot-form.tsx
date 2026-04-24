@@ -83,7 +83,7 @@ export function BotForm({ initialData }: BotFormProps) {
     }
 
     toast.success(isEditing ? "Bot atualizado!" : "Bot criado!");
-    router.push("/bots");
+    router.push("/farm/bots");
     router.refresh();
   }
 
@@ -171,7 +171,7 @@ export function BotForm({ initialData }: BotFormProps) {
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Salvando..." : isEditing ? "Salvar" : "Criar Bot"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => router.push("/bots")}>
+            <Button type="button" variant="outline" onClick={() => router.push("/farm/bots")}>
               Cancelar
             </Button>
           </div>

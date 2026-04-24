@@ -61,7 +61,7 @@ export function AwaitingHumanBanner() {
             <>
               Próximo:{' '}
               <Link
-                href={`/editor/${first.slug}`}
+                href={`/workspace/editor/${first.slug}`}
                 className="underline underline-offset-2 hover:text-amber-100"
               >
                 {firstTitle}
@@ -76,7 +76,7 @@ export function AwaitingHumanBanner() {
         </div>
       </div>
       <Link
-        href="/guides?pending=1"
+        href="/workspace/guides?pending=1"
         className="shrink-0 rounded-md border border-amber-700/50 bg-amber-900/30 px-2.5 py-1 text-xs text-amber-200 transition-colors hover:bg-amber-900/50"
       >
         Ver todos

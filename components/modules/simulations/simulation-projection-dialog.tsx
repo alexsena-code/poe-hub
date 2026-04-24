@@ -124,7 +124,7 @@ export function SimulationProjectionDialog() {
       setOpen(false);
       reset();
       setSelectedSources([]);
-      router.push(`/simulations/compare?ids=${result.ids.join(",")}`);
+      router.push(`/farm/simulations/compare?ids=${result.ids.join(",")}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao criar projecoes");
     } finally {
