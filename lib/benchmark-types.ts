@@ -95,6 +95,14 @@ export interface ContentGenBenchmarkRequest {
     league?: string;
     notes?: string;
     templateName?: string;
+    /** pobb.in link. When present, engine's enrichment pulls gear/skills from it. */
+    pobUrl?: string;
+    /** Output language. 'auto' lets engine detect. */
+    language?: "pt" | "en" | "auto";
+    /** Generation mode. 'auto' runs the full pipeline. */
+    mode?: "auto" | "manual";
+    /** Insert H2 headings between auto-detected sections. */
+    injectSectionHeadings?: boolean;
   };
   modelOverride?: string;
 }

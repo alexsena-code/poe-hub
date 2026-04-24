@@ -23,13 +23,20 @@ import type { ContentGenBenchmarkRequest } from "@/lib/benchmark-types";
 
 // Essential Briefing fields only — full Briefing has many optional fields
 // that are irrelevant for a quick benchmark run.
+// skill + ascendancy only matter for the build_guide template. currency_guide,
+// mechanic_guide, faq, quick_explainer, beginner_guide all run fine without
+// them. Let the engine enforce template-specific required fields server-side.
 const contentGenSchema = z.object({
-  skill: z.string().min(2, "Skill obrigatória"),
-  ascendancy: z.string().min(2, "Ascendancy obrigatória"),
+  skill: z.string().optional(),
+  ascendancy: z.string().optional(),
   topic: z.string().optional(),
   league: z.string().optional(),
   templateName: z.string().optional(),
   notes: z.string().optional(),
+  pobUrl: z.string().optional(),
+  language: z.enum(["pt", "en", "auto"]).optional(),
+  mode: z.enum(["auto", "manual"]).optional(),
+  injectSectionHeadings: z.boolean().optional(),
   modelOverride: z.string().optional(),
   modelOverrides: z.object({ write: z.string().optional() }).optional(),
 });
@@ -61,6 +68,10 @@ export function ContentGenBenchmarkForm({
       league: "",
       templateName: "",
       notes: "",
+      pobUrl: "",
+      language: "auto",
+      mode: "auto",
+      injectSectionHeadings: false,
       modelOverride: "",
       modelOverrides: { write: "" },
     },
@@ -86,6 +97,10 @@ export function ContentGenBenchmarkForm({
       league: p.league ?? b.league ?? "",
       templateName: p.templateName ?? b.templateName ?? "",
       notes: p.notes ?? b.notes ?? "",
+      pobUrl: p.pobUrl ?? b.pobUrl ?? "",
+      language: p.language ?? b.language ?? "auto",
+      mode: p.mode ?? b.mode ?? "auto",
+      injectSectionHeadings: p.injectSectionHeadings ?? b.injectSectionHeadings ?? false,
       modelOverride: p.modelOverride ?? "",
       modelOverrides: p.modelOverrides ?? { write: "" },
     });
@@ -94,13 +109,20 @@ export function ContentGenBenchmarkForm({
 
   function handleSubmit(values: ContentGenFormValues) {
     const body: ContentGenBenchmarkRequest = {
-      briefing: { skill: values.skill, ascendancy: values.ascendancy },
+      briefing: {
+        skill: values.skill?.trim() ?? "",
+        ascendancy: values.ascendancy?.trim() ?? "",
+      },
     };
 
     if (values.topic?.trim()) body.briefing.topic = values.topic.trim();
     if (values.league?.trim()) body.briefing.league = values.league.trim();
     if (values.templateName?.trim()) body.briefing.templateName = values.templateName.trim();
     if (values.notes?.trim()) body.briefing.notes = values.notes.trim();
+    if (values.pobUrl?.trim()) body.briefing.pobUrl = values.pobUrl.trim();
+    if (values.language && values.language !== "auto") body.briefing.language = values.language;
+    if (values.mode && values.mode !== "auto") body.briefing.mode = values.mode;
+    if (values.injectSectionHeadings) body.briefing.injectSectionHeadings = true;
     if (values.modelOverride?.trim()) body.modelOverride = values.modelOverride.trim();
     if (values.modelOverrides?.write?.trim()) {
       (body as ContentGenBenchmarkRequest & { modelOverrides?: Record<string, string> }).modelOverrides = {
@@ -130,7 +152,7 @@ export function ContentGenBenchmarkForm({
             name="skill"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Skill *</FormLabel>
+                <FormLabel>Skill (build_guide only)</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Righteous Fire" {...field} />
                 </FormControl>
@@ -144,7 +166,7 @@ export function ContentGenBenchmarkForm({
             name="ascendancy"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Ascendancy *</FormLabel>
+                <FormLabel>Ascendancy (build_guide only)</FormLabel>
                 <FormControl>
                   <Input placeholder="Ex: Juggernaut" {...field} />
                 </FormControl>
@@ -190,6 +212,23 @@ export function ContentGenBenchmarkForm({
                 <FormControl>
                   <Input placeholder="Ex: build_guide" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="pobUrl"
+            render={({ field }) => (
+              <FormItem className="md:col-span-2">
+                <FormLabel>PoB URL (opcional, só build_guide)</FormLabel>
+                <FormControl>
+                  <Input placeholder="Ex: https://pobb.in/..." {...field} />
+                </FormControl>
+                <FormDescription>
+                  Link pobb.in pro engine enriquecer gear/skills.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
