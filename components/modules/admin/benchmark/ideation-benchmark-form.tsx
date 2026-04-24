@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ModelPricingCard } from "./model-pricing-card";
+import { ModelCombobox } from "./model-combobox";
 import { PresetBar } from "./preset-bar";
 import type { IdeationBenchmarkRequest } from "@/lib/benchmark-types";
 
@@ -138,7 +139,12 @@ export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormP
               <FormItem>
                 <FormLabel>Override global (todos os nodes)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Ex: openai/gpt-4o" {...field} />
+                  <ModelCombobox
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Selecionar model..."
+                    ariaLabel="Override global"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -155,7 +161,12 @@ export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormP
             <FormItem>
               <FormLabel>Writer model (só aplica ao node <code>write</code>)</FormLabel>
               <FormControl>
-                <Input placeholder="Ex: anthropic/claude-opus-4-5" {...field} />
+                <ModelCombobox
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  placeholder="Selecionar writer model..."
+                  ariaLabel="Writer model"
+                />
               </FormControl>
               <FormDescription>
                 Isola a troca no <code>write</code> node sem afetar{" "}
