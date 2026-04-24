@@ -1,7 +1,7 @@
 /**
- * Tests for POST /api/benchmark/runs/[a]/evaluate
+ * Tests for POST /api/benchmark/runs/[id]/evaluate
  *
- * Route: app/api/benchmark/runs/[a]/evaluate/route.ts
+ * Route: app/api/benchmark/runs/[id]/evaluate/route.ts
  *
  * Uses real DB (potc_test) for persistence assertions.
  * Mocks global.fetch to control OpenRouter responses.
@@ -65,7 +65,7 @@ function makeRequest(runAId: string, runBId: string, body: object = {}) {
 }
 
 function makeParams(runAId: string) {
-  return { params: Promise.resolve({ a: runAId }) };
+  return { params: Promise.resolve({ id: runAId }) };
 }
 
 // ─── Setup / Teardown ────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ afterAll(async () => {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-describe("POST /api/benchmark/runs/[a]/evaluate", () => {
+describe("POST /api/benchmark/runs/[id]/evaluate", () => {
   describe("auth", () => {
     it("returns 401 when unauthenticated", async () => {
       const { getServerSession } = await import("next-auth");

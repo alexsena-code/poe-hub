@@ -292,7 +292,7 @@ async function runJudge(params: {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ a: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -308,7 +308,7 @@ export async function POST(
     );
   }
 
-  const { a: runAId } = await params;
+  const { id: runAId } = await params;
   const { searchParams } = request.nextUrl;
   const runBId = searchParams.get("b");
 
