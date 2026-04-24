@@ -21,6 +21,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Accordion } from '@/components/ui/accordion';
 import { QaChatWidget } from './widgets/qa-chat-widget';
 import { AssetsWidget } from './widgets/assets-widget';
+import { AssetsLookupWidget } from './widgets/assets-lookup-widget';
 import { ContentScoreWidget } from './widgets/content-score-widget';
 import { SlangReportWidget } from './widgets/slang-report-widget';
 import { SlangLookupWidget } from './widgets/slang-lookup-widget';
@@ -99,6 +100,7 @@ export function RightRail({ draftId }: RightRailProps) {
         <ContentScoreWidget />
         <SlangReportWidget />
         <AssetsWidget />
+        <AssetsLookupWidget />
         <SlangLookupWidget />
       </Accordion>
     </aside>

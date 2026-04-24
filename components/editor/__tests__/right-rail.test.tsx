@@ -3,7 +3,7 @@
  * Tests for the RightRail component.
  *
  * Validates:
- * 1. All five widget headers render by default.
+ * 1. All six widget headers render by default.
  * 2. Default open items (qa, content-score) match the accordion value.
  * 3. Accordion open/close state persists to localStorage.
  * 4. Changing draftId reloads persisted state for the new draft.
@@ -52,6 +52,10 @@ vi.mock('../widgets/slang-lookup-widget', () => ({
   SlangLookupWidget: () => <div data-testid="widget-slang-lookup">Slang Lookup Widget</div>,
 }));
 
+vi.mock('../widgets/assets-lookup-widget', () => ({
+  AssetsLookupWidget: () => <div data-testid="widget-assets-lookup">Assets Lookup Widget</div>,
+}));
+
 import { RightRail } from '../right-rail';
 
 // ---------------------------------------------------------------------------
@@ -77,12 +81,13 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('RightRail', () => {
-  it('renders all five widget stubs', () => {
+  it('renders all six widget stubs', () => {
     render(<RightRail draftId="draft-abc" />);
     expect(screen.getByTestId('widget-qa')).toBeInTheDocument();
     expect(screen.getByTestId('widget-content-score')).toBeInTheDocument();
     expect(screen.getByTestId('widget-slang-report')).toBeInTheDocument();
     expect(screen.getByTestId('widget-assets')).toBeInTheDocument();
+    expect(screen.getByTestId('widget-assets-lookup')).toBeInTheDocument();
     expect(screen.getByTestId('widget-slang-lookup')).toBeInTheDocument();
   });
 
