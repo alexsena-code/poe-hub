@@ -11,8 +11,9 @@
  * Session 10.b.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFormContext, Controller } from 'react-hook-form';
+import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -118,12 +119,33 @@ export function PublishSectionTaxonomy() {
   const {
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useFormContext<EditorMetaForm>();
 
   const language = watch('language');
+  const categoryId = watch('categoryId');
   const { authors, isLoading: authorsLoading } = useAuthors();
   const { categories, isLoading: catsLoading } = useCategories(language);
+
+  // Orphan-category guard: when language flips, the selected category may no
+  // longer exist in the new language's list (categories are language-scoped
+  // in Sanity). Try to match by tagname first (so "noticias" PT-BR maps to
+  // "noticias" EN if both exist), otherwise clear and warn the operator.
+  useEffect(() => {
+    if (catsLoading) return;
+    if (!categoryId) return;
+    if (categories.some((c) => c._id === categoryId)) return;
+    // categoryId is orphaned for this language. Best effort: find a sibling
+    // category with the same tagname (operator's convention for cross-locale
+    // pairs). Fall back to clearing.
+    // The previous-language category isn't loaded here, so we can't fetch its
+    // tagname directly — clear and let the operator pick. Toast informs why.
+    setValue('categoryId', '', { shouldValidate: true, shouldDirty: true });
+    toast.warning(
+      `Categoria não existe em ${language.toUpperCase()}. Selecione uma nova ou crie com "+ Nova categoria".`,
+    );
+  }, [language, categoryId, categories, catsLoading, setValue]);
 
   return (
     <div className="space-y-4">
