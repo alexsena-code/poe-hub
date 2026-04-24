@@ -56,7 +56,20 @@ export function IdeationBenchmarkForm({ loading, onRun }: IdeationBenchmarkFormP
   const writeOverride = form.watch("modelOverrides.write");
 
   function handleLoad(payload: unknown, presetId: string) {
-    form.reset(payload as IdeationFormValues);
+    // Seeded payload has `templateFilter: string[]` (engine request shape).
+    // UI-saved payload has `templateFilterRaw: string` (CSV for the input).
+    // Normalise both.
+    const p = (payload ?? {}) as Partial<IdeationFormValues> & {
+      templateFilter?: string[];
+    };
+    form.reset({
+      editorialBriefing: p.editorialBriefing ?? "",
+      templateFilterRaw:
+        p.templateFilterRaw ??
+        (Array.isArray(p.templateFilter) ? p.templateFilter.join(", ") : ""),
+      modelOverride: p.modelOverride ?? "",
+      modelOverrides: p.modelOverrides ?? { write: "" },
+    });
     form.setValue("__presetId" as never, presetId as never);
   }
 

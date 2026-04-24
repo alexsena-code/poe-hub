@@ -60,6 +60,14 @@ export interface BenchmarkSnapshot {
   llmCallCount: number;
   qdrantQueryCount: number;
   events: BenchmarkCollectorEvent[];
+  /**
+   * Pipeline's final output (answer for QA, ideas list for ideation,
+   * generated guide for content-generation). Hub-populated: engine returns
+   * it alongside telemetry in the job result wrapper, and the runner hook
+   * stuffs it here so the panel can render the actual LLM response instead
+   * of forcing the operator to expand the last LLM event manually.
+   */
+  finalOutput?: unknown;
 }
 
 // ---------------------------------------------------------------------------

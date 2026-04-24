@@ -70,7 +70,25 @@ export function ContentGenBenchmarkForm({
   const writeOverride = form.watch("modelOverrides.write");
 
   function handleLoad(payload: unknown, presetId: string) {
-    form.reset(payload as ContentGenFormValues);
+    // Two shapes in the wild:
+    //  1. Seeded from scenarios.yaml → nested `{ briefing: { skill, ascendancy, ... } }`
+    //     (mirrors the request body shape the engine expects).
+    //  2. Saved via the UI's "Save as preset" → flat form values.
+    // Normalise both by pulling briefing.* first, falling back to top-level.
+    const p = (payload ?? {}) as Partial<ContentGenFormValues> & {
+      briefing?: Partial<ContentGenFormValues>;
+    };
+    const b = p.briefing ?? {};
+    form.reset({
+      skill: p.skill ?? b.skill ?? "",
+      ascendancy: p.ascendancy ?? b.ascendancy ?? "",
+      topic: p.topic ?? b.topic ?? "",
+      league: p.league ?? b.league ?? "",
+      templateName: p.templateName ?? b.templateName ?? "",
+      notes: p.notes ?? b.notes ?? "",
+      modelOverride: p.modelOverride ?? "",
+      modelOverrides: p.modelOverrides ?? { write: "" },
+    });
     form.setValue("__presetId" as never, presetId as never);
   }
 

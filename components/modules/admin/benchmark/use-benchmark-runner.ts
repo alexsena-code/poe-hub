@@ -31,8 +31,10 @@ interface JobStatusResponse {
   error?: string;
 }
 
-// Engine wraps telemetry in { result, telemetry } — we only expose the snapshot.
+// Engine wraps the pipeline output + telemetry in { result, telemetry }.
+// We stuff `result` into snapshot.finalOutput so the UI can render it directly.
 interface BenchmarkJobResult {
+  result?: unknown;
   telemetry: BenchmarkSnapshot;
 }
 
@@ -205,7 +207,7 @@ async function pollUntilDone(
       if (!snapshot) {
         throw new Error(`Job ${jobId} completou mas result.telemetry está ausente.`);
       }
-      setResult(snapshot);
+      setResult({ ...snapshot, finalOutput: status.result?.result });
       return;
     }
     if (status.status === "failed") {
