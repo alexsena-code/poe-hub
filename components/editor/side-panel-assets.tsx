@@ -47,6 +47,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEditorContext } from './editor-context';
 import { useCurrencyCatalog, filterCurrencies } from './hooks/use-currency-catalog';
+import { resolveCurrencyIcon } from './hooks/resolve-currency-icon';
 
 // ---------------------------------------------------------------------------
 // Currency drag-source chip
@@ -182,12 +183,15 @@ export function SidePanelAssets() {
   const { editor } = useEditorContext();
   const [open, setOpen] = useState(true);
 
-  function insertCurrency(currencyName: string) {
+  async function insertCurrency(currencyName: string) {
     if (!editor) {
       toast.error('Editor não está pronto');
       return;
     }
-    editor.chain().focus().insertPoeCurrency({ currencyName }).run();
+    // Resolve icon at insert time so the chip matches the preview pane.
+    // resolveCurrencyIcon is fail-soft — null means engine off, chip falls back to ◈.
+    const iconUrl = await resolveCurrencyIcon(currencyName);
+    editor.chain().focus().insertPoeCurrency({ currencyName, iconUrl: iconUrl ?? undefined }).run();
   }
 
   return (

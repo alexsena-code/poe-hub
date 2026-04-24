@@ -50,13 +50,20 @@ const mockChain = vi.fn();
 const fakeEditor = {
   chain: () => ({
     focus: () => ({
-      insertPoeCurrency: (attrs: { currencyName: string }) => {
+      insertPoeCurrency: (attrs: { currencyName: string; iconUrl?: string }) => {
         mockInsertPoeCurrency(attrs);
         return { run: mockRun };
       },
     }),
   }),
 };
+
+// resolveCurrencyIcon — default returns a mock URL; overridden per test as needed.
+const mockResolveCurrencyIcon = vi.fn().mockResolvedValue('https://cdn.example.com/divine.png');
+
+vi.mock('@/components/editor/hooks/resolve-currency-icon', () => ({
+  resolveCurrencyIcon: (...args: unknown[]) => mockResolveCurrencyIcon(...args),
+}));
 
 vi.mock('@/components/editor/editor-context', () => ({
   useEditorContext: () => ({
@@ -97,6 +104,8 @@ beforeEach(() => {
   mockError = null;
   mockInsertPoeCurrency.mockClear();
   mockRun.mockClear();
+  mockResolveCurrencyIcon.mockClear();
+  mockResolveCurrencyIcon.mockResolvedValue('https://cdn.example.com/divine.png');
 });
 
 // ---------------------------------------------------------------------------
@@ -162,7 +171,10 @@ describe('SidePanelAssets', () => {
     });
   });
 
-  it('click on chip calls insertPoeCurrency command', async () => {
+  it('click on chip calls insertPoeCurrency with resolved iconUrl', async () => {
+    const iconUrl = 'https://cdn.example.com/divine.png';
+    mockResolveCurrencyIcon.mockResolvedValue(iconUrl);
+
     render(<SidePanelAssets />);
 
     const divineChip = screen.getByText('Divine Orb').closest('[role="button"]');
@@ -170,8 +182,31 @@ describe('SidePanelAssets', () => {
 
     await userEvent.click(divineChip!);
 
-    expect(mockInsertPoeCurrency).toHaveBeenCalledWith({ currencyName: 'Divine Orb' });
+    // insertCurrency is async — wait for the icon fetch to resolve before asserting.
+    await waitFor(() => {
+      expect(mockInsertPoeCurrency).toHaveBeenCalledWith({
+        currencyName: 'Divine Orb',
+        iconUrl,
+      });
+    });
     expect(mockRun).toHaveBeenCalled();
+  });
+
+  it('click on chip inserts chip without iconUrl when engine returns null', async () => {
+    // Engine is off — resolveCurrencyIcon returns null; chip falls back to ◈.
+    mockResolveCurrencyIcon.mockResolvedValue(null);
+
+    render(<SidePanelAssets />);
+
+    const chaosChip = screen.getByText('Chaos Orb').closest('[role="button"]');
+    await userEvent.click(chaosChip!);
+
+    await waitFor(() => {
+      expect(mockInsertPoeCurrency).toHaveBeenCalledWith({
+        currencyName: 'Chaos Orb',
+        iconUrl: undefined,
+      });
+    });
   });
 
   it('dragstart sets correct dataTransfer data', () => {

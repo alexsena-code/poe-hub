@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-23 (session 08 landed — editor Tiptap + publish direto no Sanity).
+Last updated: 2026-04-24 (session 09 landed — carryover cleanup: chip paridade iconUrl + vitest e2e exclude + migration retroativa zera 38 baseline failures + tracker hygiene).
 
 ## Current status
 
@@ -13,7 +13,9 @@ simulations), `/admin` (config/observability/tasks), `/hardware`
 
 Stack: Next.js 16 App Router + Prisma 6 + PostgreSQL 16 + shadcn/ui
 (Tailwind v4, **neutral** base) + NextAuth credentials. Tests: Vitest
-(~382 tests, +9 novos em `stitch-notes.test.ts`) + Playwright (32 E2E).
+(**539 passing, 0 falhos** após session 09 migration retroativa cobrir
+4 commits com drift) + Playwright (32 E2E, rodando agora fora do
+Vitest glob).
 
 Session 01 landed: 5-domain IA, sidebar rewrite, admin/config fusion,
 engine-config split (1944L → 182L + 9 tabs), style Phase 1 (neutral +
@@ -121,6 +123,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [09](progress/session-09.md) | 2026-04-24 | carryover cleanup da session 08 (chip currency paridade iconUrl + vitest e2e exclude + migration retroativa 4 commits drift + tracker hygiene) |
 | [08](progress/session-08.md) | 2026-04-23 | editor profissional (Tiptap) + publish direto no Sanity + drag-drop currencies + Q&A inline + preview render fiel do poetrade-dev |
 | [07](progress/session-07.md) | 2026-04-23 | zerar carryover (6 god files médios splits + editor inline score + sidebar regroup) pré-editor-rewrite |
 | [06](progress/session-06.md) | 2026-04-23 | engine session 21 Fase C consumers (post preview contentScore/slangReport, /admin/gsc, slang bulk approve, /admin/benchmark) |
@@ -142,16 +145,15 @@ new work lives in numbered sessions.
 | TS/TSX files | ~600 | session 08 adicionou ~45 arquivos novos em `components/editor/` + `lib/sanity/` + routes blog (editor completo ~2 god-files substituídos) |
 | Routes | **75** | +3 (blog list, blog new, blog edit) -0 (legacy workspace/new e workspace/editor viraram redirects) |
 | `'use client'` pages | **19** (app/auth) | +1 (blog edit é client wrapper) |
-| Vitest tests | **~532** (494 passed + baseline 38 falhos pre-existing) | +174 novos passando da session 08 (serializer 41, extensions 49, preview 11, publish 36, autosave 7, hooks editor 19, ...) |
-| Playwright E2E | 32 | unchanged |
+| Vitest tests | **539 passed / 0 failed** | session 09 zerou os 38 baseline failures (migration retroativa) + adicionou 7 novos (resolve-currency-icon 6 + 1 case engine-off em side-panel-assets) |
+| Playwright E2E | 32 | excluído do Vitest via `configDefaults.exclude + e2e/**` (S09.b) — rodam só via `npx playwright test` |
 | God files >1000L | **0** | stable |
-| God files 500-1000L | **0** | SectionEditor 676L **deletado** pela session 08 (editor novo em `components/editor/`, arquivos ≤300L cada) |
-| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge + (session 08) Tiptap editor + Sanity client | incremental |
+| God files 500-1000L | **0** | SectionEditor 676L deletado pela session 08 |
+| Shared primitives | PageHeader, EmptyState, Spinner, Input, Textarea, StatusBadge, Tiptap editor, Sanity client | incremental |
 | Server Components in app/(auth) | 12 pages RSC puras + 1 híbrida | stable |
 | Proxy routes | 2 catch-all | stable |
 | Engine Fase C consumers | 4/4 + editor inline | S07.g adicionou display inline no EditorShell |
 | Sidebar Admin | 3 sub-grupos (Operações/SEO Tools/Config) | was 11 flat entries |
-| God files 500-1000L | 10+ (store-prices-tab 955, workspace/ideas 928, seo/reddit 924, hardware/settings 801, workspace/templates 763, simulation-editor 755, admin/config/costs 727, week-editor 718, pipelines-tab 700, SectionEditor 676, workspace/qa 663, simulations/annual/[id] 656, hardware/analytics 621, guide-content 559, deals-tab 555, hardware/builder 529, admin/config/users 521) | BriefingForm resolvido; novos flagged de discovery |
 | Sidebar top-level | 6 (was 25+ flat) | stable |
 | Theme base | neutral | stable |
 

@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
@@ -9,6 +9,8 @@ export default defineConfig({
     globals: true,
     fileParallelism: false,
     setupFiles: ["./tests/vitest.setup.ts"],
+    // e2e lives under e2e/*.spec.ts and is driven by Playwright — not Vitest.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     env: {
       DATABASE_URL: "postgresql://poth:poth@localhost:5432/potc_test",
       ENCRYPTION_KEY:

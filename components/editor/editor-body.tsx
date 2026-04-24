@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { resolveCurrencyIcon } from './hooks/resolve-currency-icon';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,32 @@ function BubbleBtn({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 /**
+ * Handles a PoE currency drag-drop onto the editor area.
+ * Reads 'application/poe-hub-currency' from the dataTransfer, resolves the
+ * icon via the engine proxy, then inserts a currency chip at the drop position.
+ * Fire-and-forget — the chip inserts after the async icon fetch resolves.
+ */
+async function handleCurrencyDrop(
+  e: React.DragEvent<HTMLDivElement>,
+  editor: Editor,
+): Promise<void> {
+  const raw = e.dataTransfer.getData('application/poe-hub-currency');
+  if (!raw) return;
+
+  let name: string;
+  try {
+    const parsed = JSON.parse(raw) as { name?: unknown };
+    if (typeof parsed?.name !== 'string' || !parsed.name.trim()) return;
+    name = parsed.name.trim();
+  } catch {
+    return;
+  }
+
+  const iconUrl = await resolveCurrencyIcon(name);
+  editor.chain().focus().insertPoeCurrency({ currencyName: name, iconUrl: iconUrl ?? undefined }).run();
+}
+
+/**
  * Renders the Tiptap editor area with bubble/floating menus.
  * Shows a centered spinner while the editor instance is being hydrated.
  * Shows a ring border when a draggable PoE asset hovers over the drop zone.
@@ -159,7 +186,14 @@ export function EditorBody({ editor }: EditorBodyProps) {
       )}
       onDragEnter={() => setIsDragOver(true)}
       onDragLeave={() => setIsDragOver(false)}
-      onDrop={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        setIsDragOver(false);
+        // Only intercept PoE currency drops — other drops (images, text) fall through.
+        if (e.dataTransfer.types.includes('application/poe-hub-currency')) {
+          e.preventDefault();
+          void handleCurrencyDrop(e, editor);
+        }
+      }}
     >
       {/* Bubble menu — appears on text selection */}
       <BubbleMenu editor={editor}>

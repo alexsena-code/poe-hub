@@ -17,6 +17,7 @@ import { ReactRenderer } from '@tiptap/react';
 import { Suggestion } from '@tiptap/suggestion';
 import type { SuggestionOptions, SuggestionProps } from '@tiptap/suggestion';
 import type { SlashCommandItem } from '../types';
+import { resolveCurrencyIcon } from '../hooks/resolve-currency-icon';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -117,10 +118,15 @@ export function createSlashCommandItems(editor: Editor): SlashCommandItem[] {
       category: 'poe',
       icon: 'Coins',
       execute: (ed) => {
-        // No picker available at this layer — insert a placeholder currency.
-        // The side-panel-assets (S08.f) is the full picker; slash command
-        // inserts Divine Orb as a quick-insert default.
-        ed.chain().focus().insertPoeCurrency({ currencyName: 'Divine Orb' }).run();
+        // No picker at this layer — quick-insert Divine Orb as default.
+        // Icon is resolved async; chip inserts immediately with ◈ if engine is slow,
+        // then a second insert replaces it once the URL arrives.
+        // Pattern: fire-and-forget void — execute() is typed as () => void.
+        void (async () => {
+          const currencyName = 'Divine Orb';
+          const iconUrl = await resolveCurrencyIcon(currencyName);
+          ed.chain().focus().insertPoeCurrency({ currencyName, iconUrl: iconUrl ?? undefined }).run();
+        })();
       },
     },
     {
