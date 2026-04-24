@@ -25,74 +25,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, FileText, Globe } from "lucide-react";
+import { PostRow } from "@/components/modules/workspace/blog/post-row";
 
 // ─── Language filter types ────────────────────────────────────────────────────
 
 type LangFilter = "all" | "pt-br" | "en";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Formats an ISO datetime string to dd/mm/yyyy (pt-BR). */
-function formatDateBR(isoString: string | undefined): string {
-  if (!isoString) return "—";
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-/** Returns the bare post ID (strips the "drafts." prefix if present). */
-function bareId(id: string): string {
-  return id.startsWith("drafts.") ? id.slice(7) : id;
-}
-
-/** Language badge colour — pt-br is amber, en is sky. */
-function langBadgeVariant(lang: string | undefined): "default" | "secondary" | "outline" {
-  if (lang === "pt-br") return "default";
-  if (lang === "en") return "secondary";
-  return "outline";
-}
-
-// ─── Post row ────────────────────────────────────────────────────────────────
-
-interface PostRowProps {
-  post: DraftListItem;
-  isDraft: boolean;
-}
-
-function PostRow({ post, isDraft }: PostRowProps) {
-  const id = bareId(post._id);
-  const editHref = `/workspace/blog/${id}/edit`;
-  const slug = post.slug?.current ?? "—";
-  const lang = post.language ?? "?";
-  const date = isDraft ? post._updatedAt : post.publishedAt;
-
-  return (
-    <Link
-      href={editHref}
-      className="flex items-start justify-between gap-4 rounded-md px-3 py-2.5 text-sm
-                 hover:bg-zinc-800/60 transition-colors group"
-    >
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
-          {post.title ?? "(sem título)"}
-        </p>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">/{slug}</p>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <Badge variant={langBadgeVariant(lang)} className="text-[10px] uppercase">
-          {lang}
-        </Badge>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {formatDateBR(date)}
-        </span>
-      </div>
-    </Link>
-  );
-}
 
 // ─── Empty row ───────────────────────────────────────────────────────────────
 
