@@ -1,7 +1,7 @@
 'use client';
 /**
  * SWR wrappers for Sanity reference data — authors and categories.
- * Used by editor-sidebar.tsx to populate async select dropdowns.
+ * Used by publish-section-taxonomy.tsx to populate async select dropdowns.
  *
  * Cache keys include language for categories so switching PT-BR/EN
  * invalidates and re-fetches the correct locale set.

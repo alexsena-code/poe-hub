@@ -25,7 +25,7 @@ import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
 export interface EditorContextValue {
   /** Tiptap editor instance — null only before hydration (SSR-safe). */
   editor: Editor | null;
-  /** Current meta form values (controlled by react-hook-form in editor-sidebar). */
+  /** Current meta form values — autosave baseline; publish form in /publish route owns validation. */
   meta: EditorMetaForm;
   /** Callback to imperatively update one or more meta fields. */
   setMeta: (patch: Partial<EditorMetaForm>) => void;

@@ -2,29 +2,39 @@
 /**
  * Edit existing blog post page — client wrapper.
  *
- * This must be a client component because EditorShell is client-only
- * (Tiptap requires browser APIs). We fetch the post data client-side
- * via the existing draft/[id] API route with SWR.
+ * Fetches the draft via GET /api/sanity/draft/[id] which returns
+ * { meta, body, draftId } (editor-native shape since S10.a/10.c transform).
+ * Passes the loaded data to EditorShell via the new initialMeta/initialBody props.
  *
- * The `id` param is the bare Sanity document ID (without "drafts." prefix).
- * getSanityClient() on the server would require env vars at build time;
- * fetching via the auth-protected API route is safer and consistent with
- * the rest of the hub's data patterns.
+ * S10.b: EditorShell no longer accepts SanityPost — it accepts initialMeta
+ * (Partial<EditorMetaForm>) and initialBody (Tiptap JSONContent) directly.
  *
- * Session 10 S10.a — side panels removed; right rail is mounted inside EditorShell.
+ * Session 10 S10.b.
  */
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { notFound } from "next/navigation";
+import { Loader2, AlertCircle } from "lucide-react";
 import { EditorShell } from "@/components/editor/editor-shell";
-import type { SanityPost } from "@/lib/sanity/types";
+import type { EditorMetaForm } from "@/components/editor/editor-meta-schema";
+import type { PortableTextContent } from "@/lib/sanity/types";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DraftResponse {
+  meta: Partial<EditorMetaForm>;
+  body: PortableTextContent[];
+  draftId: string;
+}
 
 type LoadState =
   | { status: "loading" }
-  | { status: "found"; post: SanityPost }
+  | { status: "found"; draft: DraftResponse }
   | { status: "not-found" }
   | { status: "error"; message: string };
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EditBlogPostPage() {
   const params = useParams();
@@ -39,7 +49,7 @@ export default function EditBlogPostPage() {
 
     let cancelled = false;
 
-    async function fetchPost() {
+    async function fetchDraft() {
       try {
         const res = await fetch(`/api/sanity/draft/${id}`, {
           cache: "no-store",
@@ -56,8 +66,8 @@ export default function EditBlogPostPage() {
           return;
         }
 
-        const data = (await res.json()) as SanityPost;
-        setState({ status: "found", post: data });
+        const data = (await res.json()) as DraftResponse;
+        setState({ status: "found", draft: data });
       } catch (err) {
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -66,19 +76,19 @@ export default function EditBlogPostPage() {
       }
     }
 
-    fetchPost();
+    fetchDraft();
     return () => { cancelled = true; };
   }, [id]);
 
   if (state.status === "not-found") {
-    // Trigger Next.js 404 page
     notFound();
     return null;
   }
 
   if (state.status === "loading") {
     return (
-      <div className="flex h-screen items-center justify-center text-muted-foreground">
+      <div className="flex h-screen items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
         Carregando rascunho…
       </div>
     );
@@ -86,20 +96,21 @@ export default function EditBlogPostPage() {
 
   if (state.status === "error") {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p className="text-destructive text-sm">
-          Falha ao carregar: {state.message}
-        </p>
+      <div className="flex h-screen flex-col items-center justify-center gap-3">
+        <AlertCircle className="h-8 w-8 text-destructive" />
+        <p className="text-destructive text-sm">Falha ao carregar: {state.message}</p>
       </div>
     );
   }
 
-  const { post } = state;
+  const { draft } = state;
 
   return (
     <EditorShell
-      initialPost={post}
+      initialMeta={draft.meta}
+      initialBody={draft.body}
       draftId={id}
+      defaultLanguage={(draft.meta.language as 'pt-br' | 'en') ?? 'pt-br'}
     />
   );
 }

@@ -2,7 +2,7 @@
  * Zod schema for the blog editor meta form.
  * Mirrors the required fields of the Sanity `post` document.
  *
- * Consumed by: editor-sidebar.tsx (form validation), editor-shell.tsx
+ * Consumed by: publish-form.tsx (form validation), editor-shell.tsx
  * (state typing), use-autosave.ts (payload assembly), use-publish.ts.
  *
  * The `gameVersion` enum uses Sanity's exact strings ('path-of-exile-1' | 'path-of-exile-2')

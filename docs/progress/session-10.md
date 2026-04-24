@@ -169,3 +169,117 @@ Wave 1 inteira (era 539 baseline session 09, +47 novos).
 `npx tsc --noEmit` — 0 erros novos. Erros pré-existentes em
 `lib/simulation-diff.test.ts` e `tests/factories/monitor.factory.ts`
 continuam (já flagged no carryover session 09).
+
+### S10.b — Wizard Edit → Publish (2026-04-24)
+
+Substitui o `editor-sidebar.tsx` (487L meta form sempre à direita) por
+wizard 2 passos: `/edit` (só editor + right rail + toolbar com "Prosseguir →")
+e `/publish` (rota nova com meta form + checklist visual + botão Publicar).
+
+Arquivos novos (9):
+- `app/(auth)/workspace/blog/[id]/publish/page.tsx` (149L) — client
+  wrapper que carrega draft via GET `/api/sanity/draft/[id]`, monta
+  `<PublishForm />`. Header `<PageHeader>` + botão "← Voltar ao editor".
+- `components/editor/publish/publish-form.tsx` (234L) — orchestrator
+  da meta form. Estado controlado, autosave PATCH no blur (debounce 1s).
+  Layout 2 colunas: 4 sections à esquerda + checklist sticky-top +
+  actions à direita.
+- `components/editor/publish/publish-section-basic.tsx` (104L) — Title,
+  Slug (auto-slugify on title change), Game Version.
+- `components/editor/publish/publish-section-taxonomy.tsx` (181L) —
+  Category, Author (via `useSanityRefs(language)`), TagInput migrado.
+- `components/editor/publish/publish-section-seo.tsx` (153L) — Metadata
+  description com counter color-coded, Cover image via ImageUploadField
+  migrado.
+- `components/editor/publish/publish-section-publication.tsx` (95L) —
+  Published at (datetime-local), Language radio.
+- `components/editor/publish/publish-validation-checklist.tsx` (129L) —
+  checklist visual com `editorMetaSchema.safeParse` por campo.
+- `components/editor/publish/publish-actions.tsx` (78L) — botões Voltar +
+  Publicar (disabled if !isValid; `useTransition` loading; toast em 409).
+- 2 test files cobrindo PublishForm + ValidationChecklist (7 cases).
+
+Arquivos editados (5):
+- `components/editor/editor-toolbar.tsx` 340L → 261L. Remove fila 1
+  inteira (title input, slug, language pill, preview toggle, publish
+  button). Mantém fila 2 (formatting). Adiciona "Prosseguir →" no canto
+  direito (`router.push('/workspace/blog/[id]/publish')`).
+- `components/editor/editor-shell.tsx` 299L → 177L. Remove
+  `<EditorSidebar>`, `<PublishDialog>`, `usePublish` hook. Layout vira
+  `[EditorBody flex-1][RightRail w-80]`. Aceita `initialMeta`/`initialBody`
+  (pós-fix: PortableTextContent[]) em vez de `initialPost: SanityPost`.
+- `app/(auth)/workspace/blog/[id]/edit/page.tsx` — DraftResponse tipado
+  com novo shape `{ meta, body, draftId }`; passa `initialMeta`/`initialBody`.
+- `components/editor/editor-context.tsx` — comentário atualizado.
+- `components/editor/editor-meta-schema.ts`, `hooks/use-sanity-refs.ts` —
+  comentários atualizados.
+
+Arquivos deletados (1):
+- `components/editor/editor-sidebar.tsx` (487L) — conteúdo migrado pra
+  `publish/publish-form.tsx` + 4 sub-sections.
+
+Validação: `npx vitest run components/editor` — 174/174 verdes.
+
+### S10.e — Importar guide LLM para editor blog (2026-04-24)
+
+Engine gera guides PT-BR + EN no mesmo doc (markdown puro nas sections,
+acessível via `GET /api/engine/content/posts/<slug>`). Operador agora
+clica "Editar no Blog" no `/workspace/guides/[slug]` e o sistema cria
+2 drafts Sanity separados (1 PT-BR + 1 EN) que abrem direto no editor.
+
+Arquivos novos (5):
+- `lib/converters/markdown-to-portable.ts` (235L) — `markdownToPortableText(md)`
+  via `unified` + `remark-parse` + `remark-gfm` (já estavam como transitive
+  deps de `react-markdown`, sem npm install). Walk MDAST cobrindo headings
+  (h5/h6 clamped a h4), parágrafos, listas, code, blockquote, link, image
+  (skip — sem Sanity asset ref). Placeholders dos 5 tipos (`{{currency:}}`,
+  `{{item:}}`, `{{cta:}}`, `{{passive:}}`, `{{price:}}`): standalone vira
+  block-level (`poeCurrency`/`poeItem`/`poePassive`/`poeCta`/`poePrice`),
+  inline em parágrafo ou lista mantém span text (consumido pelo
+  `splitByPlaceholders` na deserialização). Attr names mirror
+  `POE_INLINE_VALUE_ATTR` do `tiptap-to-portable.ts`.
+- `lib/converters/__tests__/markdown-to-portable.test.ts` (211L, 26 cases).
+- `app/api/sanity/draft-from-guide/route.ts` (142L) — POST. Body
+  `{ guideSlug, languages?: ['pt-br'|'en'][] }` (default ambos). Fetch via
+  `/api/engine/content/posts/<slug>` (forwarda cookie). Para cada lang:
+  concatena sections, prepends h1 title se não presente, converte pra
+  Portable Text, cria draft via `client.createOrReplace` com
+  `_id: drafts.<nanoid(21)>`. Retorna 201 `{ drafts: [{id, language, slug, title}] }`.
+- `app/api/sanity/draft-from-guide/__tests__/route.test.ts` (154L, 8 cases:
+  401, 400 missing slug, 400 wrong shape, 404 engine, 200 happy 2 drafts,
+  200 single lang, 502 engine error, _id prefix assertion).
+- `components/modules/workspace/guides/import-to-blog-button.tsx` (131L) —
+  client component. Dialog com checkboxes PT-BR + EN. POST + toast +
+  `router.push` pro PT-BR draft.
+- `components/modules/workspace/guides/__tests__/import-to-blog-button.test.tsx`
+  (156L, 5 cases jsdom).
+
+Arquivos editados (1):
+- `app/(auth)/workspace/guides/[slug]/guide-content.tsx` — adiciona
+  `<ImportToBlogButton guide={post} />` no header (+3L).
+
+Validação: 39/39 tests novos verdes.
+
+### Body type fix (S10.b regressão, 2026-04-24)
+
+S10.b assumiu erradamente que `EditorShell.initialBody` era Tiptap JSON,
+mas o body no Sanity sempre foi Portable Text (`use-autosave` converte
+Tiptap → Portable Text antes do PUT desde session 08; S10.e também salva
+em Portable Text). Sem conversão no mount, drafts criados pelo importador
+e drafts existentes re-abertos quebravam o `setContent`.
+
+Fix:
+- `components/editor/editor-shell.tsx` — `initialBody?: PortableTextContent[]`,
+  chama `portableToTiptap(initialBody)` no mount antes do `setContent`.
+- `app/(auth)/workspace/blog/[id]/edit/page.tsx` — `DraftResponse.body:
+  PortableTextContent[]`, troca import de `JSONContent` por
+  `PortableTextContent`.
+
+Validação: 174/174 editor tests verdes; full suite **632 passed** (era
+586 pós Wave 1, +46 da Wave 2).
+
+### Wave 2 wrap (2026-04-24)
+
+`npx vitest run` — 46 files, **632 tests**, 0 falhas (32.8s).
+`npx tsc --noEmit` — 0 erros novos nos arquivos da Wave 2 (pre-existing
+unchanged).

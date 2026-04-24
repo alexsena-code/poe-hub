@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
+import { ImportToBlogButton } from "@/components/modules/workspace/guides/import-to-blog-button";
 
 type Lang = "pt-br" | "en";
 
@@ -428,6 +429,9 @@ export function GuideContent({ post }: { post: PostDetail }) {
                 <TabsTrigger value="pt-br">PT-BR</TabsTrigger>
               </TabsList>
             </Tabs>
+
+            {/* Session 10.e — import guide into Sanity blog editor */}
+            <ImportToBlogButton guide={post} />
           </div>
         </div>
       </header>

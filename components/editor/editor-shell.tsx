@@ -4,87 +4,74 @@
  *
  * Composes:
  *   EditorProvider  — shared context (editor, meta, draftId, language)
- *   EditorToolbar   — title, formatting actions, publish button
+ *   EditorToolbar   — formatting actions + "Prosseguir →" button
  *   EditorBody      — Tiptap contenteditable + bubble/floating menus
- *   EditorSidebar   — meta form (category, author, tags, image, SEO)
+ *   RightRail       — Q&A, Score, Slang Report, Assets, Slang Lookup
  *   PreviewPane     — replaces body when phase === 'preview'
  *
- * Slots for future waves:
- *   slotSidePanels  — S08.h mounts Q&A + Assets panels here
+ * S10.b: EditorSidebar removed — meta form migrated to /publish route.
+ * Toolbar now only carries formatting + autosave + phase toggle + proceed button.
+ * Publish dialog also removed — publish happens in the /publish page.
  *
- * Autosave: useAutosave({ draftId, meta, bodyJson, language }) runs in
- * background on every edit; debounced 5s.
+ * Autosave: useAutosave({ draftId, meta, bodyJson, language }) debounced 5s.
  *
- * Publish: confirm dialog → usePublish() → /api/sanity/publish → navigate.
- *
- * Load existing: useEffect converts initialPost.body (Portable Text) to
- * Tiptap JSON via portableToTiptap() on mount.
- *
- * Session 08.e.
+ * Session 08.e → updated S10.b.
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+// useCallback retained: setMeta is memoized to avoid re-renders on every keystroke.
 import type { JSONContent } from '@tiptap/core';
-import type { SanityPost } from '@/lib/sanity/types';
 import type { ContentScoreReport, SlangReport } from '@/lib/engine-types';
+import type { PortableTextContent } from '@/lib/sanity/types';
 import { EditorProvider } from './editor-context';
 import { EditorToolbar } from './editor-toolbar';
 import { EditorBody } from './editor-body';
-import { EditorSidebar } from './editor-sidebar';
 import { RightRail } from './right-rail';
 import { PreviewPane } from './preview/preview-pane';
 import { useTiptapEditor } from './hooks/use-tiptap-editor';
 import { useAutosave } from './hooks/use-autosave';
-import { usePublish } from './hooks/use-publish';
 import { tiptapToPortable } from './serializer/tiptap-to-portable';
-import { portableToTiptap } from './serializer/portable-to-tiptap';
 import type { TiptapDoc } from './serializer/tiptap-to-portable';
+import { portableToTiptap } from './serializer/portable-to-tiptap';
 import type { EditorMetaForm } from './editor-meta-schema';
 import { editorMetaDefaults } from './editor-meta-schema';
 import type { EditorPhase } from './types';
-import {
-  Dialog, DialogContent, DialogHeader,
-  DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface EditorShellProps {
-  /** Existing Sanity post to edit — undefined for new post. */
-  initialPost?: SanityPost;
-  /** Draft document ID — used for autosave and draft deletion after publish. */
+  /**
+   * Pre-loaded meta values from /api/sanity/draft/[id] GET response.
+   * Undefined for a new (blank) post.
+   *
+   * S10.b: changed from `initialPost: SanityPost` (raw Sanity shape) to
+   * `initialMeta: Partial<EditorMetaForm>` so the edit page no longer needs
+   * to reconstruct a SanityPost from the editor-native API response.
+   */
+  initialMeta?: Partial<EditorMetaForm>;
+  /**
+   * Pre-loaded body from the API in Portable Text shape (canonical Sanity
+   * format). Converted to Tiptap JSON on mount via portableToTiptap().
+   *
+   * Why Portable Text and not Tiptap JSON: autosave converts Tiptap →
+   * Portable Text before PUT (use-autosave#buildDraftPayload), and the
+   * Sanity dataset stores Portable Text so the poetrade-dev frontend can
+   * render via @portabletext/react. Body coming back from GET is therefore
+   * always Portable Text, including drafts seeded by /api/sanity/draft-from-guide.
+   */
+  initialBody?: PortableTextContent[];
+  /** Draft document ID — used for autosave. */
   draftId: string;
-  /** Starting language — overridden by initialPost.language when editing. */
+  /** Starting language — overridden by initialMeta.language when editing. */
   defaultLanguage?: 'pt-br' | 'en';
   /**
-   * Content Score from engine Fase C — passed when editing an existing post
-   * that has been processed. Exposed via EditorContext to the right rail widgets.
+   * Content Score from engine Fase C — exposed via EditorContext to right rail.
    */
   contentScore?: ContentScoreReport;
   /**
-   * Slang Report from engine Fase C — passed when editing an existing post
-   * that has been processed. Exposed via EditorContext to the right rail widgets.
+   * Slang Report from engine Fase C — exposed via EditorContext to right rail.
    */
   slangReport?: SlangReport;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function buildInitialMeta(post?: SanityPost): Partial<EditorMetaForm> {
-  if (!post) return {};
-  return {
-    title: post.title,
-    metadata: post.metadata,
-    slug: post.slug.current,
-    gameVersion: post.gameVersion,
-    categoryId: post.category._ref,
-    authorId: post.author._ref,
-    tags: post.tags,
-    mainImageAssetId: post.mainImage?.asset._ref,
-    publishedAt: post.publishedAt,
-    language: post.language,
-  };
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -94,7 +81,8 @@ function buildInitialMeta(post?: SanityPost): Partial<EditorMetaForm> {
  * and /workspace/blog/[id]/edit both render this component with different props.
  */
 export function EditorShell({
-  initialPost,
+  initialMeta,
+  initialBody,
   draftId,
   defaultLanguage = 'pt-br',
   contentScore,
@@ -104,18 +92,15 @@ export function EditorShell({
   const [phase, setPhase] = useState<EditorPhase>('draft');
   const [meta, setMetaState] = useState<EditorMetaForm>({
     ...editorMetaDefaults,
-    language: initialPost?.language ?? defaultLanguage,
-    ...buildInitialMeta(initialPost),
+    language: defaultLanguage,
+    ...initialMeta,
   });
   const [bodyJson, setBodyJson] = useState<JSONContent>({ type: 'doc', content: [] });
-  const [isFormValid, setIsFormValid] = useState(false);
-  const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
 
   // Track whether the initial content has been loaded into the editor.
   const initialContentLoaded = useRef(false);
 
-  // ── Patch meta (partial update from toolbar language pill or sidebar) ────────
+  // ── Patch meta (partial update — kept for context consumers like RightRail) ──
   const setMeta = useCallback((patch: Partial<EditorMetaForm>) => {
     setMetaState((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -125,15 +110,14 @@ export function EditorShell({
     onUpdate: (json) => setBodyJson(json),
   });
 
-  // ── Load initial post body into Tiptap ───────────────────────────────────────
+  // ── Load initial body into Tiptap ────────────────────────────────────────────
   useEffect(() => {
-    if (!editor || !initialPost?.body || initialContentLoaded.current) return;
-    const tiptapDoc = portableToTiptap(initialPost.body);
-    editor.commands.setContent(tiptapDoc);
-    // Capture the initial JSON state so autosave has a baseline.
+    if (!editor || !initialBody || initialContentLoaded.current) return;
+    const tiptapDoc = portableToTiptap(initialBody);
+    editor.commands.setContent(tiptapDoc as JSONContent);
     setBodyJson(editor.getJSON());
     initialContentLoaded.current = true;
-  }, [editor, initialPost]);
+  }, [editor, initialBody]);
 
   // ── Autosave ─────────────────────────────────────────────────────────────────
   const { status: autosaveStatus, lastSavedAt } = useAutosave({
@@ -142,15 +126,6 @@ export function EditorShell({
     bodyJson,
     language: meta.language,
   });
-
-  // ── Publish ──────────────────────────────────────────────────────────────────
-  const { publish, publishing } = usePublish();
-
-  const handlePublishConfirm = useCallback(async () => {
-    setPublishDialogOpen(false);
-    const body = tiptapToPortable(bodyJson as TiptapDoc);
-    await publish({ meta, body, draftId });
-  }, [meta, bodyJson, draftId, publish]);
 
   // ── Phase toggle ─────────────────────────────────────────────────────────────
   const togglePhase = useCallback(() => {
@@ -178,15 +153,11 @@ export function EditorShell({
         <EditorToolbar
           phase={phase}
           onPhaseToggle={togglePhase}
-          onPublish={() => setPublishDialogOpen(true)}
-          isFormValid={isFormValid}
-          formErrors={formErrors}
           autosaveStatus={autosaveStatus}
           lastSavedAt={lastSavedAt}
-          publishing={publishing}
         />
 
-        {/* 4-column layout: main content | meta sidebar | right rail */}
+        {/* 2-column layout: editor body | right rail */}
         <div className="flex flex-1 overflow-hidden">
           {/* Main content area: editor body or preview */}
           <main className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
@@ -203,96 +174,11 @@ export function EditorShell({
             )}
           </main>
 
-          {/* Meta form sidebar — S10.b will migrate this to /publish */}
-          <EditorSidebar
-            initialValues={buildInitialMeta(initialPost)}
-            onMetaChange={(values) => setMetaState(values)}
-            onValidityChange={(valid, errs) => {
-              setIsFormValid(valid);
-              setFormErrors(errs);
-            }}
-          />
-
           {/* Right rail — Q&A, Score, Slang Report, Assets, Slang Lookup */}
           <RightRail draftId={draftId} />
         </div>
       </div>
-
-      {/* Publish confirmation dialog */}
-      <PublishDialog
-        open={publishDialogOpen}
-        onCancel={() => setPublishDialogOpen(false)}
-        onConfirm={handlePublishConfirm}
-        meta={meta}
-        publishing={publishing}
-      />
     </EditorProvider>
   );
 }
 
-// ─── Publish confirmation dialog ──────────────────────────────────────────────
-
-interface PublishDialogProps {
-  open: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-  meta: EditorMetaForm;
-  publishing: boolean;
-}
-
-function PublishDialog({
-  open,
-  onCancel,
-  onConfirm,
-  meta,
-  publishing,
-}: PublishDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Publicar post</DialogTitle>
-          <DialogDescription>
-            O post será publicado no Sanity e ficará disponível no site.
-            Esta ação não pode ser desfeita facilmente.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="rounded-md border border-zinc-800 bg-zinc-900 p-3 space-y-1 text-sm">
-          <dl className="space-y-1">
-            <MetaRow label="Título" value={meta.title} />
-            <MetaRow label="Slug" value={`/blog/${meta.slug}`} mono />
-            <MetaRow label="Idioma" value={meta.language.toUpperCase()} />
-            <MetaRow label="Game" value={meta.gameVersion === 'path-of-exile-1' ? 'PoE 1' : 'PoE 2'} />
-          </dl>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel} disabled={publishing}>
-            Cancelar
-          </Button>
-          <Button onClick={onConfirm} disabled={publishing}>
-            {publishing ? 'Publicando…' : 'Confirmar publicação'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function MetaRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex gap-2">
-      <dt className="text-zinc-500 w-16 shrink-0">{label}</dt>
-      <dd className={mono ? 'font-mono text-zinc-300' : 'text-zinc-300'}>{value}</dd>
-    </div>
-  );
-}
