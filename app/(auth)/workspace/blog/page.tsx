@@ -97,8 +97,12 @@ export default async function BlogListPage({
 }) {
   // Best-effort: if Sanity is unreachable, render empty lists so the page
   // doesn't hard-error. Operator is notified via the empty state messaging.
+  // Log the failure with the env var name when it's a config issue — silent
+  // catch hid a missing SANITY_API_WRITE_TOKEN in prod that made the page
+  // render empty even though the dataset had 29 published posts.
   let drafts: DraftListItem[] = [];
   let published: PublishedListItem[] = [];
+  let fetchError: string | null = null;
 
   try {
     const client = getSanityClient();
@@ -106,8 +110,10 @@ export default async function BlogListPage({
       client.fetch<DraftListItem[]>(LIST_DRAFTS_QUERY),
       client.fetch<PublishedListItem[]>(LIST_PUBLISHED_QUERY),
     ]);
-  } catch {
-    // Sanity unreachable — empty state renders below
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    fetchError = message;
+    console.error("[workspace/blog] Sanity fetch failed:", message);
   }
 
   const { lang: langRaw } = await searchParams;
