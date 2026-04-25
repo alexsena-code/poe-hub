@@ -1,6 +1,6 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-04-24 (session 14 — bug fixes + UX polish pós S13. 5 commits hub + 1 engine: fix do `[a]` slug conflict que travava 504 universal, ModelCombobox autocomplete com pricing live OpenRouter, output final renderizado por seções, preset shape normalization (nested ↔ flat), pobUrl field + skill/ascendancy opcionais, AwaitingHumanBanner global removido, engine prefix-match no override per-node (`write` cobre `write_*`). **836 tests hub** (+10) + **17 engine benchmark tests** (+5).).
+Last updated: 2026-04-25 (session 15 — SEO i18n hreflang fix nos posts (`translation.metadata` resolve sibling slugs em vez de assumir slug compartilhado) + `og:locale` em 22 pages do `[locale]/`; bug em prod do `/workspace/blog` zerado (4 envs SANITY_* vazias na Vercel + `catch {}` mudo) corrigido com `console.error` + reset das envs via CLI; right rail polish (320→384, currency chips com ícone real, novo WidgetFilterInput, scrollbar-thin); + 2 commits paralelos do Session 32 (frontend B `posts-recommended` no hub, backend transcript-admin + keyword-analyzer no engine).
 
 ## Current status
 
@@ -122,6 +122,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [15](progress/session-15.md) | 2026-04-25 | SEO i18n hreflang fix (translation.metadata resolve sibling slugs, og:locale em 22 pages) + Sanity prod env bug (`/workspace/blog` zerado por catch mudo + envs vazias) + right rail polish (rail width, currency icons, novo WidgetFilterInput, scrollbar-thin) + Session 32 carry (posts-recommended page hub + transcript-admin engine) |
 | [14](progress/session-14.md) | 2026-04-24 | bug fixes + UX polish do benchmark — fix do `[a]` slug conflict que causava 504 universal, ModelCombobox autocomplete com pricing OpenRouter, output final renderizado, preset shape normalization, pobUrl + skill opcional, banner global removido, engine prefix-match per-node override |
 | [13](progress/session-13.md) | 2026-04-24 | benchmark infra — engine `modelOverrides` per-node + hub Prisma (Preset/Run/Evaluation) + 7 rotas API + OpenRouter live pricing + preset bar nos 3 forms + /history + /compare + Sonnet 4.6 judge (5 dimensions). 3 waves paralelizadas com 10 agents. +120 tests hub, +12 engine |
 | [12](progress/session-12.md) | 2026-04-24 | carryovers da S11 liquidados — TS fix simulation-diff + monitor.factory, vi.mock sonner dedup, smoke E2E Sanity opt-in (`SMOKE_SANITY=1`), side panel Items/Gems/Passives com novo `/api/items/list` no engine (+ 6º widget no right rail), arquival justificado de BriefingForm/diff-versioning/section-workflow |
