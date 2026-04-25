@@ -6,6 +6,10 @@ import {
   type AutoActionDailyRow,
   type DiscoveriesDailyRow,
 } from "@/components/admin/observability/auto-actions-chart";
+import {
+  AutoActionsPendingReview,
+  type PendingRow,
+} from "@/components/admin/observability/auto-actions-pending-review";
 
 interface AutoActionLogRow {
   id: number;
@@ -94,6 +98,7 @@ export default async function AutoActionsPage() {
 
   const daily = bucketByDay(data.rows);
   const discoveries = bucketDiscoveriesByDay(data.rows);
+  const pending: PendingRow[] = data.rows.filter(r => r.decision === "pending_review");
 
   return (
     <div className="p-6 max-w-[1800px] mx-auto space-y-6">
@@ -102,6 +107,8 @@ export default async function AutoActionsPage() {
         description={`SearxNG-driven keyword decisions — last ${DAYS_WINDOW} days, ${data.total} events logged`}
         className="mb-2"
       />
+
+      <AutoActionsPendingReview rows={pending} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <AutoActionsByDayChart daily={daily} />
