@@ -202,13 +202,52 @@ interface KeywordsTabProps {
   sortKey: string;
   sortDir: 'asc' | 'desc';
   onSort: (key: string) => void;
+  // Session 33 (BUG 3 fix): surfacing the underlying fetch error +
+  // signal/total discrepancy turns the silent "No keywords yet" empty
+  // state into an actionable diagnostic.
+  keywordsError?: string | null;
+  totalKeywords?: number;
+  dashboardTotal?: number | null;
+  showWithoutSignals?: boolean;
 }
 
-export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: KeywordsTabProps) {
+export function KeywordsTab({
+  keywords,
+  loading,
+  sortKey,
+  sortDir,
+  onSort,
+  keywordsError,
+  totalKeywords,
+  dashboardTotal,
+  showWithoutSignals,
+}: KeywordsTabProps) {
   const [expandedId, setExpandedId] = React.useState<number | null>(null);
 
+  // Discrepancy detector — only meaningful when "show without signals" is OFF
+  // and the engine has more rows than what the signal-gated query returns.
+  const hasDiscrepancy =
+    !showWithoutSignals &&
+    typeof totalKeywords === 'number' &&
+    typeof dashboardTotal === 'number' &&
+    dashboardTotal > 0 &&
+    totalKeywords < dashboardTotal;
+
   return (
-    <div className="overflow-x-auto border border-border rounded-lg">
+    <div className="space-y-3">
+      {keywordsError && (
+        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+          <strong className="font-semibold">Engine error:</strong> {keywordsError}
+        </div>
+      )}
+      {hasDiscrepancy && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+          <strong className="font-semibold">Heads up:</strong> {dashboardTotal} keywords cadastradas no engine,
+          mas só {totalKeywords} têm sinais (GSC / Reddit / YouTube / SERP). Ative <em>&quot;Show without signals&quot;</em>
+          {' '}no header pra ver as keywords recém-importadas (suggest scan, GSC import) que ainda não tiveram cross-ref.
+        </div>
+      )}
+      <div className="overflow-x-auto border border-border rounded-lg">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-surface border-b border-border text-left text-xs text-muted-foreground uppercase tracking-wider">
@@ -231,7 +270,13 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
           {loading ? (
             <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
           ) : keywords.length === 0 ? (
-            <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">No keywords yet. Run a suggest scan or import GSC data.</td></tr>
+            <tr>
+              <td colSpan={13} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                {hasDiscrepancy
+                  ? `Sem keywords com sinais. Ative "Show without signals" pra ver as ${dashboardTotal ?? '?'} cadastradas.`
+                  : 'No keywords yet. Run a suggest scan or import GSC data.'}
+              </td>
+            </tr>
           ) : (
             keywords.map((kw) => (
               <React.Fragment key={kw.id}>
@@ -305,6 +350,7 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,10 @@ import { PageHeader } from "@/components/ui/page-header";
 import { GapFiltersBar } from "@/components/admin/competitor-gaps/gap-filters-bar";
 import { GapsTable } from "@/components/admin/competitor-gaps/gaps-table";
 import { ImportGapsButton } from "@/components/admin/competitor-gaps/import-gaps-button";
+import {
+  PipelineStatusBar,
+  type PipelineStats,
+} from "@/components/admin/competitor-gaps/pipeline-status-bar";
 import type { GapRow } from "@/components/admin/competitor-gaps/types";
 
 interface PageProps {
@@ -61,18 +65,37 @@ async function fetchGaps(filters: {
   return Array.isArray(data) ? (data as GapRow[]) : [];
 }
 
+async function fetchPipelineStats(): Promise<PipelineStats> {
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("host") ?? "localhost:3001";
+  const url = `${proto}://${host}/api/engine/seo/competitors/pipeline-stats`;
+  const res = await fetch(url, {
+    headers: { cookie: h.get("cookie") ?? "" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`pipeline-stats fetch failed: ${res.status} (${url})`);
+  }
+  return (await res.json()) as PipelineStats;
+}
+
 export default async function CompetitorGapsPage({ searchParams }: PageProps) {
   const raw = await searchParams;
   const filters = parseFilters(raw);
 
-  let rows: GapRow[];
-  let fetchError: string | null = null;
-  try {
-    rows = await fetchGaps(filters);
-  } catch (e) {
-    rows = [];
-    fetchError = (e as Error).message;
-  }
+  const [gapsResult, statsResult] = await Promise.allSettled([
+    fetchGaps(filters),
+    fetchPipelineStats(),
+  ]);
+
+  const rows: GapRow[] = gapsResult.status === "fulfilled" ? gapsResult.value : [];
+  const fetchError =
+    gapsResult.status === "rejected" ? (gapsResult.reason as Error).message : null;
+  const stats: PipelineStats | null =
+    statsResult.status === "fulfilled" ? statsResult.value : null;
+  const statsError =
+    statsResult.status === "rejected" ? (statsResult.reason as Error).message : null;
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
@@ -81,6 +104,8 @@ export default async function CompetitorGapsPage({ searchParams }: PageProps) {
         description="Tópicos cobertos por N+ competidores que ainda não temos coverage. Use os filtros para refinar e importe como keyword opportunities em lote."
         className="mb-2"
       />
+
+      <PipelineStatusBar stats={stats} fetchError={statsError} />
 
       <div className="flex flex-wrap items-end justify-between gap-4 rounded-lg border border-border bg-surface p-4">
         <GapFiltersBar

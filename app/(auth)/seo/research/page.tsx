@@ -127,7 +127,18 @@ export default function SeoResearchPage() {
           </div>
 
           {tab === 'keywords' && (
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-3 ml-auto">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground select-none cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={state.showWithoutSignals}
+                  onChange={(e) => state.setShowWithoutSignals(e.target.checked)}
+                  className="accent-emerald-500"
+                />
+                <Tip text="When ON, the table includes keywords without GSC/Reddit/YouTube signals (freshly imported). Turn OFF to inspect only signal-bearing rows.">
+                  Show without signals
+                </Tip>
+              </label>
               <FiltersBar filters={state.filters} onChange={state.setFilters} />
               <button
                 onClick={() => { state.fetchDashboard(); state.fetchKeywords(); }}
@@ -149,6 +160,10 @@ export default function SeoResearchPage() {
             sortKey={state.sortBy}
             sortDir={state.sortDir}
             onSort={handleSort}
+            keywordsError={state.keywordsError}
+            totalKeywords={state.totalKeywords}
+            dashboardTotal={dash?.totalKeywords ?? null}
+            showWithoutSignals={state.showWithoutSignals}
           />
         )}
         {tab === 'scans' && <ScanHistoryTab scans={state.scans} />}

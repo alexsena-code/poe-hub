@@ -34,6 +34,14 @@ export interface ResearchState {
   suggestGame: string;
   actionLoading: string | null;
   actionResult: string | null;
+  // Session 33 (BUG 3 fix): when ON, the engine relaxes the hasSignal OR
+  // gate so freshly imported keywords (suggest scan, GSC import) show up
+  // even before they get GSC/Reddit/YouTube cross-signals attached.
+  showWithoutSignals: boolean;
+  // Session 33 (BUG 3 fix): surface the underlying fetch error instead of
+  // silencing it — that's how the empty-table-with-995-total bug went
+  // unnoticed.
+  keywordsError: string | null;
   setFilters: (f: Partial<ResearchFilters>) => void;
   setPage: (p: number | ((prev: number) => number)) => void;
   setSortBy: (k: string) => void;
@@ -41,6 +49,7 @@ export interface ResearchState {
   setNewBlacklistTerm: (v: string) => void;
   setSuggestSeeds: (v: string) => void;
   setSuggestGame: (v: string) => void;
+  setShowWithoutSignals: (v: boolean) => void;
   fetchDashboard: () => Promise<void>;
   fetchKeywords: () => Promise<void>;
   fetchScans: () => Promise<void>;
@@ -83,6 +92,12 @@ export function useResearchState(): ResearchState {
   const [suggestGame, setSuggestGame] = useState('auto');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  // Session 33 (BUG 3 fix): default ON so the table no longer silently
+  // hides freshly imported keywords (the "995 total / table empty" bug).
+  // Operator can toggle off if they want to inspect only signal-bearing
+  // rows.
+  const [showWithoutSignals, setShowWithoutSignals] = useState(true);
+  const [keywordsError, setKeywordsError] = useState<string | null>(null);
 
   function setFilters(partial: Partial<ResearchFilters>) {
     setFiltersState((prev) => ({ ...prev, ...partial }));
@@ -98,6 +113,7 @@ export function useResearchState(): ResearchState {
 
   const fetchKeywords = useCallback(async () => {
     setLoading(true);
+    setKeywordsError(null);
     try {
       const params = new URLSearchParams();
       if (filters.source !== 'all') params.set('source', filters.source);
@@ -113,16 +129,25 @@ export function useResearchState(): ResearchState {
       // `consolidatedScore` / `predictedClicks30d`) so the table can
       // render the columns that replaced the VICE composite.
       params.set('withSignals', 'true');
+      // Session 33 (BUG 3 fix): pass through the flag so /seo/keywords
+      // and /seo/keywords/count agree on which rows qualify.
+      if (showWithoutSignals) params.set('withoutSignals', 'true');
 
       const [kwRes, countRes] = await Promise.all([
         fetch(`${API_URL}/seo/keywords?${params}`),
         fetch(`${API_URL}/seo/keywords/count?${params}`),
       ]);
-      if (kwRes.ok) setKeywords(await kwRes.json());
+      if (!kwRes.ok) {
+        setKeywordsError(`Engine returned ${kwRes.status} for /seo/keywords`);
+      } else {
+        setKeywords(await kwRes.json());
+      }
       if (countRes.ok) setTotalKeywords(await countRes.json());
-    } catch { /* engine offline */ }
+    } catch (e) {
+      setKeywordsError((e as Error).message ?? 'engine fetch failed');
+    }
     setLoading(false);
-  }, [filters, page, sortBy, sortDir]);
+  }, [filters, page, sortBy, sortDir, showWithoutSignals]);
 
   const fetchScans = useCallback(async () => {
     try {
@@ -234,6 +259,8 @@ export function useResearchState(): ResearchState {
     suggestGame,
     actionLoading,
     actionResult,
+    showWithoutSignals,
+    keywordsError,
     setFilters,
     setPage,
     setSortBy,
@@ -241,6 +268,7 @@ export function useResearchState(): ResearchState {
     setNewBlacklistTerm,
     setSuggestSeeds,
     setSuggestGame,
+    setShowWithoutSignals,
     fetchDashboard,
     fetchKeywords,
     fetchScans,
