@@ -20,11 +20,11 @@ import React, { useState, useDeferredValue } from 'react';
 import { Boxes, Sparkles, Gem, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { WidgetShell } from './widget-shell';
+import { WidgetFilterInput } from './widget-filter-input';
 import { useEditorContext } from '../editor-context';
 import {
   useItemsCatalog,
@@ -171,20 +171,19 @@ function ItemListBody({ kind, accentClass, emptyLabel, onInsert }: ItemListBodyP
 
   return (
     <>
-      <div className="px-4 pb-2">
-        <Input
-          placeholder={emptyLabel}
+      <div className="px-4 pb-2 flex items-center gap-2">
+        <WidgetFilterInput
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-7 text-xs"
+          onChange={setQuery}
+          placeholder={emptyLabel}
+          className="flex-1"
         />
-      </div>
-      <div className="px-4 pb-1">
-        <span className="text-[10px] text-zinc-500">
-          {items.length} {total > items.length ? `de ${total}` : ''}
+        <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">
+          {items.length}
+          {total > items.length ? `/${total}` : ''}
         </span>
       </div>
-      <ScrollArea className="h-[260px]">
+      <ScrollArea className="h-[300px]">
         <div className="flex flex-col gap-0.5 px-2 pb-4">
           {isLoading && items.length === 0 ? (
             <LoadingState label="Carregando…" />
@@ -224,20 +223,19 @@ function PassiveListBody({ onInsert }: PassiveListBodyProps) {
 
   return (
     <>
-      <div className="px-4 pb-2">
-        <Input
-          placeholder="Buscar passive…"
+      <div className="px-4 pb-2 flex items-center gap-2">
+        <WidgetFilterInput
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-7 text-xs"
+          onChange={setQuery}
+          placeholder="Buscar passive…"
+          className="flex-1"
         />
-      </div>
-      <div className="px-4 pb-1">
-        <span className="text-[10px] text-zinc-500">
-          {visible.length} de {passives.length}
+        <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">
+          {visible.length}
+          {passives.length > visible.length ? `/${passives.length}` : ''}
         </span>
       </div>
-      <ScrollArea className="h-[260px]">
+      <ScrollArea className="h-[300px]">
         <div className="flex flex-col gap-0.5 px-2 pb-4">
           {visible.length === 0 ? (
             <EmptyState hasQuery={query.trim().length > 0} />

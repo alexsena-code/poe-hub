@@ -13,11 +13,11 @@
 import React, { useState, useDeferredValue } from 'react';
 import { BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { WidgetShell } from './widget-shell';
+import { WidgetFilterInput } from './widget-filter-input';
 import { useEditorContext } from '../editor-context';
 import { useSlangCatalog, filterSlangTerms } from '../hooks/use-slang-catalog';
 import type { SlangTerm } from '../hooks/use-slang-catalog';
@@ -104,20 +104,19 @@ function SlangListBody({ onInsert }: SlangListBodyProps) {
 
   return (
     <>
-      <div className="px-4 pb-2">
-        <Input
-          placeholder="Buscar slang aprovado…"
+      <div className="px-4 pb-2 flex items-center gap-2">
+        <WidgetFilterInput
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-7 text-xs"
+          onChange={setQuery}
+          placeholder="Buscar slang aprovado…"
+          className="flex-1"
         />
-      </div>
-      <div className="px-4 pb-1">
-        <span className="text-[10px] text-zinc-500">
-          {visible.length} de {terms.length} aprovados
+        <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">
+          {visible.length}
+          {terms.length > visible.length ? `/${terms.length}` : ''}
         </span>
       </div>
-      <ScrollArea className="h-[260px]">
+      <ScrollArea className="h-[300px]">
         <div className="flex flex-col gap-0.5 px-2 pb-4">
           {visible.length === 0 ? (
             <EmptyState hasQuery={query.trim().length > 0} />

@@ -27,6 +27,29 @@
   }
 }
 
+/* Subtle thin scrollbar — used by the editor right rail and widget lists.
+   Track is invisible; thumb is a low-opacity neutral that brightens on hover.
+   Width 6px so it feels native on macOS but visible on Windows/Firefox where
+   default scrollbars are 16px+ and look heavy in narrow panels. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(115, 115, 115, 0.25) transparent;
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(115, 115, 115, 0.25);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(115, 115, 115, 0.5);
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme {

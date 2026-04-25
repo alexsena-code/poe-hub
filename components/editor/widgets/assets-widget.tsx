@@ -3,59 +3,80 @@
  * Assets (Currencies) right-rail widget.
  *
  * Migrated from side-panel-assets.tsx — same functionality, wrapped in WidgetShell.
+ * S13 refresh: switched from `useCurrencyCatalog` (names-only) to
+ * `useItemsCatalog({kind:'currency'})` so chips can render the real icon,
+ * matching the preview pane and the Items/Gems/Passives widget. Drag-to-insert
+ * and click-to-insert behaviour preserved unchanged.
  *
- * Polish applied: yellow hardcoded colours replaced with neutral design tokens
- * (bg-accent/40, border-accent/30, text-foreground) to match the project palette.
- *
- * Drag-to-insert and click-to-insert behaviour is preserved unchanged.
  * See side-panel-assets.tsx S08.f doc for the full drag MIME type contract.
  */
 
 import React, { useState, useDeferredValue } from 'react';
-import { Package } from 'lucide-react';
+import { Coins } from 'lucide-react';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Spinner } from '@/components/ui/spinner';
 import { WidgetShell } from './widget-shell';
+import { WidgetFilterInput } from './widget-filter-input';
 import { useEditorContext } from '../editor-context';
-import { useCurrencyCatalog, filterCurrencies } from '../hooks/use-currency-catalog';
-import { resolveCurrencyIcon } from '../hooks/resolve-currency-icon';
+import {
+  useItemsCatalog,
+  type ItemCatalogEntry,
+} from '../hooks/use-items-catalog';
 
 // ─── Currency chip ─────────────────────────────────────────────────────────────
 
 interface CurrencyChipProps {
-  name: string;
-  onInsert: (name: string) => void;
+  entry: ItemCatalogEntry;
+  onInsert: (entry: ItemCatalogEntry) => void;
 }
 
-function CurrencyChip({ name, onInsert }: CurrencyChipProps) {
+function CurrencyChip({ entry, onInsert }: CurrencyChipProps) {
   function handleDragStart(e: React.DragEvent<HTMLDivElement>) {
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('application/poe-hub-currency', JSON.stringify({ name }));
+    e.dataTransfer.setData(
+      'application/poe-hub-currency',
+      JSON.stringify({ name: entry.name, iconUrl: entry.iconUrl ?? undefined }),
+    );
   }
 
   return (
     <div
       draggable
       onDragStart={handleDragStart}
-      onClick={() => onInsert(name)}
+      onClick={() => onInsert(entry)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onInsert(name);
+        if (e.key === 'Enter' || e.key === ' ') onInsert(entry);
       }}
-      title={`Inserir ${name}`}
+      title={`Inserir ${entry.name}`}
       className={[
-        'flex items-center gap-1.5 rounded-md border border-accent/30',
-        'bg-accent/40 px-2 py-1 text-xs text-foreground cursor-grab active:cursor-grabbing',
-        'hover:bg-accent/60 hover:border-accent/50 transition-colors select-none',
+        'flex items-center gap-2 rounded-md border border-zinc-800',
+        'bg-zinc-900/40 px-2 py-1.5 text-xs text-zinc-100 cursor-grab active:cursor-grabbing',
+        'hover:bg-zinc-800/60 hover:border-zinc-700 transition-colors select-none',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
       ].join(' ')}
     >
-      {/* ◈ placeholder glyph — replaced by real icon when available */}
-      <span className="text-[10px] text-muted-foreground opacity-80 leading-none shrink-0">◈</span>
-      <span className="truncate leading-none">{name}</span>
+      {entry.iconUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={entry.iconUrl}
+          alt=""
+          width={20}
+          height={20}
+          className="shrink-0 rounded-sm object-contain"
+          loading="lazy"
+        />
+      ) : (
+        <span
+          className="shrink-0 w-5 h-5 grid place-items-center text-[10px] text-zinc-500"
+          aria-hidden
+        >
+          ◈
+        </span>
+      )}
+      <span className="truncate leading-none">{entry.name}</span>
     </div>
   );
 }
@@ -92,42 +113,44 @@ function EmptyState({ filtered }: { filtered: boolean }) {
 // ─── Currency list body ────────────────────────────────────────────────────────
 
 interface CurrencyListBodyProps {
-  onInsert: (name: string) => void;
+  onInsert: (entry: ItemCatalogEntry) => void;
 }
 
 function CurrencyListBody({ onInsert }: CurrencyListBodyProps) {
-  const { currencies, isLoading, error } = useCurrencyCatalog();
   const [query, setQuery] = useState('');
   // Deferred value keeps the filter snappy — avoids blocking on every keystroke
   const deferredQuery = useDeferredValue(query);
+  const { items, total, isLoading, error } = useItemsCatalog({
+    kind: 'currency',
+    q: deferredQuery,
+    limit: 500,
+  });
 
-  if (isLoading) return <LoadingState />;
   if (error) return <ErrorState message={error.message} />;
-
-  const visible = filterCurrencies(currencies, deferredQuery);
 
   return (
     <>
-      <div className="px-4 pb-2">
-        <Input
-          placeholder="Filtrar currencies…"
+      <div className="px-4 pb-2 flex items-center gap-2">
+        <WidgetFilterInput
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-7 text-xs"
+          onChange={setQuery}
+          placeholder="Filtrar currencies…"
+          className="flex-1"
         />
-      </div>
-      <div className="px-4 pb-1">
-        <span className="text-[10px] text-zinc-500">
-          {visible.length} de {currencies.length} disponíveis
+        <span className="text-[10px] text-zinc-500 tabular-nums shrink-0">
+          {items.length}
+          {total > items.length ? `/${total}` : ''}
         </span>
       </div>
-      <ScrollArea className="h-[280px]">
+      <ScrollArea className="h-[320px]">
         <div className="flex flex-col gap-1 px-4 pb-4">
-          {visible.length === 0 ? (
+          {isLoading && items.length === 0 ? (
+            <LoadingState />
+          ) : items.length === 0 ? (
             <EmptyState filtered={query.trim().length > 0} />
           ) : (
-            visible.map((name) => (
-              <CurrencyChip key={name} name={name} onInsert={onInsert} />
+            items.map((entry) => (
+              <CurrencyChip key={entry.name} entry={entry} onInsert={onInsert} />
             ))
           )}
         </div>
@@ -141,19 +164,24 @@ function CurrencyListBody({ onInsert }: CurrencyListBodyProps) {
 export function AssetsWidget() {
   const { editor } = useEditorContext();
 
-  async function insertCurrency(currencyName: string) {
+  function insertCurrency(entry: ItemCatalogEntry) {
     if (!editor) {
       toast.error('Editor não está pronto');
       return;
     }
-    // Resolve icon at insert time so chip matches the preview pane.
-    // resolveCurrencyIcon is fail-soft — null means engine off, chip falls back to ◈.
-    const iconUrl = await resolveCurrencyIcon(currencyName);
-    editor.chain().focus().insertPoeCurrency({ currencyName, iconUrl: iconUrl ?? undefined }).run();
+    // iconUrl now comes straight from the catalog row — no extra round-trip.
+    editor
+      .chain()
+      .focus()
+      .insertPoeCurrency({
+        currencyName: entry.name,
+        iconUrl: entry.iconUrl ?? undefined,
+      })
+      .run();
   }
 
   return (
-    <WidgetShell id="assets" icon={Package} title="Assets — Currencies" contentClassName="overflow-hidden">
+    <WidgetShell id="assets" icon={Coins} title="Assets — Currencies" contentClassName="overflow-hidden">
       <CurrencyListBody onInsert={insertCurrency} />
     </WidgetShell>
   );

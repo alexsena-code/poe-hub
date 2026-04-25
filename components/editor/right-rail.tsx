@@ -6,7 +6,9 @@
  * from the page level). All five widgets now live inside the shell itself, removing
  * the need for page-level slot assembly.
  *
- * Layout position: after EditorSidebar, width w-80, full-height with its own scroll.
+ * Layout position: after EditorSidebar, width w-96, full-height with its own scroll.
+ * Width bumped from w-80 (320px) to w-96 (384px) so currency chips with icons
+ * and item names with metadata badges fit on a single line without truncation.
  *
  * Persistence:
  * - Open accordion items are persisted to localStorage per draftId so the rail
@@ -87,7 +89,7 @@ export function RightRail({ draftId }: RightRailProps) {
 
   return (
     <aside
-      className="w-80 shrink-0 border-l border-zinc-800 overflow-y-auto flex flex-col"
+      className="w-96 shrink-0 border-l border-zinc-800 overflow-y-auto scrollbar-thin flex flex-col"
       aria-label="Editor right rail"
     >
       <Accordion
