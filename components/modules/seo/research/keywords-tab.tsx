@@ -1,13 +1,58 @@
 'use client';
 
-// All Keywords tab — server-sorted + paginated keyword table with expandable VICE detail row.
+// All Keywords tab — server-sorted + paginated keyword table with expandable
+// VICE detail row (legacy debug panel; the inline VICE column itself was
+// retired in session 32 / Frontend A in favour of 4 separate signal columns:
+// `Striking`, `Diff`, `Consol`, `Clicks30d`).
 // Pagination and sorting are server-side (engine API); client handles row expansion only.
 
 import React from 'react';
 import { SortHeader } from '../shared/seo-primitives';
-import { sourceVariant, intentColor, viceColor, clusterLabel, formatDateBR, API_URL } from '../shared/helpers';
+import { sourceVariant, intentColor, clusterLabel, formatDateBR, API_URL } from '../shared/helpers';
 import { StatusBadge } from '@/components/ui/status-badge';
 import type { KeywordOpportunity } from '../shared/types';
+
+// Session 32 (Frontend A): difficulty badge styling matches the
+// `bg-<color>-500/15 text-<color>-300` pattern used by GapsTable
+// (components/admin/competitor-gaps/gaps-table.tsx) and ActionBadge
+// (components/seo/posts-recommended/action-badge.tsx) for SEO-surface
+// consistency. Spec: easy=emerald, medium=amber, hard=orange, blocked=red.
+const DIFFICULTY_STYLES: Record<string, string> = {
+  easy: 'bg-emerald-500/15 text-emerald-300',
+  medium: 'bg-amber-500/15 text-amber-300',
+  hard: 'bg-orange-500/15 text-orange-300',
+  blocked: 'bg-red-500/15 text-red-300',
+};
+
+function DifficultyBadge({ value }: { value: string | null | undefined }) {
+  if (!value) return <span className="text-muted-foreground">—</span>;
+  const style = DIFFICULTY_STYLES[value] ?? 'bg-slate-500/15 text-slate-300';
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-mono ${style}`}>
+      {value}
+    </span>
+  );
+}
+
+function NumericMaybe({
+  value,
+  fractionDigits = 0,
+}: {
+  value: number | null | undefined;
+  fractionDigits?: number;
+}) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <span>
+      {value.toLocaleString('en-US', {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      })}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // VICE breakdown bar (per sub-metric inside the expandable detail row)
@@ -168,10 +213,13 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
         <thead>
           <tr className="bg-surface border-b border-border text-left text-xs text-muted-foreground uppercase tracking-wider">
             <SortHeader label="Keyword" active={sortKey === 'keyword'} dir={sortKey === 'keyword' ? sortDir : null} onToggle={() => onSort('keyword')} className="px-3 py-2" />
-            <SortHeader label="VICE" active={sortKey === 'viceScore'} dir={sortKey === 'viceScore' ? sortDir : null} onToggle={() => onSort('viceScore')} className="px-3 py-2 w-16" tip="Volume 20% + Intent 30% + Competition 30% + Effort 20%. Higher = better opportunity" />
             <SortHeader label="Source" active={sortKey === 'source'} dir={sortKey === 'source' ? sortDir : null} onToggle={() => onSort('source')} className="px-3 py-2 w-20" tip="Where discovered: GSC, Suggest, YouTube, or Competitor" />
             <SortHeader label="Intent" active={sortKey === 'intent'} dir={sortKey === 'intent' ? sortDir : null} onToggle={() => onSort('intent')} className="px-3 py-2 w-24" tip="informational (how-to), commercial (best/compare), transactional (buy/sell), navigational" />
             <SortHeader label="Cluster" active={sortKey === 'cluster'} dir={sortKey === 'cluster' ? sortDir : null} onToggle={() => onSort('cluster')} className="px-3 py-2 w-28" tip="Content category: build guide, crafting, currency, tier list, atlas, league start, mechanic" />
+            <SortHeader label="Striking" active={sortKey === 'strikingOpportunity'} dir={sortKey === 'strikingOpportunity' ? sortDir : null} onToggle={() => onSort('strikingOpportunity')} className="px-3 py-2 w-20 text-right" tip="GSC-based opportunity score (higher = bigger CTR/position upside)" />
+            <SortHeader label="Diff" active={sortKey === 'personalizedDifficulty'} dir={sortKey === 'personalizedDifficulty' ? sortDir : null} onToggle={() => onSort('personalizedDifficulty')} className="px-3 py-2 w-16" tip="Personalized difficulty (DA-aware): easy / medium / hard / blocked" />
+            <SortHeader label="Consol" active={sortKey === 'consolidatedScore'} dir={sortKey === 'consolidatedScore' ? sortDir : null} onToggle={() => onSort('consolidatedScore')} className="px-3 py-2 w-16 text-right" tip="Community demand consolidation score (0..100, weighted across signals)" />
+            <SortHeader label="Clicks30d" active={sortKey === 'predictedClicks30d'} dir={sortKey === 'predictedClicks30d' ? sortDir : null} onToggle={() => onSort('predictedClicks30d')} className="px-3 py-2 w-20 text-right" tip="Predicted monthly clicks if keyword reaches the target Google position" />
             <SortHeader label="Imp" active={sortKey === 'impressions'} dir={sortKey === 'impressions' ? sortDir : null} onToggle={() => onSort('impressions')} className="px-3 py-2 w-16 text-right" tip="GSC impressions: how often this keyword appeared in Google search results" />
             <SortHeader label="Pos" active={sortKey === 'position'} dir={sortKey === 'position' ? sortDir : null} onToggle={() => onSort('position')} className="px-3 py-2 w-14 text-right" tip="Average Google position (1-100). Lower = better. 4-20 = striking distance" />
             <SortHeader label="CTR" active={sortKey === 'ctr'} dir={sortKey === 'ctr' ? sortDir : null} onToggle={() => onSort('ctr')} className="px-3 py-2 w-14 text-right" tip="clicks / impressions. Low CTR + high impressions = optimize title/meta" />
@@ -181,9 +229,9 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
           ) : keywords.length === 0 ? (
-            <tr><td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">No keywords yet. Run a suggest scan or import GSC data.</td></tr>
+            <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">No keywords yet. Run a suggest scan or import GSC data.</td></tr>
           ) : (
             keywords.map((kw) => (
               <React.Fragment key={kw.id}>
@@ -198,15 +246,24 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
                       <span className="block text-[10px] text-muted-foreground">from: {kw.parentKeyword}</span>
                     )}
                   </td>
-                  <td className={`px-3 py-2 font-mono text-xs ${viceColor(kw.viceScore)}`}>
-                    {kw.viceScore != null ? kw.viceScore.toFixed(0) : '-'}
-                  </td>
                   <td className="px-3 py-2">
                     <StatusBadge variant={sourceVariant(kw.source)}>{kw.source}</StatusBadge>
                   </td>
                   <td className={`px-3 py-2 text-xs ${intentColor(kw.intent)}`}>{kw.intent ?? '-'}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
                     {kw.cluster ? clusterLabel(kw.cluster) : '-'}
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                    <NumericMaybe value={kw.strikingOpportunity} />
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    <DifficultyBadge value={kw.personalizedDifficulty} />
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                    <NumericMaybe value={kw.consolidatedScore} fractionDigits={1} />
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
+                    <NumericMaybe value={kw.predictedClicks30d} />
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-xs text-muted-foreground">
                     {kw.impressions?.toLocaleString() ?? '-'}
@@ -241,7 +298,7 @@ export function KeywordsTab({ keywords, loading, sortKey, sortDir, onSort }: Key
                   </td>
                 </tr>
                 {expandedId === kw.id && (
-                  <tr><td colSpan={10} className="p-0"><KeywordDetailPanel kwId={kw.id} /></td></tr>
+                  <tr><td colSpan={13} className="p-0"><KeywordDetailPanel kwId={kw.id} /></td></tr>
                 )}
               </React.Fragment>
             ))

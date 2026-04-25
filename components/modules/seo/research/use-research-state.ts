@@ -67,7 +67,11 @@ export function useResearchState(): ResearchState {
   });
   const [page, setPage] = useState(0);
   const [totalKeywords, setTotalKeywords] = useState(0);
-  const [sortBy, setSortBy] = useState('viceScore');
+  // Session 32 (Frontend A): default sort moved off the retired `viceScore`
+  // composite onto `strikingOpportunity`. Engine-side sort whitelist may
+  // fall back to `trendingScore`; client still requests the new key so the
+  // intent is explicit when the engine widens the whitelist.
+  const [sortBy, setSortBy] = useState('strikingOpportunity');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const [scans, setScans] = useState<ScanResult[]>([]);
@@ -104,6 +108,11 @@ export function useResearchState(): ResearchState {
       params.set('offset', String(page * PAGE_SIZE));
       params.set('sortBy', sortBy);
       params.set('sortDir', sortDir);
+      // Session 32 (Frontend A): opt-in to the 4 editorial signals
+      // (`strikingOpportunity` / `personalizedDifficulty` /
+      // `consolidatedScore` / `predictedClicks30d`) so the table can
+      // render the columns that replaced the VICE composite.
+      params.set('withSignals', 'true');
 
       const [kwRes, countRes] = await Promise.all([
         fetch(`${API_URL}/seo/keywords?${params}`),

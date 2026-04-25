@@ -107,6 +107,8 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Research", href: "/seo/research", icon: Search },
           { title: "Analysis", href: "/seo/analysis", icon: BarChart3 },
           { title: "Opportunities", href: "/seo/opportunities", icon: TrendingUp },
+          // Session 32 Frontend B — operator-facing post recommendations.
+          { title: "Recomendações", href: "/seo/posts-recommended", icon: Lightbulb },
           { title: "Reddit", href: "/seo/reddit", icon: ScrollText },
           { title: "YouTube", href: "/seo/youtube", icon: BarChart3 },
           { title: "KeyBERT", href: "/seo/keybert", icon: Search },

@@ -25,6 +25,14 @@ export interface KeywordOpportunity {
   ninjaPopularity: number | null;
   ninjaBuilds: number | null;
   discoveredAt: string;
+  // Session 32 (Frontend A): editorial signals returned only when the
+  // engine list endpoint is called with `?withSignals=true`. Each is
+  // independent (replacing the retired VICE composite from session 26B).
+  // Renderers must treat missing/null as "no signal" and show "—".
+  strikingOpportunity?: number | null;
+  personalizedDifficulty?: 'easy' | 'medium' | 'hard' | 'blocked' | null;
+  consolidatedScore?: number | null;
+  predictedClicks30d?: number | null;
 }
 
 export interface StrikingKeyword {
