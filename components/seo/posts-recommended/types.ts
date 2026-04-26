@@ -37,3 +37,13 @@ export interface PostRecommendation {
 }
 
 export type GameFilter = "poe1" | "poe2" | "all";
+
+// Session 36 Phase O: engine endpoint now returns a paginated envelope.
+// Mirrors PostRecommendationPage in
+// packages/api/src/modules/seo/services/post-recommendation.service.ts.
+export interface PostRecommendationPage {
+  items: PostRecommendation[];
+  total: number;
+  limit: number;
+  offset: number;
+}

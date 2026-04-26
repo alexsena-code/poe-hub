@@ -51,6 +51,11 @@ interface FiltersState {
 }
 
 function buildParams(state: FiltersState): URLSearchParams {
+  // Session 36 Phase O: filter changes always reset to page 1. Carrying
+  // `offset` from a prior URL would land the user on a page that no longer
+  // exists when the filter shrinks the result set, e.g. switching from
+  // game=poe1 (1500 results, page 5) to game=poe2 (40 results, only 1 page).
+  // Pager component owns the offset rewrite; filters bar always wipes it.
   const params = new URLSearchParams({
     game: state.game,
     targetPosition: String(state.targetPosition),
