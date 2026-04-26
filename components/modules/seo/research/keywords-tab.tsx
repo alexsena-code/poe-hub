@@ -34,6 +34,28 @@ function DifficultyBadge({ value }: { value: string | null | undefined }) {
   );
 }
 
+/**
+ * Color-coded 0-100 quality score badge. Red <30 (skip), amber 30-60
+ * (consider), emerald >60 (write). Mirrors the difficulty badge styling
+ * for visual consistency with the rest of the SEO surface.
+ */
+function QualityBadge({ value }: { value: number | null | undefined }) {
+  if (value == null || Number.isNaN(value)) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  const style =
+    value >= 60
+      ? 'bg-emerald-500/15 text-emerald-300'
+      : value >= 30
+        ? 'bg-amber-500/15 text-amber-300'
+        : 'bg-red-500/15 text-red-300';
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-mono ${style}`}>
+      {value.toFixed(0)}
+    </span>
+  );
+}
+
 function NumericMaybe({
   value,
   fractionDigits = 0,
@@ -252,6 +274,7 @@ export function KeywordsTab({
         <thead>
           <tr className="bg-surface border-b border-border text-left text-xs text-muted-foreground uppercase tracking-wider">
             <SortHeader label="Keyword" active={sortKey === 'keyword'} dir={sortKey === 'keyword' ? sortDir : null} onToggle={() => onSort('keyword')} className="px-3 py-2" />
+            <SortHeader label="Quality" active={sortKey === 'qualityScore'} dir={sortKey === 'qualityScore' ? sortDir : null} onToggle={() => onSort('qualityScore')} className="px-3 py-2 w-20 text-center" tip="Composite 0-100 ranker (Session 36 Phase F): 25% consolidated demand, 20% LLM relevance, 20% predicted clicks, 10% striking, 10% intent, 8% long-tail, 7% LLM confidence. Red <30 = skip, amber = consider, emerald >60 = write." />
             <SortHeader label="Source" active={sortKey === 'source'} dir={sortKey === 'source' ? sortDir : null} onToggle={() => onSort('source')} className="px-3 py-2 w-20" tip="Where discovered: GSC, Suggest, YouTube, or Competitor" />
             <SortHeader label="Intent" active={sortKey === 'intent'} dir={sortKey === 'intent' ? sortDir : null} onToggle={() => onSort('intent')} className="px-3 py-2 w-24" tip="informational (how-to), commercial (best/compare), transactional (buy/sell), navigational" />
             <SortHeader label="Cluster" active={sortKey === 'cluster'} dir={sortKey === 'cluster' ? sortDir : null} onToggle={() => onSort('cluster')} className="px-3 py-2 w-28" tip="Content category: build guide, crafting, currency, tier list, atlas, league start, mechanic" />
@@ -268,10 +291,10 @@ export function KeywordsTab({
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            <tr><td colSpan={14} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
           ) : keywords.length === 0 ? (
             <tr>
-              <td colSpan={13} className="px-3 py-10 text-center text-sm text-muted-foreground">
+              <td colSpan={14} className="px-3 py-10 text-center text-sm text-muted-foreground">
                 {hasDiscrepancy
                   ? `Sem keywords com sinais. Ative "Show without signals" pra ver as ${dashboardTotal ?? '?'} cadastradas.`
                   : 'No keywords yet. Run a suggest scan or import GSC data.'}
@@ -290,6 +313,9 @@ export function KeywordsTab({
                     {kw.parentKeyword && (
                       <span className="block text-[10px] text-muted-foreground">from: {kw.parentKeyword}</span>
                     )}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <QualityBadge value={kw.qualityScore} />
                   </td>
                   <td className="px-3 py-2">
                     <StatusBadge variant={sourceVariant(kw.source)}>{kw.source}</StatusBadge>
@@ -343,7 +369,7 @@ export function KeywordsTab({
                   </td>
                 </tr>
                 {expandedId === kw.id && (
-                  <tr><td colSpan={13} className="p-0"><KeywordDetailPanel kwId={kw.id} /></td></tr>
+                  <tr><td colSpan={14} className="p-0"><KeywordDetailPanel kwId={kw.id} /></td></tr>
                 )}
               </React.Fragment>
             ))

@@ -33,6 +33,10 @@ export interface KeywordOpportunity {
   personalizedDifficulty?: 'easy' | 'medium' | 'hard' | 'blocked' | null;
   consolidatedScore?: number | null;
   predictedClicks30d?: number | null;
+  // Session 36 Phase F: composite 0-100 ranker. Engine attaches when
+  // `?withSignals=true`. See keyword-analyzer.service.ts:computeQualityScore
+  // for the weighted formula.
+  qualityScore?: number | null;
 }
 
 export interface StrikingKeyword {
