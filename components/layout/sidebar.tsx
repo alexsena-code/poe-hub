@@ -148,6 +148,8 @@ const navSections: { label: string; items: NavEntry[] }[] = [
             title: "Operacoes",
             icon: Activity,
             children: [
+              // Session 36 — unified control center for crawls/pipelines/maintenance
+              { title: "Operations", href: "/admin/operations", icon: Activity },
               { title: "Observability", href: "/admin/observability", icon: Activity },
               { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
               // Session 06 S06.d — benchmark page for QA/Ideation/ContentGen runs

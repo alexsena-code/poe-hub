@@ -11,7 +11,7 @@ import { useRedditState } from '@/components/modules/seo/reddit/use-reddit-state
 import { ScanControls } from '@/components/modules/seo/reddit/scan-controls';
 import { SubredditFilter } from '@/components/modules/seo/reddit/subreddit-filter';
 import { PostsList } from '@/components/modules/seo/reddit/posts-list';
-import { TrendingTopicsTab } from '@/components/modules/seo/reddit/trending-topics-tab';
+import { TrendingKeywordsTab } from '@/components/modules/seo/reddit/trending-keywords-tab';
 import { BuildPostsTab } from '@/components/modules/seo/reddit/build-posts-tab';
 
 export default function RedditDashboardPage() {
@@ -59,7 +59,7 @@ export default function RedditDashboardPage() {
         {/* Header */}
         <PageHeader
           title="Reddit Dashboard"
-          description="Top posts, trending topics, and build discussions"
+          description="Top posts, trending keywords, and build discussions"
           accent="var(--color-seo)"
           className="mb-4"
         />
@@ -183,9 +183,9 @@ export default function RedditDashboardPage() {
         />
       )}
 
-      {/* Tab: Trending Topics */}
-      {!loading && tab === 'trending-topics' && (
-        <TrendingTopicsTab posts={posts} />
+      {/* Tab: Trending Keywords (Reddit-sourced KeywordOpportunity rows) */}
+      {!loading && tab === 'trending-keywords' && (
+        <TrendingKeywordsTab />
       )}
 
       {/* Tab: Build Posts */}

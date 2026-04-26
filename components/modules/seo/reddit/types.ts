@@ -52,12 +52,12 @@ export interface RedditScanProgress {
   logs: string[];
 }
 
-export type Tab = 'recent' | 'top-posts' | 'trending-topics' | 'build-posts';
+export type Tab = 'recent' | 'top-posts' | 'trending-keywords' | 'build-posts';
 
 export const TABS: { key: Tab; label: string }[] = [
   { key: 'recent', label: 'Recent (24h)' },
   { key: 'top-posts', label: 'Top Posts' },
-  { key: 'trending-topics', label: 'Trending Topics' },
+  { key: 'trending-keywords', label: 'Trending Keywords' },
   { key: 'build-posts', label: 'Build Posts' },
 ];
 
