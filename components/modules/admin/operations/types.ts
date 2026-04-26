@@ -66,6 +66,15 @@ export const ACTIONS: Action[] = [
     method: 'POST',
     statusEndpoint: '/seo/keybert/status',
   },
+  {
+    id: 'extract-llm-youtube',
+    category: 'crawl',
+    title: 'LLM extract YouTube',
+    description: 'Re-extract keywords from existing YouTube videos via LLM with the pathoftrade currency-trading domain prompt. Replaces n-gram garbage.',
+    endpoint: '/seo/keywords/extract-llm/youtube',
+    method: 'POST',
+    defaultBody: { minViews: 1000, limit: 200 },
+  },
 
   // ---------------- Pipelines ----------------
   {
@@ -147,6 +156,14 @@ export const ACTIONS: Action[] = [
     endpoint: '/seo/volume/enrich',
     method: 'POST',
     defaultBody: { limit: 50 },
+  },
+  {
+    id: 'reset-keywords',
+    category: 'maintenance',
+    title: 'Reset all keywords',
+    description: 'DESTRUCTIVE: deletes every KeywordOpportunity + KeywordScan row. Re-ingest required after.',
+    endpoint: '/seo/keywords/reset',
+    method: 'DELETE',
   },
 ];
 
