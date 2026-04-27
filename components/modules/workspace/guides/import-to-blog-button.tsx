@@ -26,6 +26,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -130,11 +131,10 @@ export function ImportToBlogButton({ guide }: Props) {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Importar para o Blog</DialogTitle>
+            <DialogDescription>
+              Selecione os idiomas para criar drafts separados no Sanity:
+            </DialogDescription>
           </DialogHeader>
-
-          <p className="text-sm text-muted-foreground">
-            Selecione os idiomas para criar drafts separados no Sanity:
-          </p>
 
           <div className="flex flex-col gap-3 py-2">
             <div className="flex items-center gap-2">
