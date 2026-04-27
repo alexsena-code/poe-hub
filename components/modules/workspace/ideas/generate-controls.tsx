@@ -4,6 +4,7 @@
 // model select, and the Generate/Clear action buttons.
 // Rendered in the header row when the filterStatus is not "generated".
 
+import { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { GENERATABLE_TEMPLATES, TEMPLATE_LABELS, MODEL_OPTIONS } from './constants';
 
@@ -24,6 +25,7 @@ interface GenerateControlsProps {
   setSelectedModel: (v: number) => void;
   onGenerate: () => void;
   onClear: () => void;
+  onGenerateFromUrl: (url: string) => Promise<void>;
 }
 
 export function GenerateControls({
@@ -43,7 +45,24 @@ export function GenerateControls({
   setSelectedModel,
   onGenerate,
   onClear,
+  onGenerateFromUrl,
 }: GenerateControlsProps) {
+  const [showUrlDialog, setShowUrlDialog] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [generatingUrl, setGeneratingUrl] = useState(false);
+
+  async function handleUrlGenerate() {
+    if (!urlInput.trim()) return;
+    setGeneratingUrl(true);
+    try {
+      await onGenerateFromUrl(urlInput.trim());
+      setShowUrlDialog(false);
+      setUrlInput('');
+    } finally {
+      setGeneratingUrl(false);
+    }
+  }
+
   return (
     <>
       {/* Action buttons row */}
@@ -85,6 +104,43 @@ export function GenerateControls({
         >
           {generating ? (msg?.startsWith('Generating...') ? msg : 'Generating...') : 'Generate Ideas'}
         </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowUrlDialog(!showUrlDialog)}
+            className="px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-700/50 rounded-md text-xs font-medium transition-colors"
+          >
+            Gerar de URL
+          </button>
+          
+          {showUrlDialog && (
+            <div className="absolute right-0 top-full mt-2 w-80 p-3 bg-surface border border-border rounded-lg shadow-xl z-50">
+              <label className="text-xs text-foreground mb-2 block">Cole a URL do concorrente</label>
+              <input 
+                type="text" 
+                value={urlInput}
+                onChange={e => setUrlInput(e.target.value)}
+                placeholder="https://maxroll.gg/..."
+                className="w-full bg-background border border-border rounded px-2 py-1.5 text-xs text-foreground mb-2"
+                onKeyDown={e => { if(e.key === 'Enter') handleUrlGenerate() }}
+              />
+              <div className="flex justify-end gap-2">
+                <button 
+                  onClick={() => setShowUrlDialog(false)}
+                  className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleUrlGenerate}
+                  disabled={generatingUrl || !urlInput.trim()}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded text-xs font-medium"
+                >
+                  {generatingUrl ? 'Gerando...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         {briefs.length > 0 && (
           <button
             onClick={onClear}

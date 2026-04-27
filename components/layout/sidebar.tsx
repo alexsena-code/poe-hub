@@ -168,6 +168,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
               { title: "Auto-actions", href: "/admin/auto-actions", icon: Activity },
               { title: "Domain Lists", href: "/admin/domain-lists", icon: ListTodo },
               { title: "Competitor Gaps", href: "/admin/competitor-gaps", icon: TrendingUp },
+              { title: "Competitor Pages", href: "/admin/competitor-pages", icon: ScrollText },
             ],
           },
           {

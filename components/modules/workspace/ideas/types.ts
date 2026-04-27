@@ -23,6 +23,8 @@ export interface ContentBrief {
   createdAt: string;
   briefingText: string | null;
   briefingTextModel: string | null;
+  templateInputs: Record<string, any> | null;
+  pobUrl: string | null;
 }
 
 export type BriefStatus = 'all' | 'pending' | 'accepted' | 'rejected' | 'generated';

@@ -16,6 +16,7 @@ interface UseGenerateFlowReturn {
   generatingContent: number | null;
   handleGenerate: () => Promise<void>;
   generateContent: (id: number) => Promise<void>;
+  generateFromUrl: (url: string) => Promise<void>;
 }
 
 export function useGenerateFlow({
@@ -162,5 +163,25 @@ export function useGenerateFlow({
     }
   }
 
-  return { generating, generatingContent, handleGenerate, generateContent };
+  async function generateFromUrl(url: string) {
+    setMsg(null);
+    try {
+      const res = await fetch(`${IDEAS_API}/ideation/from-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json() as { error?: string; count?: number };
+      if (data.error) {
+        setMsg(`Error: ${data.error}`);
+        return;
+      }
+      setMsg(`Gerou ${data.count ?? 3} briefs a partir da URL.`);
+      fetchBriefs();
+    } catch {
+      setMsg('Failed to generate from URL');
+    }
+  }
+
+  return { generating, generatingContent, handleGenerate, generateContent, generateFromUrl };
 }

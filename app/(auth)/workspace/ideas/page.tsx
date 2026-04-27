@@ -43,7 +43,7 @@ export default function IdeasPage() {
     );
   }
 
-  const { generating, generatingContent, handleGenerate, generateContent } = useGenerateFlow({
+  const { generating, generatingContent, handleGenerate, generateContent, generateFromUrl } = useGenerateFlow({
     selectedModel,
     editorialBriefing,
     selectedTemplates,
@@ -93,6 +93,7 @@ export default function IdeasPage() {
               setSelectedModel={setSelectedModel}
               onGenerate={handleGenerate}
               onClear={clearBriefs}
+              onGenerateFromUrl={generateFromUrl}
             />
           )}
         </div>

@@ -11,6 +11,7 @@ import {
   IDEAS_API,
 } from './constants';
 import { BriefingTextPanel } from './briefing-text-panel';
+import { BriefInputsPanel } from './brief-inputs-panel';
 
 interface BriefExpandedDetailProps {
   brief: ContentBrief;
@@ -71,6 +72,8 @@ export function BriefExpandedDetail({
             <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Rationale</div>
             <p className="text-xs text-foreground/80 leading-relaxed">{b.rationale}</p>
           </div>
+
+          <BriefInputsPanel brief={b} onUpdate={onBriefUpdate} />
 
           <BriefingTextPanel brief={b} onUpdate={onBriefUpdate} />
 
