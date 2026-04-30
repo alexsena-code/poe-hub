@@ -148,7 +148,7 @@ export function PreviewPane({
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <ArticleHeader title={title} metadata={metadata} mainImageUrl={mainImageUrl} />
-      <article className="prose dark:prose-invert max-w-none mt-8">
+      <article className="markdown-body max-w-none mt-8">
         <PreviewRenderer value={resolved ?? body} />
       </article>
     </div>

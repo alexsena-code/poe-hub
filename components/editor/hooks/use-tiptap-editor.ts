@@ -33,6 +33,8 @@ import TextAlign from '@tiptap/extension-text-align';
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import { createLowlight, common } from 'lowlight';
 import type { JSONContent } from '@tiptap/core';
+import { DOMParser } from '@tiptap/pm/model';
+import { marked } from 'marked';
 
 import { PoeItemNode } from '../extensions/poe-item-node';
 import { PoePriceNode } from '../extensions/poe-price-node';
@@ -183,13 +185,45 @@ export function useTiptapEditor({
       content: initialContent,
       editorProps: {
         attributes: {
-          // Applied to the contenteditable div — Tailwind prose for typography,
+          // Applied to the contenteditable div — markdown-body for typography,
           // min-h so the editor is always clickable even when empty.
           class: [
-            'prose dark:prose-invert max-w-none',
+            'markdown-body max-w-none',
             'min-h-[400px] px-6 py-4',
             'focus:outline-none',
           ].join(' '),
+        },
+        /**
+         * Intercept paste to support Markdown-to-RichText conversion.
+         * If the pasted text contains markdown indicators (#, **, etc),
+         * we parse it via 'marked' and let Tiptap handle the resulting HTML.
+         */
+        handlePaste(view, event) {
+          const { clipboardData } = event;
+          if (!clipboardData) return false;
+
+          const text = clipboardData.getData('text/plain');
+          const html = clipboardData.getData('text/html');
+
+          // If there's already HTML (e.g. copied from a webpage), let Tiptap's
+          // default logic handle it.
+          if (html || !text) return false;
+
+          // Simple heuristic: if it looks like Markdown, parse it.
+          const isMarkdown = /^[#\->\+]|[\*_]{1,3}[^*_]+[\*_]{1,3}|\[.+\]\(.+\)/m.test(text);
+
+          if (isMarkdown) {
+            const parsedHtml = marked.parse(text, { async: false }) as string;
+            const element = document.createElement('div');
+            element.innerHTML = parsedHtml;
+
+            const nodes = DOMParser.fromSchema(view.state.schema).parse(element);
+            const tr = view.state.tr.replaceSelectionWith(nodes);
+            view.dispatch(tr);
+            return true;
+          }
+
+          return false;
         },
       },
       onUpdate({ editor: ed }) {
