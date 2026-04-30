@@ -107,14 +107,20 @@ interface TiptapBlockquoteNode {
 interface TiptapHeadingNode {
   type: "heading";
   attrs: { level: number };
-  content?: (TiptapTextNode | TiptapPoeInlineNode)[];
+  content?: (TiptapTextNode | TiptapPoeInlineNode | TiptapHardBreakNode)[];
 }
 
-/** Paragraph node. */
+/** A paragraph node. */
 interface TiptapParagraphNode {
   type: "paragraph";
-  content?: (TiptapTextNode | TiptapPoeInlineNode)[];
+  content?: (TiptapTextNode | TiptapPoeInlineNode | TiptapHardBreakNode)[];
 }
+
+/** A hard break node. */
+interface TiptapHardBreakNode {
+  type: "hardBreak";
+}
+
 
 type TiptapGenericNode =
   | TiptapTextNode
@@ -127,6 +133,7 @@ type TiptapGenericNode =
   | TiptapCodeBlockNode
   | TiptapImageNode
   | TiptapPoeCTANode
+  | TiptapHardBreakNode
   | { type: string; attrs?: Record<string, unknown>; content?: TiptapGenericNode[] };
 
 export interface TiptapDoc {
@@ -303,6 +310,8 @@ function buildChildrenFromInlines(
     if (node.type === "text") {
       const spans = convertTextNode(node as TiptapTextNode, markDefs);
       children.push(...spans);
+    } else if (node.type === "hardBreak") {
+      children.push({ _type: "span", _key: nanoid(8), text: "\n", marks: [] });
     } else if (isPoeInlineNode(node)) {
       const span = convertPoeInlineNode(node as TiptapPoeInlineNode);
       children.push(span);

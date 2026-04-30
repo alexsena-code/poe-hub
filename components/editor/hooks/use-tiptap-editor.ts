@@ -210,16 +210,21 @@ export function useTiptapEditor({
           if (html || !text) return false;
 
           // Simple heuristic: if it looks like Markdown, parse it.
-          const isMarkdown = /^[#\->\+]|[\*_]{1,3}[^*_]+[\*_]{1,3}|\[.+\]\(.+\)/m.test(text);
+          // We check for headers, lists, links, or bold/italic.
+          // Requires a space after # to avoid false positives with hashtags or IDs.
+          const isMarkdown = /^#{1,6}\s|[#\->\+*]\s|[\*_]{1,3}[^*_]+[\*_]{1,3}|\[.+\]\(.+\)/m.test(text);
 
           if (isMarkdown) {
-            const parsedHtml = marked.parse(text, { async: false }) as string;
+            // gfm: true is default, but breaks: true ensures single newlines become <br>
+            // or we can stick to standard markdown where two newlines = paragraph.
+            // Many users expect single newlines to split paragraphs in a web editor.
+            const parsedHtml = marked.parse(text, { async: false, breaks: true }) as string;
             const element = document.createElement('div');
             element.innerHTML = parsedHtml;
 
-            const nodes = DOMParser.fromSchema(view.state.schema).parse(element);
-            const tr = view.state.tr.replaceSelectionWith(nodes);
-            view.dispatch(tr);
+            const slice = DOMParser.fromSchema(view.state.schema).parseSlice(element);
+            const tr = view.state.tr.replaceSelection(slice);
+            view.dispatch(tr.scrollIntoView());
             return true;
           }
 

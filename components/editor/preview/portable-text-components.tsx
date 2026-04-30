@@ -174,7 +174,7 @@ const HEADING_CLASSES: Record<number, string> = {
 };
 
 function processNormalBlock(children: React.ReactNode): React.ReactNode {
-  const { first: firstText, full: fullText } = getTextContent(children);
+  const { first: firstText } = getTextContent(children);
 
   if (firstText) {
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(firstText)) {
@@ -184,56 +184,13 @@ function processNormalBlock(children: React.ReactNode): React.ReactNode {
     if (/^\|[\s:-]+\|/.test(firstText) && !firstText.replace(/[\s|:-]/g, "")) {
       return null;
     }
-
-    if (/^\|.+\|/.test(firstText) && fullText) {
-      const tableLines = fullText.split("\n").filter((l) => l.trim().startsWith("|"));
-      if (tableLines.length > 1) return renderMarkdownTable(fullText);
-    }
-
-    const headingMatch = firstText.match(/^(#{1,6})\s+(.+)$/);
-    if (headingMatch) {
-      const level = Math.min(headingMatch[1].length, 4) as 1 | 2 | 3 | 4;
-      const Tag = `h${level}` as "h1" | "h2" | "h3" | "h4";
-      return (
-        <Tag className={HEADING_CLASSES[level]}>
-          {renderInlineMarkdown(headingMatch[2], `hd-${level}`)}
-        </Tag>
-      );
-    }
-
-    if (fullText?.includes("\n")) {
-      const lines = fullText.split("\n").map((l) => l.trim()).filter(Boolean);
-      if (lines.length >= 2) {
-        const isOrdered = lines.every((l) => /^\d+\.\s+/.test(l));
-        const isBullet = lines.every((l) => /^[*-]\s+/.test(l));
-        if (isOrdered || isBullet) {
-          const items = lines.map((l) => l.replace(/^(?:\d+\.|[*-])\s+/, ""));
-          if (isOrdered) {
-            return (
-              <ol className="list-decimal pl-6 mb-4 space-y-1">
-                {items.map((item, i) => (
-                  <li key={i} className="text-zinc-300">
-                    {renderInlineMarkdown(item, `oli-${i}`)}
-                  </li>
-                ))}
-              </ol>
-            );
-          }
-          return (
-            <ul className="list-disc pl-6 mb-4 space-y-1">
-              {items.map((item, i) => (
-                <li key={i} className="text-zinc-300">
-                  {renderInlineMarkdown(item, `uli-${i}`)}
-                </li>
-              ))}
-            </ul>
-          );
-        }
-      }
-    }
   }
 
-  return <p className="leading-relaxed mb-4">{processChildren(children)}</p>;
+  return (
+    <p className="leading-relaxed mb-4 whitespace-pre-wrap">
+      {processChildren(children)}
+    </p>
+  );
 }
 
 // ─── Image component ──────────────────────────────────────────────────────────

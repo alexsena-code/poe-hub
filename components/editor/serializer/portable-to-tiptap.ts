@@ -52,13 +52,17 @@ const POE_INLINE_VALUE_ATTR: Record<TiptapPoeInlineNode["type"], string> = {
 
 interface TiptapParagraphNode {
   type: "paragraph";
-  content: (TiptapTextNode | TiptapPoeInlineNode)[];
+  content: (TiptapTextNode | TiptapPoeInlineNode | TiptapHardBreakNode)[];
 }
 
 interface TiptapHeadingNode {
   type: "heading";
   attrs: { level: number };
-  content: (TiptapTextNode | TiptapPoeInlineNode)[];
+  content: (TiptapTextNode | TiptapPoeInlineNode | TiptapHardBreakNode)[];
+}
+
+interface TiptapHardBreakNode {
+  type: "hardBreak";
 }
 
 interface TiptapBlockquoteNode {
@@ -195,28 +199,38 @@ function buildMarkDefsMap(defs: PortableTextMarkDef[]): Map<string, PortableText
 function convertChildren(
   spans: PortableTextSpan[],
   markDefsMap: Map<string, PortableTextMarkDef>,
-): (TiptapTextNode | TiptapPoeInlineNode)[] {
-  const result: (TiptapTextNode | TiptapPoeInlineNode)[] = [];
+): (TiptapTextNode | TiptapPoeInlineNode | TiptapHardBreakNode)[] {
+  const result: (TiptapTextNode | TiptapPoeInlineNode | TiptapHardBreakNode)[] = [];
 
   for (const span of spans) {
     if (span._type !== "span") continue;
 
     const tiptapMarks = resolveSpanMarks(span.marks, markDefsMap);
-    const segments = splitByPlaceholders(span.text);
+    const lines = span.text.split("\n");
 
-    for (const seg of segments) {
-      if (seg.type === "text") {
-        if (seg.text) result.push(makeTextNode(seg.text, tiptapMarks));
-      } else {
-        // Placeholder segment — convert to custom inline node
-        const ph = seg.placeholder;
-        const node = placeholderToInlineNode(ph.kind, ph.value, ph.modifier);
-        if (node) {
-          result.push(node);
+    for (let l = 0; l < lines.length; l++) {
+      const line = lines[l];
+      const segments = splitByPlaceholders(line);
+
+      for (const seg of segments) {
+        if (seg.type === "text") {
+          if (seg.text) result.push(makeTextNode(seg.text, tiptapMarks));
         } else {
-          // Unknown kind — preserve as text
-          result.push(makeTextNode(ph.raw, tiptapMarks));
+          // Placeholder segment — convert to custom inline node
+          const ph = seg.placeholder;
+          const node = placeholderToInlineNode(ph.kind, ph.value, ph.modifier);
+          if (node) {
+            result.push(node);
+          } else {
+            // Unknown kind — preserve as text
+            result.push(makeTextNode(ph.raw, tiptapMarks));
+          }
         }
+      }
+
+      // Add hardBreak for newlines within a span
+      if (l < lines.length - 1) {
+        result.push({ type: "hardBreak" });
       }
     }
   }
