@@ -18,6 +18,7 @@ export interface Simulation {
   id: string;
   name: string;
   league: string;
+  kind: "operational" | "forecast";
   status: "draft" | "active" | "archived";
   durationWeeks: number;
   startDayOffset: number;
@@ -45,4 +46,14 @@ export const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline"
   draft: "outline",
   active: "default",
   archived: "secondary",
+};
+
+export const KIND_LABELS: Record<string, string> = {
+  operational: "Operacional",
+  forecast: "Forecast",
+};
+
+export const KIND_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
+  operational: "secondary",
+  forecast: "outline",
 };

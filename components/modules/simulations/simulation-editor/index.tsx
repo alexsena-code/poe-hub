@@ -35,6 +35,7 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
   const [nameValue, setNameValue] = useState("");
   const [editingStatus, setEditingStatus] = useState(false);
   const [editingLeague, setEditingLeague] = useState(false);
+  const [editingKind, setEditingKind] = useState(false);
 
   const fetchSimulation = useCallback(async () => {
     try {
@@ -97,6 +98,26 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
       toast.success("Status atualizado");
     } catch {
       toast.error("Erro ao atualizar status");
+    }
+  }
+
+  // --- Kind change ---
+  async function changeKind(kind: string) {
+    if (!simulation) return;
+    try {
+      const res = await fetch(`/api/simulations/${simulationId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      setSimulation((s) =>
+        s ? { ...s, kind: kind as Simulation["kind"] } : s
+      );
+      setEditingKind(false);
+      toast.success("Tipo de operação atualizado");
+    } catch {
+      toast.error("Erro ao atualizar tipo de operação");
     }
   }
 
@@ -202,6 +223,7 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
         nameValue={nameValue}
         editingStatus={editingStatus}
         editingLeague={editingLeague}
+        editingKind={editingKind}
         costConfig={costConfig}
         leagues={leagues}
         onBackClick={() => router.push("/farm/simulations")}
@@ -215,6 +237,8 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
         }}
         onStatusChange={changeStatus}
         onEditStatusOpen={() => setEditingStatus(true)}
+        onKindChange={changeKind}
+        onEditKindOpen={() => setEditingKind(true)}
         onLeagueChange={changeLeague}
         onEditLeagueOpen={() => setEditingLeague(true)}
         onImported={fetchSimulation}

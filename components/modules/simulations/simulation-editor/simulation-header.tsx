@@ -17,7 +17,14 @@ import {
 } from "@/components/ui/select";
 import { ImportPricesDialog } from "../import-prices-dialog";
 import { CostConfigSelector } from "../cost-config-selector";
-import { STATUS_LABELS, STATUS_VARIANTS, type CostConfig, type Simulation } from "./types";
+import {
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+  KIND_LABELS,
+  KIND_VARIANTS,
+  type CostConfig,
+  type Simulation,
+} from "./types";
 
 interface League {
   id: string;
@@ -32,6 +39,7 @@ interface SimulationHeaderProps {
   nameValue: string;
   editingStatus: boolean;
   editingLeague: boolean;
+  editingKind: boolean;
   costConfig: CostConfig | null;
   leagues: League[];
   onBackClick: () => void;
@@ -42,6 +50,8 @@ interface SimulationHeaderProps {
   onNameKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onStatusChange: (status: string) => void;
   onEditStatusOpen: () => void;
+  onKindChange: (kind: string) => void;
+  onEditKindOpen: () => void;
   onLeagueChange: (val: string) => void;
   onEditLeagueOpen: () => void;
   onImported: () => void;
@@ -55,6 +65,7 @@ export function SimulationHeader({
   nameValue,
   editingStatus,
   editingLeague,
+  editingKind,
   costConfig,
   leagues,
   onBackClick,
@@ -65,6 +76,8 @@ export function SimulationHeader({
   onNameKeyDown,
   onStatusChange,
   onEditStatusOpen,
+  onKindChange,
+  onEditKindOpen,
   onLeagueChange,
   onEditLeagueOpen,
   onImported,
@@ -103,6 +116,36 @@ export function SimulationHeader({
               {simulation.name}
               <Pencil className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
             </h1>
+          )}
+
+          {editingKind ? (
+            <Select value={simulation.kind} onValueChange={onKindChange}>
+              <SelectTrigger className="w-48 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="operational">
+                  <div className="flex flex-col">
+                    <span>Operacional</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Liga real em andamento</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="forecast">
+                  <div className="flex flex-col">
+                    <span>Forecast</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Planejamento anual</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge
+              variant={KIND_VARIANTS[simulation.kind] ?? "secondary"}
+              className="cursor-pointer"
+              onClick={onEditKindOpen}
+            >
+              Tipo: {KIND_LABELS[simulation.kind] ?? simulation.kind}
+            </Badge>
           )}
         </div>
 
