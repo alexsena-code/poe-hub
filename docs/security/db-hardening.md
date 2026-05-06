@@ -271,6 +271,14 @@ docker exec poe-postgres tail -50 /var/lib/postgresql/data/log/postgresql-*.log
 
 ## Passo 6 — Fail2ban
 
+### Pré-requisitos validados durante execução real
+
+- Postgres rodando no container `poe-postgres` (compose do engine)
+- Logs em arquivo (passo 5 com `logging_collector = on` + restart)
+- Docker manipula iptables — fail2ban precisa inserir regras na chain
+  `DOCKER-USER`, não em `INPUT` (pacotes pra containers passam pela chain
+  `DOCKER-USER` antes do DNAT, então é ali que o ban precisa estar)
+
 ### Instalação
 
 ```bash
@@ -278,71 +286,137 @@ sudo apt update && sudo apt install -y fail2ban
 sudo systemctl enable --now fail2ban
 ```
 
+### Descobrir o path do volume no host
+
+O volume do `poe-postgres` segue o naming do compose. No projeto real foi
+`poetrade-content_postgres_data` (não `path-of-trade-content_postgres_data`).
+Confirma:
+
+```bash
+docker inspect poe-postgres --format '{{ range .Mounts }}{{ .Source }}{{ println }}{{ end }}'
+# Ex: /var/lib/docker/volumes/poetrade-content_postgres_data/_data
+```
+
+Logs ficam em `<MOUNTPOINT>/log/postgresql-*.log`.
+
 ### Filter
 
-Cria `/etc/fail2ban/filter.d/postgresql.conf`:
+Cria `/etc/fail2ban/filter.d/postgresql.conf` (use `nano` — `cat <<EOF` no
+MobaXterm injeta indentação):
 
 ```ini
 [Definition]
-failregex = ^.*FATAL:\s+password authentication failed for user.*client=<HOST>.*$
-            ^.*FATAL:\s+no pg_hba.conf entry for host "<HOST>".*$
+failregex = ^.*client=<HOST>.*FATAL:\s+password authentication failed.*$
+            ^.*FATAL:\s+no pg_hba\.conf entry for host "<HOST>".*$
 ignoreregex =
 ```
 
-> O regex assume `log_line_prefix` do passo 4 (com `client=%h`). Se você manteve
-> outro prefix, ajusta o `<HOST>`.
-
-### Descobrir o path do volume no host
-
-O volume do `poe-postgres` é nomeado (`postgres_data` no compose do engine).
-Pra achar o path real:
-
-```bash
-docker volume inspect path-of-trade-content_postgres_data \
-  --format '{{ .Mountpoint }}'
-# Ex: /var/lib/docker/volumes/path-of-trade-content_postgres_data/_data
-```
-
-> Se o nome do projeto compose for diferente (ex: rodou com `-p` flag), ajusta.
-> Lista tudo com `docker volume ls | grep postgres`.
-
-Logs do Postgres ficam em `<MOUNTPOINT>/log/postgresql-*.log`. Confirma:
-
-```bash
-ls /var/lib/docker/volumes/path-of-trade-content_postgres_data/_data/log/
-```
+> O regex assume `log_line_prefix` do passo 5 com `client=%h` (que vem antes
+> de `FATAL:`). Sem o prefix, o IP real do cliente não aparece e o regex não
+> casa.
 
 ### Jail
 
-Cria `/etc/fail2ban/jail.d/postgresql.local` (ajusta `logpath` com o caminho
-real do passo anterior):
+Cria `/etc/fail2ban/jail.d/postgresql.local`:
 
 ```ini
 [postgresql]
-enabled  = true
-port     = 5432
-filter   = postgresql
-logpath  = /var/lib/docker/volumes/path-of-trade-content_postgres_data/_data/log/postgresql-*.log
-maxretry = 5
-findtime = 600
-bantime  = 3600
+enabled   = true
+backend   = polling
+banaction = iptables-multiport
+chain     = DOCKER-USER
+port      = 5432
+filter    = postgresql
+logpath   = /var/lib/docker/volumes/poetrade-content_postgres_data/_data/log/postgresql-*.log
+maxretry  = 5
+findtime  = 600
+bantime   = 3600
+ignoreip  = 127.0.0.1/8 172.18.0.0/16 ::1
 ```
+
+3 linhas críticas que descobrimos serem necessárias:
+
+- **`backend = polling`** — sem isso, Ubuntu 24.04 cai no backend `systemd`
+  (lê do journal) e ignora o `logpath`. Status mostra `Journal matches:` em
+  vez de `File list:`.
+- **`chain = DOCKER-USER`** — sem isso, o ban vai pra `INPUT` e tráfego pra
+  containers Docker bypassa a regra (DNAT acontece antes). Status mostra
+  ban ativo mas pacotes continuam chegando no Postgres.
+- **`banaction = iptables-multiport`** — força o uso de `iptables` (Docker já
+  manipula iptables, então a chain `DOCKER-USER` existe lá). nftables nativo
+  do Ubuntu não pega tráfego de container.
+
+`ignoreip = 172.18.0.0/16` é essencial: gateway da Docker network aparece
+como `client=172.18.0.1` quando apps locais conectam via loopback do host
+(NAT do Docker traduz localhost→172.18.0.1). Sem essa linha, fail2ban baniria
+o gateway e quebraria todos os apps locais.
+
+### MobaXterm: paste injeta 2 espaços no início de cada linha
+
+Se você editar via nano com paste do MobaXterm, o terminal injeta 2 espaços
+no começo de cada linha colada. Limpa depois:
+
+```bash
+sudo sed -i 's/^  //' /etc/fail2ban/jail.d/postgresql.local
+sudo sed -i 's/^  //' /etc/fail2ban/filter.d/postgresql.conf
+```
+
+Confirma com `cat -A` (deve mostrar `[postgresql]$` sem espaços antes).
 
 ### Aplicar e testar
 
 ```bash
 sudo systemctl restart fail2ban
-sudo fail2ban-client status postgresql       # deve mostrar a jail ativa
-
-# Simula 5 falhas de outra máquina:
-for i in {1..6}; do psql "postgresql://poth_app:errada@77.42.47.106:5432/poth"; done
-
-# Verifica ban:
+sleep 2
 sudo fail2ban-client status postgresql
-# IP listado em "Banned IP list"
+# Esperado: "File list: /var/lib/docker/volumes/.../postgresql-*.log"
+# (NÃO "Journal matches:")
+```
 
-# Desbanir manualmente:
+Da sua máquina local, simula 6 falhas (`maxretry=5`):
+
+```powershell
+1..6 | ForEach-Object { docker run --rm postgres:16 psql `
+  "postgresql://poth_app:errada@77.42.47.106:5432/poth" -c "SELECT 1;" 2>&1 | `
+  Select-String "FATAL|refused" }
+```
+
+Confirma ban + regra no firewall:
+
+```bash
+sudo fail2ban-client status postgresql
+# Currently banned: 1
+# Banned IP list:   <SEU_IP>
+
+sudo iptables -L DOCKER-USER -n -v
+# Deve aparecer linha: f2b-postgresql ... multiport dports 5432
+
+sudo iptables -L f2b-postgresql -n -v
+# Deve aparecer: REJECT all -- <SEU_IP>  ...  reject-with icmp-port-unreachable
+# E pacotes contados (15 packets, 780 bytes) provando que está bloqueando
+```
+
+Smoke test final (do PowerShell, depois do ban):
+
+```powershell
+docker run --rm postgres:16 psql `
+  "postgresql://poth_app:errada@77.42.47.106:5432/poth" -c "SELECT 1;"
+# Esperado: "Connection refused" (não FATAL)
+# REJECT do iptables responde com ICMP antes do pacote chegar no Postgres
+```
+
+### Desbanir teu próprio IP (importante)
+
+```bash
 sudo fail2ban-client set postgresql unbanip <SEU_IP>
+```
+
+Se IP residencial fixo, adiciona em `ignoreip` permanentemente:
+
+```bash
+sudo sed -i 's|^ignoreip = .*|ignoreip = 127.0.0.1/8 172.18.0.0/16 ::1 <SEU_IP>|' \
+  /etc/fail2ban/jail.d/postgresql.local
+sudo systemctl restart fail2ban
 ```
 
 ---
