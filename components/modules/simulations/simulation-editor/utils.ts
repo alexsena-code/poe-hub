@@ -55,9 +55,50 @@ export interface SimulationTotals {
   revenueBrl: number;
   operationalCost: number;
   oneTimeCost: number;
+  /** Build cost in BRL — canonical (divine prices are BRL-quoted in this op). */
+  buildCostBrl: number;
   totalCost: number;
   profit: number;
   roi: number;
+}
+
+/**
+ * Walks every week/day chronologically and accumulates BRL build cost,
+ * locked at the divine BRL price of the day each bot first comes online.
+ * Falls back to USD × exchangeRate when only USD price is set on that day.
+ */
+export function calcBuildCostBrl(
+  simulation: Simulation,
+  exchangeRate: number
+): number {
+  const sortedWeeks = [...simulation.weeks].sort(
+    (a, b) => a.weekNumber - b.weekNumber
+  );
+  let prevBots = 0;
+  let total = 0;
+
+  for (const week of sortedWeeks) {
+    const divines =
+      week.buildCostDivines != null ? Number(week.buildCostDivines) : 0;
+    const sortedDays = [...week.days].sort((a, b) => a.dayNumber - b.dayNumber);
+    for (const day of sortedDays) {
+      const bots = resolveField(day, "activeBots", week) ?? 0;
+      const newBots = Math.max(0, bots - prevBots);
+      prevBots = bots;
+      if (newBots === 0 || divines === 0) continue;
+
+      const priceUsd = resolveField(day, "divinePriceUsd", week);
+      const priceBrl = resolveField(day, "divinePriceBrl", week);
+      let unitBrl = 0;
+      if (priceBrl != null && priceBrl > 0) unitBrl = priceBrl;
+      else if (priceUsd != null && priceUsd > 0 && exchangeRate > 0)
+        unitBrl = priceUsd * exchangeRate;
+      if (unitBrl === 0) continue;
+
+      total += newBots * divines * unitBrl;
+    }
+  }
+  return total;
 }
 
 /** Computes aggregate revenue, cost, profit and ROI from the full simulation. */
@@ -116,7 +157,10 @@ export function calcTotals(
       (Number(costConfig.levelingCostPerBot) + Number(costConfig.stashPackCostPerBot));
   }
 
-  const totalCostWithOneTime = totalCost + oneTimeCost;
+  const buildCostBrl = calcBuildCostBrl(simulation, exchangeRate);
+  const buildCostUsd = exchangeRate > 0 ? buildCostBrl / exchangeRate : 0;
+
+  const totalCostWithOneTime = totalCost + oneTimeCost + buildCostUsd;
   const profit = effectiveRevenueUsd - totalCostWithOneTime;
   const roi = totalCostWithOneTime > 0 ? (profit / totalCostWithOneTime) * 100 : 0;
 
@@ -125,6 +169,7 @@ export function calcTotals(
     revenueBrl: totalRevenueBrl,
     operationalCost: totalCost,
     oneTimeCost,
+    buildCostBrl,
     totalCost: totalCostWithOneTime,
     profit,
     roi,

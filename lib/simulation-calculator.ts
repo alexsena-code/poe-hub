@@ -80,6 +80,8 @@ export interface SimulationCalculation {
   totalRevenueUsd: number | null;
   totalRevenueBrl: number | null;
   totalCostUsd: number;
+  /** Build cost in BRL — canonical because divine prices are typically BRL-quoted. */
+  buildCostBrl: number;
   totalProfitUsd: number | null;
   roi: number | null;
   breakEvenWeek: number | null;
@@ -202,34 +204,47 @@ export function calculateWeek(
 }
 
 /**
- * Computes the build cost (in USD) charged once per bot when it comes online.
+ * Computes the build cost (in BRL), locked in at the moment each bot first
+ * comes online: cost = newBotsOnDay × week.buildCostDivines × dayPriceBrl.
  *
- * - Week 1: all `defaultActiveBots` are considered "new" (initial build).
- * - Week N > 1: only `max(0, bots[N] - bots[N-1])` pay the week-N build cost.
- * - Amount in USD = newBots * week.buildCostDivines * priceUsd(week).
- *   If USD price is missing, falls back to BRL/exchangeRate if provided; otherwise 0.
+ * BRL is canonical — divine prices in this operation are quoted in BRL and
+ * the divine is dollar-pegged in-game, so locking BRL on the day of build
+ * mirrors the operator's actual spend. Falls back to USD × exchangeRate
+ * when only the USD price is set on that day. Once paid, the per-bot R$
+ * cost is fixed — subsequent FX swings don't retroactively change it.
+ *
+ * A "new bot" is detected when resolved active-bots on day D > day D-1.
  */
-export function calculateBuildCostUsd(
-  weeks: RawWeek[],
+export function calculateBuildCostBrl(
+  weeks: { week: RawWeek; days: RawDay[] }[],
   exchangeRate?: number
 ): number {
-  const sorted = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  const sorted = [...weeks].sort((a, b) => a.week.weekNumber - b.week.weekNumber);
   let total = 0;
   let prevBots = 0;
-  for (const w of sorted) {
-    const currentBots = w.defaultActiveBots;
-    const newBots = Math.max(0, currentBots - prevBots);
-    prevBots = currentBots;
-    const divines = toNum(w.buildCostDivines) ?? 0;
-    if (newBots === 0 || divines === 0) continue;
-    const priceUsd = toNum(w.defaultDivinePriceUsd);
-    const priceBrl = toNum(w.defaultDivinePriceBrl);
-    let unitUsd = 0;
-    if (priceUsd != null) unitUsd = priceUsd;
-    else if (priceBrl != null && exchangeRate && exchangeRate > 0)
-      unitUsd = priceBrl / exchangeRate;
-    if (unitUsd === 0) continue;
-    total += newBots * divines * unitUsd;
+
+  for (const { week, days } of sorted) {
+    const divines = toNum(week.buildCostDivines) ?? 0;
+    const sortedDays = [...days].sort((a, b) => a.dayNumber - b.dayNumber);
+    for (const day of sortedDays) {
+      const resolved = resolveDay(day, week);
+      const newBots = Math.max(0, resolved.activeBots - prevBots);
+      prevBots = resolved.activeBots;
+
+      if (newBots === 0 || divines === 0) continue;
+
+      let unitBrl = 0;
+      if (resolved.divinePriceBrl != null) unitBrl = resolved.divinePriceBrl;
+      else if (
+        resolved.divinePriceUsd != null &&
+        exchangeRate &&
+        exchangeRate > 0
+      )
+        unitBrl = resolved.divinePriceUsd * exchangeRate;
+
+      if (unitBrl === 0) continue;
+      total += newBots * divines * unitBrl;
+    }
   }
   return total;
 }
@@ -286,10 +301,9 @@ export function calculateSimulation(
         })()
       : 0;
 
-  const buildCostUsd = calculateBuildCostUsd(
-    weeks.map((w) => w.week),
-    exchangeRate
-  );
+  const buildCostBrl = calculateBuildCostBrl(weeks, exchangeRate);
+  const buildCostUsd =
+    exchangeRate && exchangeRate > 0 ? buildCostBrl / exchangeRate : 0;
 
   const totalCostUsd = operationalCostUsd + levelingCostUsd + buildCostUsd;
 
@@ -320,6 +334,7 @@ export function calculateSimulation(
     totalRevenueUsd,
     totalRevenueBrl,
     totalCostUsd,
+    buildCostBrl,
     totalProfitUsd,
     roi,
     breakEvenWeek,

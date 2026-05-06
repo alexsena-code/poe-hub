@@ -60,6 +60,44 @@ export function customOneTime(
   return sum;
 }
 
+/**
+ * Walks the simulation day-by-day chronologically and accumulates BRL build
+ * cost locked at the divine BRL price on the day each bot first appears.
+ *
+ *   onDay D: newBots = max(0, resolvedBots(D) - resolvedBots(D-1))
+ *           cost += newBots × week.buildCostDivines × resolvedPriceBrl(D)
+ *
+ * Falls back to USD × exchangeRate when only USD price is available.
+ */
+export function calcBuildCostBrl(sim: Simulation, exchangeRate: number): number {
+  const sortedWeeks = [...sim.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+  let prevBots = 0;
+  let total = 0;
+
+  for (const week of sortedWeeks) {
+    const divines =
+      week.buildCostDivines != null ? Number(week.buildCostDivines) : 0;
+    const sortedDays = [...week.days].sort((a, b) => a.dayNumber - b.dayNumber);
+    for (const day of sortedDays) {
+      const bots = resolveField(day, "activeBots", week) ?? 0;
+      const newBots = Math.max(0, bots - prevBots);
+      prevBots = bots;
+      if (newBots === 0 || divines === 0) continue;
+
+      const priceUsd = resolveField(day, "divinePriceUsd", week);
+      const priceBrl = resolveField(day, "divinePriceBrl", week);
+      let unitBrl = 0;
+      if (priceBrl != null && priceBrl > 0) unitBrl = priceBrl;
+      else if (priceUsd != null && priceUsd > 0 && exchangeRate > 0)
+        unitBrl = priceUsd * exchangeRate;
+      if (unitBrl === 0) continue;
+
+      total += newBots * divines * unitBrl;
+    }
+  }
+  return total;
+}
+
 /** Aggregates all weeks/days of a simulation into a single SimTotals object. */
 export function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals {
   let totalRevenueUsd = 0;
@@ -122,22 +160,11 @@ export function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals 
   }
   oneTimeCost += customOneTime(sim.customCosts, maxBots);
 
-  // Build cost: newBotsW × buildDivinesW × priceW (USD, falls back to BRL÷exch)
-  const sortedWeeks = [...sim.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
-  let prevBotsBuild = 0;
-  for (const w of sortedWeeks) {
-    const currentBots = Number(w.defaultActiveBots);
-    const newBots = Math.max(0, currentBots - prevBotsBuild);
-    prevBotsBuild = currentBots;
-    const divines = w.buildCostDivines != null ? Number(w.buildCostDivines) : 0;
-    if (newBots === 0 || divines === 0) continue;
-    const priceUsd = w.defaultDivinePriceUsd != null ? Number(w.defaultDivinePriceUsd) : null;
-    const priceBrl = w.defaultDivinePriceBrl != null ? Number(w.defaultDivinePriceBrl) : null;
-    let unitUsd = 0;
-    if (priceUsd != null) unitUsd = priceUsd;
-    else if (priceBrl != null && exchangeRate > 0) unitUsd = priceBrl / exchangeRate;
-    oneTimeCost += newBots * divines * unitUsd;
-  }
+  // Build cost in BRL, locked at day each bot first comes online.
+  // Convert to USD for inclusion in the USD-canonical totalCost aggregate.
+  const buildCostBrl = calcBuildCostBrl(sim, exchangeRate);
+  const buildCostUsd = exchangeRate > 0 ? buildCostBrl / exchangeRate : 0;
+  oneTimeCost += buildCostUsd;
 
   const totalCost = totalOperationalCost + oneTimeCost;
   const profit = effectiveRevenueUsd - totalCost;
@@ -147,6 +174,7 @@ export function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals 
     revenueUsd: effectiveRevenueUsd,
     operationalCost: totalOperationalCost,
     oneTimeCost,
+    buildCostBrl,
     totalCost,
     profit,
     roi,

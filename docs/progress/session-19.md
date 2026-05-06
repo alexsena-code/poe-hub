@@ -1,0 +1,77 @@
+# Session 19 — Simulations: progressão automática de bots + build cost BRL canônico
+
+Tema: dois ajustes no módulo de simulações pedidos pelo operador — (1)
+um botão pra preencher `activeBots` em todos os dias seguindo uma rampa
+linear até o teto, e (2) refatoração do cálculo de build cost pra travar
+o valor em BRL no dia em que cada bot entra em operação, em vez de usar
+o preço da divine da semana.
+
+## Progressão automática de bots
+
+Novo endpoint `POST /api/simulations/[id]/bot-progression` recebe
+`{ maxBots, incrementPerDay, startBots?, startDay? }`, itera todo dia
+em ordem cronológica e grava `activeBots = min(startBots + i ×
+incrementPerDay, maxBots)` como override em cada `SimulationDay`. Tudo
+em uma única `prisma.$transaction()` pra evitar estado parcial.
+
+`startDay` default = `simulation.startDayOffset + 1` (pula os dias
+travados pelo offset). `startBots` default = 1.
+
+UI nova em `components/modules/simulations/bot-progression-dialog.tsx`
+— botão "Progressão Auto" no `SimulationHeader` (ao lado do Importar
+Preços e do CostConfigSelector), formulário com 4 campos numéricos e
+preview em tempo real ("dias afetados", "atinge máximo no dia X", "Y
+dias de rampa"). Após submeter, dispara `fetchSimulation()` pra
+recarregar.
+
+Schema zod novo: `botProgressionSchema` em
+`lib/validations/simulation.ts`, com `.refine()` exigindo `startBots ≤
+maxBots`.
+
+## Build cost: BRL canônico, travado no dia do bot
+
+Antes: `buildCostDivines` por semana × `defaultDivinePriceUsd(semana)`,
+com fallback BRL/exchange. Acumulava em USD na hora do agregado.
+
+Agora: itera dia-a-dia. Pra cada dia D, `newBots = max(0,
+resolvedBots(D) - resolvedBots(D-1))`, custo `= newBots ×
+week.buildCostDivines × dayPriceBrl(D)`. Fallback `priceUsd ×
+exchangeRate` quando só USD está setado. O total fica em BRL canônico
+(divine é dolar-pegado in-game; travar em BRL no dia do build espelha o
+gasto real do operador).
+
+Aplicado em 4 lugares:
+
+- `lib/simulation-calculator.ts` — `calculateBuildCostUsd` →
+  `calculateBuildCostBrl`. `SimulationCalculation` ganha campo
+  `buildCostBrl`.
+- `app/api/simulations/[id]/route.ts` — resposta expõe
+  `calculated.buildCostBrl`.
+- `components/modules/simulations/simulation-editor/utils.ts` — nova
+  `calcBuildCostBrl` + `SimulationTotals.buildCostBrl`. Antes o editor
+  nem somava build cost no `totalCost`; agora soma (convertido pra USD
+  via exchangeRate, pra manter o agregado USD consistente).
+- `components/modules/simulations/simulation-editor/simulation-cost-breakdown.tsx`
+  — linha "Build (divines)" usa `formatMoney(totals.buildCostBrl,
+  "brl")` em vez de `"usd"`, então respeita o toggle BRL/USD do
+  `currency-provider` automaticamente.
+- `components/modules/simulations/simulation-comparison/{types,helpers}.ts`
+  — `SimTotals.buildCostBrl` + `calcBuildCostBrl`.
+- `lib/annual-plan-calculator.ts` — loop de build per-day, calcula em
+  BRL, converte pro agregado USD da liga.
+
+## Validação
+
+- `npx tsc --noEmit` — sem erros novos nos arquivos tocados (apenas
+  pre-existentes em annual page, benchmark forms, editor tests).
+- `npx vitest run lib/simulation-calculator` — 45/45 passando.
+
+## O que ficou pra depois
+
+- Testes de unidade pra `calcBuildCostBrl` cobrindo: rampa diária com
+  preços diferentes por dia, fallback USD→BRL, dia sem preço, semana
+  sem `buildCostDivines`.
+- Teste de integração pro endpoint `bot-progression` (precisa do
+  `potc_test` DB rodando).
+- O scraper Discord segue manual — infra do `docker compose up -d
+  scraper` existe mas o serviço nunca foi iniciado nesta máquina.

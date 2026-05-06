@@ -75,6 +75,26 @@ export const updateDaySchema = z.object({
 });
 
 // ============================================================
+// Bot progression — write activeBots overrides across all days
+// ramping from startBots up to maxBots at +incrementPerDay/day.
+// ============================================================
+
+export const botProgressionSchema = z
+  .object({
+    maxBots: z.number().int().min(1, "Mínimo 1 bot"),
+    incrementPerDay: z.number().int().min(1, "Aumento mínimo de 1 bot/dia"),
+    startBots: z.number().int().min(0).optional().default(1),
+    // 1-based global day index. Defaults to simulation.startDayOffset + 1 server-side.
+    startDay: z.number().int().min(1).optional(),
+  })
+  .refine((d) => d.startBots === undefined || d.startBots <= d.maxBots, {
+    message: "Bots iniciais não podem exceder o máximo",
+    path: ["startBots"],
+  });
+
+export type BotProgressionInput = z.infer<typeof botProgressionSchema>;
+
+// ============================================================
 // GlobalCostConfig
 // ============================================================
 

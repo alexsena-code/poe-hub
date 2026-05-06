@@ -46,6 +46,8 @@ export interface SimTotals {
   revenueUsd: number;
   operationalCost: number;
   oneTimeCost: number;
+  /** Build cost in BRL — canonical, locked at day-of-build divine BRL price. */
+  buildCostBrl: number;
   totalCost: number;
   profit: number;
   roi: number;

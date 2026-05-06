@@ -121,22 +121,30 @@ export function calcSimulationLeagueTotals(
     oneTimeCost += cc.perBot ? cc.amount * maxBots : cc.amount;
   }
 
-  // Build cost per league: new bots × weekly buildDivines × weekly USD price
+  // Build cost canonical in BRL (divine prices are BRL-quoted; in-game divine
+  // is dollar-pegged so locking BRL on day-of-build mirrors actual spend).
+  // Converted to USD for the league-totals aggregate.
   const sortedWeeks = [...sim.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
   let prevBotsBuild = 0;
   for (const w of sortedWeeks) {
-    const currentBots = w.defaultActiveBots;
-    const newBots = Math.max(0, currentBots - prevBotsBuild);
-    prevBotsBuild = currentBots;
     const divines = toNum(w.buildCostDivines);
-    if (newBots === 0 || divines === 0) continue;
-    const priceUsd = toNum(w.defaultDivinePriceUsd);
-    const priceBrl = toNum(w.defaultDivinePriceBrl);
-    let unitUsd = 0;
-    if (priceUsd > 0) unitUsd = priceUsd;
-    else if (priceBrl > 0 && exchangeRate > 0) unitUsd = priceBrl / exchangeRate;
-    if (unitUsd === 0) continue;
-    oneTimeCost += newBots * divines * unitUsd;
+    const sortedDays = [...w.days].sort((a, b) => a.dayNumber - b.dayNumber);
+    for (const d of sortedDays) {
+      const dayBots = d.activeBots ?? w.defaultActiveBots;
+      const newBots = Math.max(0, dayBots - prevBotsBuild);
+      prevBotsBuild = dayBots;
+      if (newBots === 0 || divines === 0) continue;
+
+      const priceUsd = toNum(d.divinePriceUsd ?? w.defaultDivinePriceUsd);
+      const priceBrl = toNum(d.divinePriceBrl ?? w.defaultDivinePriceBrl);
+      let unitBrl = 0;
+      if (priceBrl > 0) unitBrl = priceBrl;
+      else if (priceUsd > 0 && exchangeRate > 0) unitBrl = priceUsd * exchangeRate;
+      if (unitBrl === 0) continue;
+
+      const costBrl = newBots * divines * unitBrl;
+      oneTimeCost += exchangeRate > 0 ? costBrl / exchangeRate : 0;
+    }
   }
 
   const totalCost = operationalCost + oneTimeCost;

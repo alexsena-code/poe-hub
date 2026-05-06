@@ -124,6 +124,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       totalRevenueUsd: simCalc.totalRevenueUsd,
       totalRevenueBrl: simCalc.totalRevenueBrl,
       totalCostUsd: simCalc.totalCostUsd,
+      buildCostBrl: simCalc.buildCostBrl,
       totalProfitUsd: simCalc.totalProfitUsd,
       roi: simCalc.roi,
       breakEvenWeek: simCalc.breakEvenWeek,

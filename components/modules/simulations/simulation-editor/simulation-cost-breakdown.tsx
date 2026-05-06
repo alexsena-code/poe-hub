@@ -114,6 +114,23 @@ export function SimulationCostBreakdown({
             </div>
           )}
 
+          {totals.buildCostBrl > 0 && (
+            <div className="flex items-center justify-between py-1 border-b border-border/50 text-muted-foreground">
+              <span>
+                Build (divines){" "}
+                <span
+                  className="text-xs ml-1"
+                  title="Custo de divines para montar cada bot novo, travado em BRL pelo preço da divine no dia em que o bot entrou em operação. Conversão para USD usa a cotação atual."
+                >
+                  fixado por bot
+                </span>
+              </span>
+              <span className="font-mono tabular-nums w-28 text-right">
+                {formatMoney(totals.buildCostBrl, "brl")}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between py-1 font-medium">
             <span>Total</span>
             <span className="font-mono tabular-nums w-28 text-right">

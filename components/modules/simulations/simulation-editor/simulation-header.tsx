@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { ImportPricesDialog } from "../import-prices-dialog";
 import { CostConfigSelector } from "../cost-config-selector";
+import { BotProgressionDialog } from "../bot-progression-dialog";
 import {
   STATUS_LABELS,
   STATUS_VARIANTS,
@@ -199,6 +200,12 @@ export function SimulationHeader({
       </div>
 
       <div className="flex gap-2">
+        <BotProgressionDialog
+          simulationId={simulationId}
+          durationWeeks={simulation.durationWeeks}
+          startDayOffset={simulation.startDayOffset ?? 0}
+          onApplied={onImported}
+        />
         <ImportPricesDialog simulationId={simulationId} onImported={onImported} />
         <CostConfigSelector
           simulationId={simulationId}
