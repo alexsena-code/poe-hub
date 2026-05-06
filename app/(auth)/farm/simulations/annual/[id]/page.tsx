@@ -25,8 +25,11 @@ export default function AnnualPlanDetailPage({
 
   const rollup = useMemo(() => {
     if (!state.plan) return null;
-    const sims = state.plan.simulationLinks.map((l) => l.simulation);
-    return computeAnnualRollup(sims, state.plan.annualCustomCosts, exchangeRate);
+    const inputs = state.plan.simulationLinks.map((l) => ({
+      snapshot: l.simulation,
+      repeatCount: l.repeatCount,
+    }));
+    return computeAnnualRollup(inputs, state.plan.annualCustomCosts, exchangeRate);
   }, [state.plan, exchangeRate]);
 
   if (state.loading) {
@@ -72,6 +75,7 @@ export default function AnnualPlanDetailPage({
         leagues={rollup?.leagues ?? []}
         onAddLeague={() => state.setPickerOpen(true)}
         onUnlink={state.unlinkSimulation}
+        onUpdateRepeat={state.updateRepeatCount}
         formatMoney={formatMoney}
       />
 

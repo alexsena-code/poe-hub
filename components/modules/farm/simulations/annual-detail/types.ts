@@ -14,6 +14,7 @@ export interface PlanResponse {
   simulationLinks: {
     position: number;
     simulationId: string;
+    repeatCount: number;
     simulation: SimulationSnapshot;
   }[];
 }

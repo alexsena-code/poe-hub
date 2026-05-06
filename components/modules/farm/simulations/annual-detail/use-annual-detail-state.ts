@@ -20,6 +20,7 @@ export interface AnnualDetailState {
   removeFixedCost: (costId: string) => void;
   linkSimulation: (simId: string) => void;
   unlinkSimulation: (simId: string) => void;
+  updateRepeatCount: (simId: string, repeatCount: number) => void;
   save: () => Promise<void>;
 }
 
@@ -42,7 +43,7 @@ function buildPartialSnapshot(sim: SimulationListItem, position: number): PlanRe
     customCosts: null,
     weeks: [],
   };
-  return { position, simulationId: sim.id, simulation: snapshot };
+  return { position, simulationId: sim.id, repeatCount: 1, simulation: snapshot };
 }
 
 /** Hook that owns all fetch/save/optimistic state for the annual plan detail page. */
@@ -143,6 +144,18 @@ export function useAnnualDetailState(id: string): AnnualDetailState {
     setDirty(true);
   }
 
+  function updateRepeatCount(simId: string, repeatCount: number) {
+    if (!plan) return;
+    const n = Math.max(1, Math.floor(repeatCount));
+    setPlan({
+      ...plan,
+      simulationLinks: plan.simulationLinks.map((l) =>
+        l.simulationId === simId ? { ...l, repeatCount: n } : l
+      ),
+    });
+    setDirty(true);
+  }
+
   async function save() {
     if (!plan) return;
     setSaving(true);
@@ -155,7 +168,10 @@ export function useAnnualDetailState(id: string): AnnualDetailState {
           year: plan.year,
           notes: plan.notes,
           annualCustomCosts: plan.annualCustomCosts ?? [],
-          simulationIds: plan.simulationLinks.map((l) => l.simulationId),
+          simulationLinks: plan.simulationLinks.map((l) => ({
+            simulationId: l.simulationId,
+            repeatCount: l.repeatCount,
+          })),
         }),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
@@ -186,6 +202,7 @@ export function useAnnualDetailState(id: string): AnnualDetailState {
     removeFixedCost,
     linkSimulation,
     unlinkSimulation,
+    updateRepeatCount,
     save,
   };
 }

@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -20,10 +21,17 @@ interface LeaguesTableProps {
   leagues: SimulationLeagueTotals[];
   onAddLeague: () => void;
   onUnlink: (simId: string) => void;
+  onUpdateRepeat: (simId: string, repeatCount: number) => void;
   formatMoney: (v: number, currency: string) => string;
 }
 
-export function LeaguesTable({ leagues, onAddLeague, onUnlink, formatMoney }: LeaguesTableProps) {
+export function LeaguesTable({
+  leagues,
+  onAddLeague,
+  onUnlink,
+  onUpdateRepeat,
+  formatMoney,
+}: LeaguesTableProps) {
   const fmt = (v: number) => formatMoney(v, "usd");
 
   return (
@@ -55,6 +63,7 @@ export function LeaguesTable({ leagues, onAddLeague, onUnlink, formatMoney }: Le
                   <TableHead>Liga</TableHead>
                   <TableHead className="text-center">Kind</TableHead>
                   <TableHead className="text-center">Semanas</TableHead>
+                  <TableHead className="text-center w-28">Repetições</TableHead>
                   <TableHead className="text-right">Receita</TableHead>
                   <TableHead className="text-right">Custo op.</TableHead>
                   <TableHead className="text-right">Custo único</TableHead>
@@ -67,12 +76,19 @@ export function LeaguesTable({ leagues, onAddLeague, onUnlink, formatMoney }: Le
                 {leagues.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell>
-                      <Link
-                        href={`/farm/simulations/${l.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {l.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/farm/simulations/${l.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {l.name}
+                        </Link>
+                        {l.repeatCount > 1 && (
+                          <Badge variant="secondary" className="text-xs font-mono">
+                            × {l.repeatCount}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{l.league}</TableCell>
                     <TableCell className="text-center">
@@ -85,6 +101,18 @@ export function LeaguesTable({ leagues, onAddLeague, onUnlink, formatMoney }: Le
                     </TableCell>
                     <TableCell className="text-center font-mono text-sm">
                       {l.durationWeeks}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={l.repeatCount}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          if (Number.isFinite(n) && n >= 1) onUpdateRepeat(l.id, n);
+                        }}
+                        className="h-8 w-20 mx-auto text-center font-mono"
+                      />
                     </TableCell>
                     <TableCell className="text-right font-mono tabular-nums text-sm">
                       {fmt(l.revenue)}

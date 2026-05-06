@@ -74,16 +74,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.notes !== undefined) updateData.notes = data.notes ?? null;
 
   // Handle simulation links: replace-all semantics if provided
-  if (data.simulationIds !== undefined) {
+  if (data.simulationLinks !== undefined) {
     await prisma.$transaction([
       prisma.annualPlanSimulation.deleteMany({ where: { annualPlanId: id } }),
-      ...(data.simulationIds.length > 0
+      ...(data.simulationLinks.length > 0
         ? [
             prisma.annualPlanSimulation.createMany({
-              data: data.simulationIds.map((simulationId, index) => ({
+              data: data.simulationLinks.map((link, index) => ({
                 annualPlanId: id,
-                simulationId,
+                simulationId: link.simulationId,
                 position: index,
+                repeatCount: link.repeatCount ?? 1,
               })),
             }),
           ]

@@ -120,12 +120,17 @@ export const updateCostConfigSchema = createCostConfigSchema.partial();
 // AnnualPlan
 // ============================================================
 
+export const annualPlanSimulationLinkSchema = z.object({
+  simulationId: z.string().uuid(),
+  repeatCount: z.number().int().min(1).optional().default(1),
+});
+
 export const createAnnualPlanSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   year: z.number().int().min(2000).max(2100),
   annualCustomCosts: z.array(customCostSchema).optional(),
   notes: z.string().nullable().optional(),
-  simulationIds: z.array(z.string().uuid()).optional(),
+  simulationLinks: z.array(annualPlanSimulationLinkSchema).optional(),
 });
 
 export const updateAnnualPlanSchema = z.object({
@@ -133,7 +138,7 @@ export const updateAnnualPlanSchema = z.object({
   year: z.number().int().min(2000).max(2100).optional(),
   annualCustomCosts: z.array(customCostSchema).nullable().optional(),
   notes: z.string().nullable().optional(),
-  simulationIds: z.array(z.string().uuid()).optional(),
+  simulationLinks: z.array(annualPlanSimulationLinkSchema).optional(),
 });
 
 export type CreateAnnualPlanInput = z.infer<typeof createAnnualPlanSchema>;

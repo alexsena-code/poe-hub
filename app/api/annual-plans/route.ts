@@ -44,11 +44,12 @@ export async function POST(request: NextRequest) {
       year: data.year,
       annualCustomCosts: data.annualCustomCosts ?? [],
       notes: data.notes ?? null,
-      simulationLinks: data.simulationIds
+      simulationLinks: data.simulationLinks
         ? {
-            create: data.simulationIds.map((simulationId, index) => ({
-              simulationId,
+            create: data.simulationLinks.map((link, index) => ({
+              simulationId: link.simulationId,
               position: index,
+              repeatCount: link.repeatCount ?? 1,
             })),
           }
         : undefined,

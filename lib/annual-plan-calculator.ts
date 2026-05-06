@@ -46,12 +46,22 @@ export interface SimulationLeagueTotals {
   league: string;
   kind: "operational" | "forecast";
   durationWeeks: number;
+  // Number of times this league runs in the year. Already applied to
+  // revenue/operationalCost/oneTimeCost/totalCost/profit below — UI does
+  // not need to multiply again. ROI is invariant under N (numerator and
+  // denominator scale together).
+  repeatCount: number;
   revenue: number;
   operationalCost: number;
   oneTimeCost: number;
   totalCost: number;
   profit: number;
   roi: number;
+}
+
+export interface AnnualLeagueInput {
+  snapshot: SimulationSnapshot;
+  repeatCount: number;
 }
 
 /**
@@ -171,6 +181,7 @@ export function calcSimulationLeagueTotals(
     league: sim.league,
     kind: sim.kind,
     durationWeeks: sim.durationWeeks,
+    repeatCount: 1,
     revenue: effectiveRevenue,
     operationalCost,
     oneTimeCost,
@@ -200,11 +211,24 @@ export interface AnnualRollup {
 }
 
 export function computeAnnualRollup(
-  sims: SimulationSnapshot[],
+  inputs: AnnualLeagueInput[],
   annualCustomCosts: CustomCostEntry[] | null | undefined,
   exchangeRate: number
 ): AnnualRollup {
-  const leagues = sims.map((s) => calcSimulationLeagueTotals(s, exchangeRate));
+  const leagues = inputs.map(({ snapshot, repeatCount }) => {
+    const base = calcSimulationLeagueTotals(snapshot, exchangeRate);
+    const n = Math.max(1, repeatCount);
+    return {
+      ...base,
+      repeatCount: n,
+      revenue: base.revenue * n,
+      operationalCost: base.operationalCost * n,
+      oneTimeCost: base.oneTimeCost * n,
+      totalCost: base.totalCost * n,
+      profit: base.profit * n,
+      // roi unchanged — ratio is invariant under uniform scaling
+    };
+  });
   const leagueRevenue = leagues.reduce((s, l) => s + l.revenue, 0);
   const leagueOperationalCost = leagues.reduce((s, l) => s + l.operationalCost, 0);
   const leagueOneTimeCost = leagues.reduce((s, l) => s + l.oneTimeCost, 0);

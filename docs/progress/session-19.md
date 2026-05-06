@@ -205,6 +205,41 @@ gap interno, before-first, single-row, decay custom, validação de
 decayPerDay). Suite pura passando 92/92 (extrapolation + simulation-calculator
 + simulation-diff + crypto).
 
+## Repetições de liga no plano anual (chunk 7)
+
+Operador queria simular um faturamento anual onde a mesma liga roda
+N vezes (ex: PoE league típica de 13 semanas × 4 = ano inteiro) sem
+precisar criar 4 simulações duplicadas. Solução minimalista: 1 campo
+numérico por liga que multiplica os totais.
+
+**Schema**: novo `repeatCount Int @default(1)` em `AnnualPlanSimulation`.
+Migration `20260506110653_annual_plan_simulation_repeat_count`. Não
+mexe na PK composta `(annualPlanId, simulationId)` — apenas adiciona
+coluna.
+
+**Validations**: `simulationIds: string[]` virou `simulationLinks:
+[{ simulationId, repeatCount }]` no `createAnnualPlanSchema` e
+`updateAnnualPlanSchema` (`lib/validations/simulation.ts`). Novo
+`annualPlanSimulationLinkSchema` exportado.
+
+**API**: POST `/api/annual-plans` e PUT `/api/annual-plans/[id]`
+adaptados pra persistir `repeatCount` no `createMany`.
+
+**Calculator**: `computeAnnualRollup` agora recebe `AnnualLeagueInput[]`
+(`{ snapshot, repeatCount }`) em vez de `SimulationSnapshot[]`. Multiplica
+`revenue`, `operationalCost`, `oneTimeCost`, `totalCost` e `profit` por
+N. ROI invariante (numerador e denominador escalam juntos). Custo único
+multiplicado é o comportamento correto: cada repetição é liga nova com
+characters/atlas resetados, então leveling/build cost recorrem.
+
+**UI**: `leagues-table.tsx` ganhou coluna "Repetições" com `<Input
+type=number min=1>` controlado, badge `× N` ao lado do nome quando
+N > 1. Hook `useAnnualDetailState` ganhou `updateRepeatCount(simId, n)`.
+PUT do save envia `simulationLinks: [{simulationId, repeatCount}]`.
+
+Validação: tsc filtrado nos arquivos tocados sem erros novos. Migration
+aplicada com sucesso no DB de dev.
+
 ## O que ficou pra depois
 
 - Testes de unidade pra `calcBuildCostBrl` cobrindo: rampa diária com

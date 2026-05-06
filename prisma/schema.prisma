@@ -305,6 +305,9 @@ model AnnualPlanSimulation {
   annualPlanId String @map("annual_plan_id")
   simulationId String @map("simulation_id")
   position     Int    @default(0)
+  // How many times this league runs in the year. Multiplies revenue and
+  // costs (each repetition is a fresh league: characters/atlas reset).
+  repeatCount  Int    @default(1) @map("repeat_count")
 
   annualPlan AnnualPlan @relation(fields: [annualPlanId], references: [id], onDelete: Cascade)
   simulation Simulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
