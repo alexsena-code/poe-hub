@@ -38,6 +38,8 @@ export interface Simulation {
   stashPackCostPerBot: number | null;
   expluginsKeyCostDaily: number | null;
   dpbKeyCostDaily: number | null;
+  expluginsDiscountStartDay: number | null;
+  expluginsDiscountPercent: number | null;
   customCosts: CustomCost[] | null;
   weeks: SimulationWeek[];
 }

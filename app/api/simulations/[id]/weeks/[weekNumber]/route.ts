@@ -80,7 +80,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
     overrideNotes: d.overrideNotes,
   }));
 
-  const weekCalc = calculateWeek(rawWeek, rawDays, costConfig);
+  const simOpts = {
+    expluginsDiscountStartDay: week.simulation.expluginsDiscountStartDay,
+    expluginsDiscountPercent:
+      week.simulation.expluginsDiscountPercent !== null
+        ? Number(week.simulation.expluginsDiscountPercent)
+        : null,
+  };
+  const weekCalc = calculateWeek(rawWeek, rawDays, costConfig, simOpts);
 
   // Remove nested simulation from response
   const { simulation: _sim, ...weekData } = week;

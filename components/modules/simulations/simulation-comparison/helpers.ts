@@ -111,12 +111,13 @@ export function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals 
     sim.expluginsKeyCostDaily != null &&
     sim.dpbKeyCostDaily != null;
 
-  const expluginsDaily = hasCost ? Number(sim.expluginsKeyCostDaily) : 0;
+  const baseExplugins = hasCost ? Number(sim.expluginsKeyCostDaily) : 0;
   const dpbDaily = hasCost ? Number(sim.dpbKeyCostDaily) : 0;
   const proxyDaily = hasCost ? Number(sim.proxyCostPerBotMonthly) / 30 : 0;
   const customPerBot = customPerBotDaily(sim.customCosts);
   const customGlobal = customGlobalDaily(sim.customCosts);
-  const costPerBotDaily = expluginsDaily + dpbDaily + proxyDaily + customPerBot;
+  const discountStartDay = sim.expluginsDiscountStartDay;
+  const discountPercent = sim.expluginsDiscountPercent ?? 50;
 
   for (const week of sim.weeks) {
     for (const day of week.days) {
@@ -137,7 +138,13 @@ export function calcSimTotals(sim: Simulation, exchangeRate: number): SimTotals 
 
       const activeBots = resolveField(day, "activeBots", week) ?? 0;
       if (hasCost) {
-        totalOperationalCost += activeBots * costPerBotDaily;
+        const globalDay1 = globalDayIndex + 1;
+        const effExplugins =
+          discountStartDay != null && globalDay1 >= discountStartDay
+            ? baseExplugins * (1 - discountPercent / 100)
+            : baseExplugins;
+        const cpb = effExplugins + dpbDaily + proxyDaily + customPerBot;
+        totalOperationalCost += activeBots * cpb;
       }
       // Global daily customs run every day that's not offset-locked
       totalOperationalCost += customGlobal;
@@ -190,12 +197,13 @@ export function calcWeekTotals(sim: Simulation, exchangeRate: number): WeekTotal
     sim.expluginsKeyCostDaily != null &&
     sim.dpbKeyCostDaily != null;
 
-  const expluginsDaily = hasCost ? Number(sim.expluginsKeyCostDaily) : 0;
+  const baseExplugins = hasCost ? Number(sim.expluginsKeyCostDaily) : 0;
   const dpbDaily = hasCost ? Number(sim.dpbKeyCostDaily) : 0;
   const proxyDaily = hasCost ? Number(sim.proxyCostPerBotMonthly) / 30 : 0;
   const customPerBot = customPerBotDaily(sim.customCosts);
   const customGlobal = customGlobalDaily(sim.customCosts);
-  const costPerBotDaily = expluginsDaily + dpbDaily + proxyDaily + customPerBot;
+  const discountStartDay = sim.expluginsDiscountStartDay;
+  const discountPercent = sim.expluginsDiscountPercent ?? 50;
 
   return [...sim.weeks]
     .sort((a, b) => a.weekNumber - b.weekNumber)
@@ -222,7 +230,13 @@ export function calcWeekTotals(sim: Simulation, exchangeRate: number): WeekTotal
 
         const activeBots = resolveField(day, "activeBots", week) ?? 0;
         if (hasCost) {
-          weekCost += activeBots * costPerBotDaily;
+          const globalDay1 = globalDayIndex + 1;
+          const effExplugins =
+            discountStartDay != null && globalDay1 >= discountStartDay
+              ? baseExplugins * (1 - discountPercent / 100)
+              : baseExplugins;
+          const cpb = effExplugins + dpbDaily + proxyDaily + customPerBot;
+          weekCost += activeBots * cpb;
         }
         weekCost += customGlobal;
       }

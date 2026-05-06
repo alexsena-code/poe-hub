@@ -129,6 +129,28 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
     }
   }
 
+  // --- Explugins discount change ---
+  // Optimistic + immediate save. The patch shape mirrors the API contract:
+  // null startDay disables the discount; null percent falls back to 50.
+  async function changeDiscount(patch: {
+    expluginsDiscountStartDay?: number | null;
+    expluginsDiscountPercent?: number | null;
+  }) {
+    if (!simulation) return;
+    setSimulation({ ...simulation, ...patch });
+    try {
+      const res = await fetch(`/api/simulations/${simulationId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch {
+      toast.error("Erro ao salvar desconto Explugins");
+      fetchSimulation();
+    }
+  }
+
   // --- League change ---
   async function changeLeague(val: string) {
     if (!simulation) return;
@@ -263,6 +285,7 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
             totals={totals}
             weekData={weekData}
             formatMoney={formatMoney}
+            onDiscountChange={changeDiscount}
           />
           <SimulationRevenueChart weekData={weekData} formatMoney={formatMoney} />
         </div>

@@ -46,6 +46,26 @@ export interface CostConfigData {
   customCosts?: CustomCostEntry[] | null;
 }
 
+/** Simulation-level options that can shift per-day costs (e.g. explugins discount). */
+export interface SimulationCostOptions {
+  /** 1-based global day from which the discount applies. null disables. */
+  expluginsDiscountStartDay?: number | null;
+  /** Percent off (0-100). Defaults to 50 when startDay is set but this isn't. */
+  expluginsDiscountPercent?: number | null;
+}
+
+/** Returns the effective explugins daily rate for a given 1-based global day. */
+export function effectiveExpluginsRate(
+  baseRate: number,
+  globalDay: number,
+  opts?: SimulationCostOptions | null
+): number {
+  if (!opts || opts.expluginsDiscountStartDay == null) return baseRate;
+  if (globalDay < opts.expluginsDiscountStartDay) return baseRate;
+  const percent = opts.expluginsDiscountPercent ?? 50;
+  return baseRate * (1 - percent / 100);
+}
+
 /** Day with all values resolved (no nulls for core fields) */
 export interface ResolvedDay {
   dayNumber: number;
@@ -136,14 +156,19 @@ export function calculateDay(resolved: ResolvedDay): DayCalculation {
 
 /**
  * Calculates totals for a week including costs.
- * Cost per day = expluginsKeyCostDaily + dpbKeyCostDaily + (activeBots * proxyCostPerBotMonthly)
- * Week cost = sum of per-day costs across all days in the week.
+ * Cost per day = effectiveExpluginsRate(day) + dpbKeyCostDaily + proxyDaily +
+ *                customPerBotDaily, all multiplied by activeBots.
+ * Plus customGlobalDaily added once per day.
  * Leveling cost is a one-time charge at simulation level, not included here.
+ *
+ * `simOpts` carries per-day adjustments — currently the explugins discount,
+ * which scales the explugins component from a configured global day onwards.
  */
 export function calculateWeek(
   week: RawWeek,
   days: RawDay[],
-  costConfig?: CostConfigData | null
+  costConfig?: CostConfigData | null,
+  simOpts?: SimulationCostOptions | null
 ): WeekCalculation {
   const resolvedDays = days.map((d) => resolveDay(d, week));
   const dayCalcs = resolvedDays.map((rd) => calculateDay(rd));
@@ -181,13 +206,17 @@ export function calculateWeek(
       else customGlobalDaily += dailyAmount;
     }
 
-    const costPerBotDaily =
-      expluginsPerBotDaily + dpbPerBotDaily + proxyPerBotDaily + customPerBotDaily;
-
-    costUsd = resolvedDays.reduce(
-      (sum, rd) => sum + rd.activeBots * costPerBotDaily + customGlobalDaily,
-      0
-    );
+    costUsd = resolvedDays.reduce((sum, rd) => {
+      const globalDay = (week.weekNumber - 1) * 7 + rd.dayNumber;
+      const effExplugins = effectiveExpluginsRate(
+        expluginsPerBotDaily,
+        globalDay,
+        simOpts
+      );
+      const cpb =
+        effExplugins + dpbPerBotDaily + proxyPerBotDaily + customPerBotDaily;
+      return sum + rd.activeBots * cpb + customGlobalDaily;
+    }, 0);
   }
 
   const profitUsd = revenueUsd !== null ? revenueUsd - costUsd : null;
@@ -256,10 +285,11 @@ export function calculateBuildCostBrl(
 export function calculateSimulation(
   weeks: { week: RawWeek; days: RawDay[] }[],
   costConfig?: CostConfigData | null,
-  exchangeRate?: number
+  exchangeRate?: number,
+  simOpts?: SimulationCostOptions | null
 ): SimulationCalculation {
   const weekCalcs = weeks.map(({ week, days }) =>
-    calculateWeek(week, days, costConfig)
+    calculateWeek(week, days, costConfig, simOpts)
   );
 
   const totalDivines = weekCalcs.reduce((sum, wc) => sum + wc.totalDivines, 0);

@@ -44,6 +44,10 @@ export const updateSimulationSchema = z.object({
   expluginsKeyCostDaily: z.number().min(0).nullable().optional(),
   dpbKeyCostDaily: z.number().min(0).nullable().optional(),
   customCosts: z.array(customCostSchema).nullable().optional(),
+  // Explugins discount: kicks in at this 1-based global day, scaling daily
+  // explugins cost by (1 - percent/100). null startDay disables it.
+  expluginsDiscountStartDay: z.number().int().min(1).nullable().optional(),
+  expluginsDiscountPercent: z.number().min(0).max(100).nullable().optional(),
 });
 
 // ============================================================

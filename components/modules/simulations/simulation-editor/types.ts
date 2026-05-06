@@ -30,6 +30,10 @@ export interface Simulation {
   stashPackCostPerBot: number | null;
   expluginsKeyCostDaily: number | null;
   dpbKeyCostDaily: number | null;
+  /** 1-based global day from which explugins cost is discounted. null = off. */
+  expluginsDiscountStartDay: number | null;
+  /** Percent off (0-100). Defaults to 50 server-side when startDay is set. */
+  expluginsDiscountPercent: number | null;
   createdAt: string;
   updatedAt: string;
   weeks: SimulationWeek[];

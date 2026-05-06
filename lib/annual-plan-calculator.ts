@@ -12,6 +12,8 @@ export interface SimulationSnapshot {
   stashPackCostPerBot: number | { toNumber(): number } | null;
   expluginsKeyCostDaily: number | { toNumber(): number } | null;
   dpbKeyCostDaily: number | { toNumber(): number } | null;
+  expluginsDiscountStartDay: number | null;
+  expluginsDiscountPercent: number | { toNumber(): number } | null;
   customCosts: CustomCostEntry[] | null;
   weeks: {
     weekNumber: number;
@@ -84,8 +86,14 @@ export function calcSimulationLeagueTotals(
     else customGlobalDaily += d;
   }
 
-  const costPerBotDaily =
-    (hasCost ? proxyMonthly / 30 + expluginsDaily + dpbDaily : 0) + customPerBotDaily;
+  const baseExplugins = hasCost ? expluginsDaily : 0;
+  const fixedDailyOther =
+    (hasCost ? proxyMonthly / 30 + dpbDaily : 0) + customPerBotDaily;
+  const discountStartDay = sim.expluginsDiscountStartDay;
+  const discountPercent =
+    sim.expluginsDiscountPercent != null
+      ? toNum(sim.expluginsDiscountPercent)
+      : 50;
 
   for (const w of sim.weeks) {
     for (const d of w.days) {
@@ -102,7 +110,13 @@ export function calcSimulationLeagueTotals(
       if (priceUsd != null) revenueUsd += divines * toNum(priceUsd);
       else if (priceBrl != null) revenueBrl += divines * toNum(priceBrl);
 
-      operationalCost += bots * costPerBotDaily + customGlobalDaily;
+      const globalDay1 = globalIdx + 1;
+      const effExplugins =
+        discountStartDay != null && globalDay1 >= discountStartDay
+          ? baseExplugins * (1 - discountPercent / 100)
+          : baseExplugins;
+      operationalCost +=
+        bots * (effExplugins + fixedDailyOther) + customGlobalDaily;
     }
   }
 

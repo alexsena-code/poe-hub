@@ -125,6 +125,52 @@ de preços que a Apply não vai persistir.
 Tamanhos finais: scenarios.ts 185L, scenario-tester.tsx 353L,
 scenario-row.tsx 246L.
 
+## Bugfix scenario tester (chunk 4)
+
+`useEffect` com `priceCache` + `fetchingLeagues` no array de deps tinha
+race: cada `setFetchingLeagues` dentro do effect re-disparava o
+cleanup do effect anterior, que setava `cancelled = true`, matando o
+`.then` que populava o `priceCache`. UI ficava em "..." pra sempre.
+
+Fix: tracking de fetch movido pra `useRef` (não dispara re-render).
+Removido o mecanismo `cancelled` (não é necessário com refs). Cache
+agora persiste resultado vazio em caso de erro/sem dados pra evitar
+loop de retry. UI mostra "sem dados" quando a liga retorna 0 rows.
+
+## Desconto Explugins configurável (chunk 5)
+
+Modela o desconto que os devs do Explugins dão a partir de algum dia
+da liga (50% off por padrão) quando o preço da divine cai. Antes não
+tinha como contabilizar.
+
+**Schema**: 2 campos novos no `Simulation`:
+`expluginsDiscountStartDay Int?` (1-based global day, null = off) +
+`expluginsDiscountPercent Decimal? @default(50)`. Migration
+`20260506080127_explugins_discount`.
+
+**Helper**: `effectiveExpluginsRate(baseRate, globalDay, opts)` retorna
+o valor diário do Explugins aplicando o desconto a partir do
+`startDay`. Aplicado em todos os 4 calculadores:
+- `lib/simulation-calculator.ts` — `calculateWeek` aceita `simOpts`
+- `components/modules/simulations/simulation-editor/utils.ts` — `calcTotals`
+  e `buildWeekData` (usado no chart)
+- `components/modules/simulations/simulation-editor/cohorts.ts` —
+  `costPerBotDailyUsd` agora é per-day em vez de pré-computado
+- `components/modules/simulations/simulation-comparison/helpers.ts` —
+  `calcSimTotals` e `calcWeekTotals` recomputam o cpb por dia
+- `lib/annual-plan-calculator.ts` — idem
+
+**UI**: form inline no `SimulationCostBreakdown`, abaixo da linha de
+custo/bot/dia. Switch + input dia + input %, salvamento otimista via
+PUT `/api/simulations/[id]` com fallback de refetch em caso de erro.
+Mostra preview "custo cai pra R$ X" ao lado.
+
+**Validação**: `expluginsDiscountStartDay` (int, nullable) e
+`expluginsDiscountPercent` (number 0-100, nullable) adicionados ao
+`updateSimulationSchema`.
+
+Tests: 45/45 do calculator passando.
+
 ## O que ficou pra depois
 
 - Testes de unidade pra `calcBuildCostBrl` cobrindo: rampa diária com

@@ -37,6 +37,8 @@ function buildPartialSnapshot(sim: SimulationListItem, position: number): PlanRe
     stashPackCostPerBot: null,
     expluginsKeyCostDaily: null,
     dpbKeyCostDaily: null,
+    expluginsDiscountStartDay: null,
+    expluginsDiscountPercent: null,
     customCosts: null,
     weeks: [],
   };

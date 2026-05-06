@@ -6,7 +6,7 @@
 // independently from other cohorts (each cohort owns only its own bots).
 
 import type { CostConfig, Simulation } from "./types";
-import { resolveField } from "./utils";
+import { effectiveExpluginsRate, resolveField } from "./utils";
 
 export interface Cohort {
   /** 1-based global day index when bots came online. */
@@ -89,10 +89,20 @@ function dayPriceBrl(day: FlatDay, exchangeRate: number): number | null {
   return null;
 }
 
-function costPerBotDailyUsd(costConfig: CostConfig | null): number {
+/** Per-day cost-per-bot in USD, accounting for the explugins discount. */
+function costPerBotDailyUsd(
+  costConfig: CostConfig | null,
+  simulation: Simulation,
+  globalDay: number
+): number {
   if (!costConfig) return 0;
+  const effExplugins = effectiveExpluginsRate(
+    Number(costConfig.expluginsKeyCostDaily),
+    globalDay,
+    simulation
+  );
   return (
-    Number(costConfig.expluginsKeyCostDaily) +
+    effExplugins +
     Number(costConfig.dpbKeyCostDaily) +
     Number(costConfig.proxyCostPerBotMonthly) / 30
   );
@@ -120,7 +130,6 @@ export function calcCohorts(
   const activeDays = flat.filter((d) => d.globalDay > offset);
   if (activeDays.length === 0) return [];
 
-  const cpbDaily = costPerBotDailyUsd(costConfig);
   const levelingPerBot = levelingPerBotUsd(costConfig);
 
   const cohorts: Cohort[] = [];
@@ -144,7 +153,8 @@ export function calcCohorts(
         size: newBots,
         activeDays,
         startIndex: i,
-        cpbDaily,
+        costConfig,
+        simulation,
         buildCostBrl,
         buildCostUsd,
         levelingCostUsd,
@@ -161,7 +171,8 @@ interface LifetimeArgs {
   size: number;
   activeDays: FlatDay[];
   startIndex: number;
-  cpbDaily: number;
+  costConfig: CostConfig | null;
+  simulation: Simulation;
   buildCostBrl: number;
   buildCostUsd: number;
   levelingCostUsd: number;
@@ -169,7 +180,8 @@ interface LifetimeArgs {
 }
 
 function computeCohortLifetime(args: LifetimeArgs): Cohort {
-  const { cohortStart, size, activeDays, startIndex, cpbDaily } = args;
+  const { cohortStart, size, activeDays, startIndex, costConfig, simulation } =
+    args;
   const oneTimeUsd = args.buildCostUsd + args.levelingCostUsd;
 
   let divinesProduced = 0;
@@ -188,6 +200,7 @@ function computeCohortLifetime(args: LifetimeArgs): Cohort {
     const dayRevUsd = priceUsd != null ? dayDivines * priceUsd : 0;
     revenueUsd += dayRevUsd;
 
+    const cpbDaily = costPerBotDailyUsd(costConfig, simulation, d.globalDay);
     const dayCostUsd = size * cpbDaily;
     operationalCostUsd += dayCostUsd;
 

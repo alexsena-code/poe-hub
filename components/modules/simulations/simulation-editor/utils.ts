@@ -101,6 +101,18 @@ export function calcBuildCostBrl(
   return total;
 }
 
+/** Returns the effective explugins daily rate for a given 1-based global day. */
+export function effectiveExpluginsRate(
+  baseRate: number,
+  globalDay: number,
+  simulation: Simulation
+): number {
+  const startDay = simulation.expluginsDiscountStartDay;
+  if (startDay == null || globalDay < startDay) return baseRate;
+  const percent = simulation.expluginsDiscountPercent ?? 50;
+  return baseRate * (1 - percent / 100);
+}
+
 /** Computes aggregate revenue, cost, profit and ROI from the full simulation. */
 export function calcTotals(
   simulation: Simulation,
@@ -131,11 +143,15 @@ export function calcTotals(
       }
 
       if (costConfig) {
+        const globalDay1Based = globalDayIndex + 1;
+        const effExplugins = effectiveExpluginsRate(
+          Number(costConfig.expluginsKeyCostDaily),
+          globalDay1Based,
+          simulation
+        );
         const proxyPerBotDaily = Number(costConfig.proxyCostPerBotMonthly) / 30;
         const costPerBotDaily =
-          Number(costConfig.expluginsKeyCostDaily) +
-          Number(costConfig.dpbKeyCostDaily) +
-          proxyPerBotDaily;
+          effExplugins + Number(costConfig.dpbKeyCostDaily) + proxyPerBotDaily;
         totalCost += (bots ?? 0) * costPerBotDaily;
       }
     }
@@ -183,10 +199,9 @@ export function buildWeekData(
   exchangeRate: number
 ) {
   const offset = simulation.startDayOffset ?? 0;
-  const explugins = Number(costConfig.expluginsKeyCostDaily);
+  const baseExplugins = Number(costConfig.expluginsKeyCostDaily);
   const dpb = Number(costConfig.dpbKeyCostDaily);
   const proxyDaily = Number(costConfig.proxyCostPerBotMonthly) / 30;
-  const costPerBotDaily = explugins + dpb + proxyDaily;
 
   const sortedWeeks = [...simulation.weeks].sort(
     (a, b) => a.weekNumber - b.weekNumber
@@ -205,6 +220,13 @@ export function buildWeekData(
 
     for (const day of activeDays) {
       const bots = resolveField(day, "activeBots", week) ?? 0;
+      const globalDay = (week.weekNumber - 1) * 7 + day.dayNumber;
+      const effExplugins = effectiveExpluginsRate(
+        baseExplugins,
+        globalDay,
+        simulation
+      );
+      const costPerBotDaily = effExplugins + dpb + proxyDaily;
       weekCost += bots * costPerBotDaily;
       const dph = resolveField(day, "divinePerHour", week);
       const hours = resolveField(day, "hoursPerDay", week);

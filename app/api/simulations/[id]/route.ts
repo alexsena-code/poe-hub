@@ -54,6 +54,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
       }
     : null;
 
+  const simOpts = {
+    expluginsDiscountStartDay: simulation.expluginsDiscountStartDay,
+    expluginsDiscountPercent:
+      simulation.expluginsDiscountPercent !== null
+        ? Number(simulation.expluginsDiscountPercent)
+        : null,
+  };
+
   // Calculate per-week results
   const weeksWithCalc = simulation.weeks.map((week) => {
     const rawWeek: RawWeek = {
@@ -76,7 +84,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       overrideNotes: d.overrideNotes,
     }));
 
-    const weekCalc = calculateWeek(rawWeek, rawDays, costConfig);
+    const weekCalc = calculateWeek(rawWeek, rawDays, costConfig, simOpts);
 
     return {
       ...week,
@@ -114,7 +122,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     })) as RawDay[],
   }));
 
-  const simCalc = calculateSimulation(weeksForCalc, costConfig);
+  const simCalc = calculateSimulation(weeksForCalc, costConfig, undefined, simOpts);
 
   return NextResponse.json({
     ...simulation,
@@ -171,6 +179,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (data.expluginsKeyCostDaily !== undefined) updateData.expluginsKeyCostDaily = data.expluginsKeyCostDaily;
   if (data.dpbKeyCostDaily !== undefined) updateData.dpbKeyCostDaily = data.dpbKeyCostDaily;
   if (data.customCosts !== undefined) updateData.customCosts = data.customCosts;
+  if (data.expluginsDiscountStartDay !== undefined)
+    updateData.expluginsDiscountStartDay = data.expluginsDiscountStartDay;
+  if (data.expluginsDiscountPercent !== undefined)
+    updateData.expluginsDiscountPercent = data.expluginsDiscountPercent;
 
   // Handle cost config: support both costConfigId (singular) and costConfigIds (array)
   const configId = (body as Record<string, unknown>).costConfigId as string | undefined;

@@ -267,6 +267,12 @@ model Simulation {
   dpbKeyCostDaily         Decimal? @map("sim_dpb_key_cost_daily") @db.Decimal(10, 4)
   customCosts             Json?    @map("sim_custom_costs")
 
+  // Explugins discount: from this 1-based global day onwards, the daily
+  // explugins cost is multiplied by (1 - percent/100). null = no discount.
+  // Models the dev-side discount that kicks in mid-league when divine drops.
+  expluginsDiscountStartDay Int?     @map("explugins_discount_start_day")
+  expluginsDiscountPercent  Decimal? @default(50) @map("explugins_discount_percent") @db.Decimal(5, 2)
+
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
