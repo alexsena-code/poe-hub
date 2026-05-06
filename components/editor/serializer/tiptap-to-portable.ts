@@ -75,6 +75,9 @@ interface TiptapImageNode {
     alt?: string;
     /** Sanity asset _ref — present when image was uploaded to Sanity. */
     "data-sanity-ref"?: string;
+    /** Natural pixel dimensions captured at upload time. */
+    width?: number | null;
+    height?: number | null;
   };
 }
 
@@ -263,6 +266,8 @@ function convertCodeBlock(node: TiptapCodeBlockNode): PortableTextCodeBlock {
 
 function convertImage(node: TiptapImageNode): PortableTextImageBlock {
   const sanityRef = node.attrs["data-sanity-ref"] ?? "";
+  const width = typeof node.attrs.width === "number" && node.attrs.width > 0 ? node.attrs.width : undefined;
+  const height = typeof node.attrs.height === "number" && node.attrs.height > 0 ? node.attrs.height : undefined;
   return {
     _type: "image",
     _key: nanoid(8),
@@ -271,6 +276,8 @@ function convertImage(node: TiptapImageNode): PortableTextImageBlock {
       _ref: sanityRef || node.attrs.src,
     },
     alt: node.attrs.alt,
+    width,
+    height,
   };
 }
 

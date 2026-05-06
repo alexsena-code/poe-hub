@@ -95,6 +95,13 @@ export interface PortableTextImageBlock {
   hotspot?: SanityImageRef["hotspot"];
   crop?: SanityImageRef["crop"];
   alt?: string;
+  /**
+   * Natural dimensions in pixels, captured at upload time. Stored on the block
+   * (not only on the asset metadata) so renderers can lay out correctly without
+   * a GROQ join to fetch asset.metadata.dimensions.
+   */
+  width?: number;
+  height?: number;
 }
 
 /** A code block — matches the `code` schema type. */

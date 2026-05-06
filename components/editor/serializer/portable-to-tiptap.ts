@@ -17,6 +17,7 @@
  */
 
 import { splitByPlaceholders } from "./placeholders";
+import { imageUrlFor } from "@/lib/sanity/image-url";
 import type {
   PortableTextContent,
   PortableTextBlock,
@@ -92,6 +93,8 @@ interface TiptapImageNode {
     src: string;
     alt?: string;
     "data-sanity-ref"?: string;
+    width?: number;
+    height?: number;
   };
 }
 
@@ -409,12 +412,25 @@ function buildNestedList(
 
 function convertImageBlock(block: PortableTextImageBlock): TiptapImageNode {
   const ref = block.asset._ref;
+  // The src must be a renderable URL — Tiptap puts it straight into <img src>.
+  // Build the CDN URL from the asset ref; if the ref is malformed for any
+  // reason, fall back to the raw value so at least nothing crashes.
+  let src = ref;
+  try {
+    src = imageUrlFor({ asset: { _ref: ref, _type: "reference" } } as Parameters<typeof imageUrlFor>[0])
+      .auto("format")
+      .url();
+  } catch {
+    // imageUrlFor throws on malformed refs — keep src=ref as a last resort.
+  }
   return {
     type: "image",
     attrs: {
-      src: ref,
+      src,
       alt: block.alt,
       "data-sanity-ref": ref,
+      width: block.width,
+      height: block.height,
     },
   };
 }

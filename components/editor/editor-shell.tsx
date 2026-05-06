@@ -31,6 +31,7 @@ import { RightRail } from './right-rail';
 import { PreviewPane } from './preview/preview-pane';
 import { useTiptapEditor } from './hooks/use-tiptap-editor';
 import { useAutosave } from './hooks/use-autosave';
+import { openImageFilePicker } from './extensions/image-upload';
 import { tiptapToPortable } from './serializer/tiptap-to-portable';
 import type { TiptapDoc } from './serializer/tiptap-to-portable';
 import { portableToTiptap } from './serializer/portable-to-tiptap';
@@ -126,6 +127,19 @@ export function EditorShell({
     setBodyJson(editor.getJSON());
     setInitialContentLoaded(true);
   }, [editor, initialBody, initialContentLoaded]);
+
+  // Wire the slash-command '/image' and toolbar Image button.
+  // Both dispatch 'editor:open-image-picker' — we intercept it here and open
+  // the native file picker against the live ProseMirror view, then upload via
+  // /api/sanity/upload (handled inside openImageFilePicker).
+  useEffect(() => {
+    if (!editor) return;
+    const handler = openImageFilePicker(editor.view);
+    window.addEventListener('editor:open-image-picker', handler);
+    return () => {
+      window.removeEventListener('editor:open-image-picker', handler);
+    };
+  }, [editor]);
 
   // Toggle `editor-fullscreen` on #app-main so the auth layout drops its
   // padding + overflow-auto while the editor is mounted. Without this the

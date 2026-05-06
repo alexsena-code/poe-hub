@@ -196,28 +196,49 @@ function processNormalBlock(children: React.ReactNode): React.ReactNode {
 // ─── Image component ──────────────────────────────────────────────────────────
 
 function ImageComponent({ value, isInline }: { value: Record<string, unknown>; isInline?: boolean }) {
-  // Prefer metadata dimensions from Sanity; fall back to 1280×720 to avoid
-  // CLS. @sanity/asset-utils is not installed in this repo.
-  const metadata = value.asset as Record<string, unknown> | undefined;
-  const metaDims = (metadata?.metadata as Record<string, unknown>)?.dimensions as Record<string, number> | undefined;
-  const width = metaDims?.width ?? 1280;
-  const height = metaDims?.height ?? 720;
+  // Dimension precedence: block-level fields (captured at upload time by the
+  // hub) → asset.metadata.dimensions (only present after a GROQ-side join) →
+  // 16:9 placeholder so SSR layout is at least stable.
+  const blockWidth = typeof value.width === "number" ? value.width : undefined;
+  const blockHeight = typeof value.height === "number" ? value.height : undefined;
+  const assetMeta = (value.asset as Record<string, unknown> | undefined)?.metadata as
+    | Record<string, unknown>
+    | undefined;
+  const metaDims = assetMeta?.dimensions as Record<string, number> | undefined;
+  const width = blockWidth ?? metaDims?.width ?? 1280;
+  const height = blockHeight ?? metaDims?.height ?? 720;
 
   const src = imageUrlFor(value as Parameters<typeof imageUrlFor>[0])
     .fit("max")
     .auto("format")
     .url();
 
+  // Layout strategy:
+  //  - width:100% + height:auto so small uploads still fill the article column
+  //    (575×365 → renders at column width without looking lost).
+  //  - max-height:80vh + object-fit:contain caps portrait/tall sources so they
+  //    don't dominate the viewport; the image is letterboxed inside a centered
+  //    box that keeps the aspect ratio.
+  //  - aspectRatio CSS reserves space pre-load (no CLS).
+  //  - Negative horizontal margins (lg+) let images break out of the
+  //    max-w-3xl prose column (~768px) while text stays compact. Effective
+  //    image widths: lg ≈1088px, xl ≈1344px — covers ultrawide nicely without
+  //    needing JS for breakout positioning.
   return (
-    <div className="my-10 overflow-hidden rounded-[15px]">
+    <div className="my-10 flex justify-center overflow-hidden rounded-[15px] lg:-mx-40 xl:-mx-72">
       <Image
         src={src}
         width={width}
         height={height}
         alt={(value.alt as string) || "blog image"}
         loading="lazy"
+        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 768px, (max-width: 1280px) 1088px, 1344px"
         style={{
           display: isInline ? "inline-block" : "block",
+          width: "100%",
+          height: "auto",
+          maxHeight: "80vh",
+          objectFit: "contain",
           aspectRatio: `${width} / ${height}`,
         }}
       />

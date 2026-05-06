@@ -41,6 +41,9 @@ import { PoePriceNode } from '../extensions/poe-price-node';
 import { PoeCurrencyNode } from '../extensions/poe-currency-node';
 import { PoeCtaNode } from '../extensions/poe-cta-node';
 import { PoePassiveNode } from '../extensions/poe-passive-node';
+import { buildSlashExtension } from '../extensions/slash-commands';
+import { buildMentionExtension } from '../extensions/mention-at';
+import { buildImageUploadExtension } from '../extensions/image-upload';
 
 // ---------------------------------------------------------------------------
 // lowlight instance shared across all editor instances in the app
@@ -97,12 +100,53 @@ export function buildEditorExtensions() {
       },
     }),
 
-    Image.configure({
-      // Allow setting width/height and alt text — image-upload (S08.g) adds
-      // the paste/drop handlers on top of this base extension.
+    // Extend the base Image to keep the Sanity asset id on the node. ProseMirror
+    // drops attrs that are not declared in the schema, so without addAttributes
+    // the data-sanity-ref attr set by image-upload silently disappears and the
+    // serializer falls back to writing the CDN URL as the Portable Text _ref —
+    // which @sanity/image-url then rejects with "Malformed asset _ref".
+    Image.extend({
+      addAttributes() {
+        // Capturing width/height alongside data-sanity-ref so the serializer
+        // emits them on the PortableTextImageBlock — renderers can size
+        // correctly without a GROQ join to asset.metadata.dimensions.
+        const numericAttr = (htmlAttr: string) => ({
+          default: null as number | null,
+          parseHTML: (el: HTMLElement) => {
+            const raw = el.getAttribute(htmlAttr);
+            const n = raw ? parseInt(raw, 10) : NaN;
+            return Number.isFinite(n) && n > 0 ? n : null;
+          },
+          renderHTML: (attrs: Record<string, unknown>) => {
+            const v = attrs[htmlAttr];
+            return typeof v === 'number' && v > 0 ? { [htmlAttr]: String(v) } : {};
+          },
+        });
+        return {
+          ...this.parent?.(),
+          'data-sanity-ref': {
+            default: null,
+            parseHTML: (el) => el.getAttribute('data-sanity-ref'),
+            renderHTML: (attrs) => {
+              const ref = attrs['data-sanity-ref'];
+              return ref ? { 'data-sanity-ref': ref } : {};
+            },
+          },
+          width: numericAttr('width'),
+          height: numericAttr('height'),
+        };
+      },
+    }).configure({
       allowBase64: false,
       HTMLAttributes: {
-        class: 'editor-image rounded-md max-w-full',
+        // h-auto + w-auto override the width/height HTML attrs (set by
+        // addAttributes for the captured natural dimensions) so the image can
+        // shrink under max-w-full / max-h-[80vh]. Without those overrides, a
+        // portrait 746×1653 would render at native pixel size and overflow
+        // the viewport. mx-auto + block centers portrait images that end up
+        // narrower than the editor block after the height cap kicks in.
+        class:
+          'editor-image rounded-md block mx-auto w-auto h-auto max-w-full max-h-[80vh] object-contain',
       },
     }),
 
@@ -158,6 +202,13 @@ export function buildEditorExtensions() {
     PoeCurrencyNode,
     PoeCtaNode,
     PoePassiveNode,
+
+    // Suggestion + upload extensions. Must come AFTER the base Image extension
+    // (above) — ImageUploadExtension augments it with paste/drop handlers.
+    // Slash '/' opens the command menu; '@' opens item/currency mention search.
+    ...buildSlashExtension(),
+    ...buildMentionExtension(),
+    ...buildImageUploadExtension(),
   ];
 }
 

@@ -22,7 +22,7 @@ import {
   Code2, Heading1, Heading2, Heading3,
   Eye, EyeOff, CheckCircle2, Loader2, AlertCircle,
   ArrowRight, Undo2, Redo2, AlignLeft, AlignCenter,
-  AlignRight, AlignJustify, Minus, Table,
+  AlignRight, AlignJustify, Minus, Table, ImageIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -339,6 +339,17 @@ export function EditorToolbar({
 
               {/* Table insert dropdown */}
               <TableInsertMenu editor={editor ?? null} />
+
+              {/* Image upload — dispatches the same custom event the slash
+                  '/image' command uses, so editor-shell's listener handles it. */}
+              <FmtButton
+                label="Inserir imagem"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('editor:open-image-picker'));
+                }}
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+              </FmtButton>
             </>
           )}
         </div>

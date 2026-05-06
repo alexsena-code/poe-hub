@@ -124,10 +124,10 @@ describe('uploadImageFile', () => {
     await expect(uploadImageFile(file)).rejects.toThrow('Sanity write token invalid');
   });
 
-  it('accepts webp and avif MIME types', async () => {
+  it('accepts the four MIME types in the backend whitelist', async () => {
     const { uploadImageFile } = await import('../image-upload');
 
-    for (const mime of ['image/webp', 'image/avif']) {
+    for (const mime of ['image/jpeg', 'image/png', 'image/gif', 'image/webp']) {
       const mockFetch = mockFetchSuccess(`asset-${mime}`, `https://cdn.sanity.io/${mime}.img`);
       const file = makeFakeFile(`img.${mime.split('/')[1]}`, mime, 512 * 1024);
       const result = await uploadImageFile(file);
@@ -135,6 +135,21 @@ describe('uploadImageFile', () => {
       expect(mockFetch).toHaveBeenCalledOnce();
       vi.unstubAllGlobals();
     }
+  });
+
+  // SVG carries XSS risk (embedded <script>) and AVIF is not in the backend
+  // whitelist (app/api/sanity/upload/route.ts). Reject both client-side so the
+  // operator gets immediate feedback instead of a 400 from the server.
+  it('rejects avif and svg without calling fetch', async () => {
+    const { uploadImageFile } = await import('../image-upload');
+    const mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+
+    for (const mime of ['image/avif', 'image/svg+xml']) {
+      const file = makeFakeFile(`bad.${mime.split('/')[1]}`, mime, 100 * 1024);
+      await expect(uploadImageFile(file)).rejects.toThrow(/não suportado/);
+    }
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('rejects exactly 8MB + 1 byte file', async () => {
@@ -162,5 +177,39 @@ describe('buildImageUploadExtension', () => {
     expect(Array.isArray(exts)).toBe(true);
     expect(exts.length).toBe(1);
     expect(exts[0].name).toBe('imageUpload');
+  });
+});
+
+describe('clampDimensions', () => {
+  it('passes through when both dimensions are below the cap', async () => {
+    const { clampDimensions } = await import('../image-upload');
+    expect(clampDimensions(800, 600)).toEqual({ targetW: 800, targetH: 600 });
+  });
+
+  it('passes through at exactly the cap boundary', async () => {
+    const { clampDimensions } = await import('../image-upload');
+    expect(clampDimensions(1920, 1080)).toEqual({ targetW: 1920, targetH: 1080 });
+  });
+
+  it('downscales a 4K landscape to fit the longest-side cap', async () => {
+    const { clampDimensions } = await import('../image-upload');
+    // 3840×2160 → longest 3840 → scale 0.5 → 1920×1080
+    expect(clampDimensions(3840, 2160)).toEqual({ targetW: 1920, targetH: 1080 });
+  });
+
+  it('downscales tall portrait images by clamping the longest side', async () => {
+    const { clampDimensions } = await import('../image-upload');
+    // 1000×3000 → longest 3000 → scale 0.64 → 640×1920
+    expect(clampDimensions(1000, 3000)).toEqual({ targetW: 640, targetH: 1920 });
+  });
+
+  it('rounds dimensions to integers and never returns zero', async () => {
+    const { clampDimensions } = await import('../image-upload');
+    // 1921×1 → scale 1920/1921 ≈ 0.9995 → 1920×1 (Math.max(1, round(0.9995)))
+    const out = clampDimensions(1921, 1);
+    expect(out.targetW).toBe(1920);
+    expect(out.targetH).toBe(1);
+    expect(Number.isInteger(out.targetW)).toBe(true);
+    expect(Number.isInteger(out.targetH)).toBe(true);
   });
 });
