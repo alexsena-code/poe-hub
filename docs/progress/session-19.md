@@ -171,6 +171,40 @@ Mostra preview "custo cai pra R$ X" ao lado.
 
 Tests: 45/45 do calculator passando.
 
+## Extrapolação de preços com decay 10%/dia (chunk 6)
+
+Operador notou que dois cenários no scenario tester com a **mesma**
+progressão de bots davam receita diferente quando um deles selecionava
+overlay de preços histórico (ex: Mirage · CNL). Investigado: comportamento
+era by-design — `applyPriceOverlay` substituía os preços da sim pelos do
+DailyPrice e dias **sem dado** (raros gaps + dias da sim além do último
+preço raspado) viravam `null` → contribuíam R$ 0 pra receita.
+
+Fix: novo módulo `lib/price-extrapolation.ts` com `extrapolatePrice()`
+puro fazendo forward-fill com **decay composto de 10%/dia**:
+
+- Hit direto: retorna o preço da row.
+- Após o último dado: `lastPrice × (1 − 0.1)^daysAfter` (ex: 80 → 72 → 64.8 → ...).
+- Dentro de gap interno: ancora no último preço *antes* do dia alvo.
+- Antes do primeiro dado: usa o primeiro preço sem decay reverso.
+- Retorna `{ price, fromHistorical }` pra caller distinguir real vs extrapolado.
+
+Aplicado nos dois pontos que consumiam o histórico de preço:
+
+- `components/modules/simulations/simulation-editor/scenarios.ts`
+  (`applyPriceOverlay`) — substitui `priceMap.get` por `extrapolatePrice`.
+- `app/api/simulations/[id]/import-prices/route.ts` — idem; resposta JSON
+  ganha `extrapolatedDays` separado de `updatedDays`.
+
+`ImportPricesDialog` mostra "X dias importados (Y extrapolados a −10%/dia)"
+no toast e a `DialogDescription` avisa sobre o decay. Constante
+`PRICE_DECAY_PER_DAY = 0.1` exportada — ajustável num único ponto.
+
+Tests: 10 novos em `lib/price-extrapolation.test.ts` (hit direto, after-last,
+gap interno, before-first, single-row, decay custom, validação de
+decayPerDay). Suite pura passando 92/92 (extrapolation + simulation-calculator
++ simulation-diff + crypto).
+
 ## O que ficou pra depois
 
 - Testes de unidade pra `calcBuildCostBrl` cobrindo: rampa diária com

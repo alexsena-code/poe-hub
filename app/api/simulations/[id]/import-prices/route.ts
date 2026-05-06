@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { extrapolatePrice, type PriceRow } from "@/lib/price-extrapolation";
 import { z } from "zod/v4";
 
 type Params = { params: Promise<{ id: string }> };
@@ -68,15 +69,20 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "No price data for this league" }, { status: 404 });
   }
 
-  // Build a date→price map
-  const priceMap = new Map<string, number>();
-  for (const dp of dailyPrices) {
-    const dateKey = dp.date.toISOString().split("T")[0];
-    const price = priceSource === "cnl" && dp.cnlPrice
-      ? Number(dp.cnlPrice)
-      : Number(dp.median);
-    priceMap.set(dateKey, price);
-  }
+  // Sorted historical rows. Sim days past the last entry get extrapolated via
+  // 10%/day compounded decay (see lib/price-extrapolation.ts) — keeps
+  // long-horizon sims from collapsing to R$ 0 just because the league is still
+  // running and we don't have data yet for the target date.
+  const sortedRows: PriceRow[] = dailyPrices
+    .map((dp) => ({
+      date: dp.date.toISOString().split("T")[0],
+      price:
+        priceSource === "cnl" && dp.cnlPrice
+          ? Number(dp.cnlPrice)
+          : Number(dp.median),
+    }))
+    .filter((r) => r.price > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   // Reset all day overrides before reimporting so stale data is cleared
   const allDayIds = simulation.weeks.flatMap((w) => w.days.map((d) => d.id));
@@ -104,6 +110,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   // Days before startDayOffset get activeBots=0 (no production, prices for reference).
   const leagueStart = new Date(leagueData.startDate);
   let updatedDays = 0;
+  let extrapolatedDays = 0;
 
   for (const week of simulation.weeks) {
     for (const day of week.days) {
@@ -113,19 +120,24 @@ export async function POST(request: NextRequest, { params }: Params) {
       realDate.setDate(realDate.getDate() + globalDayIndex);
       const dateKey = realDate.toISOString().split("T")[0];
 
-      const price = priceMap.get(dateKey);
+      const extrapolated = extrapolatePrice(sortedRows, dateKey);
       const isBeforeStart = globalDayIndex < startDayOffset;
 
       await prisma.simulationDay.update({
         where: { id: day.id },
         data: {
           date: realDate,
-          ...(price !== undefined ? { divinePriceBrl: price.toString() } : {}),
+          ...(extrapolated && extrapolated.price > 0
+            ? { divinePriceBrl: extrapolated.price.toString() }
+            : {}),
           // Zero out bots for days before the chosen start day
           ...(isBeforeStart ? { activeBots: 0 } : {}),
         },
       });
-      if (price !== undefined) updatedDays++;
+      if (extrapolated && extrapolated.price > 0) {
+        updatedDays++;
+        if (!extrapolated.fromHistorical) extrapolatedDays++;
+      }
     }
 
     // Update week default with the average price for that week
@@ -135,8 +147,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       const realDate = new Date(leagueStart);
       realDate.setDate(realDate.getDate() + weekStartIndex + d);
       const dateKey = realDate.toISOString().split("T")[0];
-      const price = priceMap.get(dateKey);
-      if (price !== undefined) weekPrices.push(price);
+      const extrapolated = extrapolatePrice(sortedRows, dateKey);
+      if (extrapolated && extrapolated.price > 0) {
+        weekPrices.push(extrapolated.price);
+      }
     }
 
     if (weekPrices.length > 0) {
@@ -155,6 +169,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   return NextResponse.json({
     success: true,
     updatedDays,
+    extrapolatedDays,
     totalDaysInSimulation: simulation.weeks.reduce((acc, w) => acc + w.days.length, 0),
     priceDataDays: dailyPrices.length,
     league,

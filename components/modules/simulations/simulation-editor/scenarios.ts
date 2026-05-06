@@ -5,6 +5,7 @@
 import type { SimulationWeek } from "../week-editor";
 import type { CostConfig, Simulation } from "./types";
 import { calcTotals, type SimulationTotals } from "./utils";
+import { extrapolatePrice, type PriceRow } from "@/lib/price-extrapolation";
 
 export interface BotProgressionParams {
   maxBots: number;
@@ -78,9 +79,10 @@ export function applyProgression(
 /**
  * Overlays historical daily prices onto the simulation. Each sim day is
  * mapped to a real date = leagueStartDate + (priceStartDay-1) + globalDayIdx,
- * then divinePriceBrl/Usd are set from the priceMap. Days without a match
- * AND week defaults are cleared, so calcTotals computes revenue exclusively
- * from overlay-matched days.
+ * then divinePriceBrl/Usd are set from `extrapolatePrice` — sim days past the
+ * last known DailyPrice get a 10%/day compounded decay instead of falling to
+ * R$ 0 (see lib/price-extrapolation.ts). Week defaults are cleared so
+ * calcTotals computes revenue exclusively from per-day values.
  *
  * USD per day is derived as BRL/exchangeRate using the *current* rate (we
  * don't have historical FX). This is fine because calcTotals also uses the
@@ -94,14 +96,16 @@ export function applyPriceOverlay(
 ): Simulation {
   if (overlay.league === null) return simulation;
 
-  const priceMap = new Map<string, number>();
-  for (const row of data.rows) {
-    const price =
-      overlay.source === "cnl" && row.cnlPrice != null && row.cnlPrice > 0
-        ? row.cnlPrice
-        : row.median;
-    if (price > 0) priceMap.set(row.date, price);
-  }
+  const sortedRows: PriceRow[] = data.rows
+    .map((row) => {
+      const price =
+        overlay.source === "cnl" && row.cnlPrice != null && row.cnlPrice > 0
+          ? row.cnlPrice
+          : row.median;
+      return { date: row.date, price };
+    })
+    .filter((r) => r.price > 0)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   const day1 = new Date(data.leagueStartDate);
   day1.setUTCDate(day1.getUTCDate() + (overlay.startDay - 1));
@@ -115,13 +119,14 @@ export function applyPriceOverlay(
       const realDate = new Date(day1);
       realDate.setUTCDate(realDate.getUTCDate() + globalIdx);
       const dateKey = realDate.toISOString().split("T")[0];
-      const matched = priceMap.get(dateKey);
+      const extrapolated = extrapolatePrice(sortedRows, dateKey);
 
-      if (matched != null) {
+      if (extrapolated && extrapolated.price > 0) {
         return {
           ...day,
-          divinePriceBrl: matched,
-          divinePriceUsd: exchangeRate > 0 ? matched / exchangeRate : null,
+          divinePriceBrl: extrapolated.price,
+          divinePriceUsd:
+            exchangeRate > 0 ? extrapolated.price / exchangeRate : null,
         };
       }
       return { ...day, divinePriceBrl: null, divinePriceUsd: null };

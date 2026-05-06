@@ -59,8 +59,12 @@ export function ImportPricesDialog({
       }
 
       const result = await res.json();
+      const extrapolatedSuffix =
+        result.extrapolatedDays > 0
+          ? ` (${result.extrapolatedDays} extrapolados a −10%/dia)`
+          : "";
       toast.success(
-        `Preços importados: ${result.updatedDays} dias atualizados de ${result.priceDataDays} disponíveis`
+        `Preços importados: ${result.updatedDays} dias atualizados de ${result.priceDataDays} disponíveis${extrapolatedSuffix}`
       );
       setOpen(false);
       onImported();
@@ -84,7 +88,8 @@ export function ImportPricesDialog({
             <DialogTitle>Importar Preços Históricos</DialogTitle>
             <DialogDescription>
               Preenche automaticamente os preços da divine em cada dia da
-              simulação com dados reais coletados do Discord.
+              simulação com dados reais coletados do Discord. Dias além do
+              último registro são extrapolados com decay de 10% ao dia.
             </DialogDescription>
           </DialogHeader>
 
