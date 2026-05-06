@@ -66,6 +66,33 @@ Aplicado em 4 lugares:
   pre-existentes em annual page, benchmark forms, editor tests).
 - `npx vitest run lib/simulation-calculator` — 45/45 passando.
 
+## Cenários e cohorts (chunk 2)
+
+Dois painéis novos no editor da simulação, expansíveis via Accordion.
+
+**A — Testador de cenários** (`scenarios.ts` + `scenario-tester.tsx`):
+forka a `Simulation` em memória sobrescrevendo `activeBots` por dia
+segundo a fórmula de progressão e roda `calcTotals` no fork — sem
+persistir nada. Tabela com baseline + N variantes editáveis (max bots,
+incr/dia, bots iniciais, dia início), recálculo instantâneo via
+`useMemo`, coluna Δ Lucro vs baseline, botão Aplicar por linha que
+chama o endpoint `bot-progression` existente. Default 2 cenários
+("Rampa lenta" e "Rampa rápida"), até 6 simultâneos.
+
+**B — Cohort breakdown** (`cohorts.ts` + `cohort-breakdown.tsx`):
+detecta dias onde `bots(D) > bots(D-1)` e cria um cohort por evento.
+Pra cada cohort, calcula lifetime isolado (só os bots dele, de D até
+o fim): divines produzidos, receita, custo operacional, build cost
+BRL travado, leveling, lucro, ROI, break-even em dias e lucro por
+bot. Tabela ordenada cronologicamente com header agregado (total de
+bots, cohorts, break-even médio).
+
+Integrados via `Accordion type="multiple"` entre chart e weeks
+accordion, ambos colapsados por default pra não poluir.
+
+Tamanhos: scenarios.ts 98L, cohorts.ts 226L, cohort-breakdown.tsx
+172L, scenario-tester.tsx 377L — todos < 500L.
+
 ## O que ficou pra depois
 
 - Testes de unidade pra `calcBuildCostBrl` cobrindo: rampa diária com

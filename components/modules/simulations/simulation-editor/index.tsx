@@ -19,6 +19,14 @@ import { SimulationSummaryCards } from "./simulation-summary-cards";
 import { SimulationCostBreakdown } from "./simulation-cost-breakdown";
 import { SimulationRevenueChart } from "./simulation-revenue-chart";
 import { SimulationWeeksAccordion } from "./simulation-weeks-accordion";
+import { ScenarioTester } from "./scenario-tester";
+import { CohortBreakdown } from "./cohort-breakdown";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface SimulationEditorProps {
   simulationId: string;
@@ -259,6 +267,44 @@ export function SimulationEditor({ simulationId }: SimulationEditorProps) {
           <SimulationRevenueChart weekData={weekData} formatMoney={formatMoney} />
         </div>
       )}
+
+      <Accordion type="multiple" className="space-y-2">
+        <AccordionItem value="scenarios" className="border rounded-lg px-4">
+          <AccordionTrigger className="hover:no-underline">
+            <span className="text-base font-semibold">
+              Testador de cenários
+            </span>
+            <span className="ml-2 text-xs text-muted-foreground font-normal">
+              comparar variações de progressão
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <ScenarioTester
+              simulation={simulation}
+              simulationId={simulationId}
+              costConfig={costConfig}
+              onApplied={fetchSimulation}
+            />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="cohorts" className="border rounded-lg px-4">
+          <AccordionTrigger className="hover:no-underline">
+            <span className="text-base font-semibold">
+              Cohorts de bots
+            </span>
+            <span className="ml-2 text-xs text-muted-foreground font-normal">
+              economia por dia de criação
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <CohortBreakdown
+              simulation={simulation}
+              costConfig={costConfig}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <SimulationWeeksAccordion
         simulationId={simulationId}
