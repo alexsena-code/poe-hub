@@ -1,15 +1,16 @@
 "use client";
 
-// What-if scenario tester. Lets the operator define N variations of bot
-// progression params and see deltas vs the current simulation baseline,
-// purely client-side — nothing is persisted until they hit "Aplicar".
+// What-if scenario tester. Two orthogonal axes per scenario:
+//   1) bot progression (max, increment/day, startBots, startDay)
+//   2) price overlay (historical league + median/cnl + day-1 alignment)
+// Recomputes totals client-side via calcScenario — only the "Aplicar" button
+// persists, and even then only the bot progression (not the price overlay).
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, FlaskConical, Save } from "lucide-react";
+import { Plus, FlaskConical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -21,13 +22,15 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
+import { useLeagues } from "@/hooks/use-leagues";
 import {
-  calcDelta,
   calcScenario,
   makeScenarioId,
   type Scenario,
+  type PriceLeagueData,
 } from "./scenarios";
 import { calcTotals, fmtNum } from "./utils";
+import { ScenarioRow } from "./scenario-row";
 import type { CostConfig, Simulation } from "./types";
 
 interface ScenarioTesterProps {
@@ -44,23 +47,21 @@ function defaultScenarios(simulation: Simulation): Scenario[] {
     ...simulation.weeks.map((w) => Number(w.defaultActiveBots)),
     10
   );
+  const baseProgression = (incr: number, label: string): Scenario => ({
+    id: makeScenarioId(),
+    label,
+    maxBots: peak,
+    incrementPerDay: incr,
+    startBots: 1,
+    startDay,
+    price: { league: null, source: "median", startDay: 1 },
+  });
   return [
-    {
-      id: makeScenarioId(),
-      label: "Rampa lenta",
-      maxBots: peak,
-      incrementPerDay: 1,
-      startBots: 1,
-      startDay,
-    },
-    {
-      id: makeScenarioId(),
-      label: "Rampa rápida",
-      maxBots: peak,
-      incrementPerDay: Math.max(2, Math.ceil(peak / Math.max(1, totalDays / 4))),
-      startBots: 1,
-      startDay,
-    },
+    baseProgression(1, "Rampa lenta"),
+    baseProgression(
+      Math.max(2, Math.ceil(peak / Math.max(1, totalDays / 4))),
+      "Rampa rápida"
+    ),
   ];
 }
 
@@ -71,10 +72,68 @@ export function ScenarioTester({
   onApplied,
 }: ScenarioTesterProps) {
   const { formatMoney, exchangeRate } = useCurrency();
+  const { leagues } = useLeagues();
   const [scenarios, setScenarios] = useState<Scenario[]>(() =>
     defaultScenarios(simulation)
   );
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [priceCache, setPriceCache] = useState<
+    Record<string, PriceLeagueData>
+  >({});
+  const [fetchingLeagues, setFetchingLeagues] = useState<Set<string>>(
+    new Set()
+  );
+
+  // Lazy-fetch price data when a scenario references a league we don't have yet.
+  useEffect(() => {
+    const needed = new Set<string>();
+    for (const s of scenarios) {
+      if (s.price.league && !priceCache[s.price.league]) {
+        needed.add(s.price.league);
+      }
+    }
+    if (needed.size === 0) return;
+
+    let cancelled = false;
+    for (const leagueName of needed) {
+      if (fetchingLeagues.has(leagueName)) continue;
+      const lg = leagues.find((l) => l.name === leagueName);
+      if (!lg?.startDate) continue;
+
+      setFetchingLeagues((prev) => new Set(prev).add(leagueName));
+      fetch(`/api/prices/daily?league=${encodeURIComponent(leagueName)}&item=divine`)
+        .then((res) => (res.ok ? res.json() : Promise.reject()))
+        .then((rows: Array<{ date: string; median: number; cnlPrice: number | null }>) => {
+          if (cancelled) return;
+          setPriceCache((prev) => ({
+            ...prev,
+            [leagueName]: {
+              leagueStartDate: lg.startDate as string,
+              rows: rows.map((r) => ({
+                date: r.date,
+                median: Number(r.median),
+                cnlPrice: r.cnlPrice == null ? null : Number(r.cnlPrice),
+              })),
+            },
+          }));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          toast.error(`Erro ao buscar preços de ${leagueName}`);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setFetchingLeagues((prev) => {
+            const next = new Set(prev);
+            next.delete(leagueName);
+            return next;
+          });
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [scenarios, leagues, priceCache, fetchingLeagues]);
 
   const baseline = useMemo(
     () => calcTotals(simulation, costConfig, exchangeRate),
@@ -83,13 +142,31 @@ export function ScenarioTester({
 
   const results = useMemo(
     () =>
-      scenarios.map((s) =>
-        calcScenario(simulation, costConfig, exchangeRate, s)
-      ),
-    [scenarios, simulation, costConfig, exchangeRate]
+      scenarios.map((s) => {
+        const data = s.price.league ? priceCache[s.price.league] ?? null : null;
+        return calcScenario(simulation, costConfig, exchangeRate, s, data);
+      }),
+    [scenarios, simulation, costConfig, exchangeRate, priceCache]
   );
 
   const totalDays = simulation.durationWeeks * 7;
+
+  // Leagues with daily-price data are inferred from the leagues list. We can't
+  // know in advance which leagues actually have rows in DailyPrice without an
+  // extra round-trip, so we mark all leagues with a startDate as eligible and
+  // surface "no data" via toast when the fetch returns empty.
+  const leagueOptions = useMemo(
+    () =>
+      leagues
+        .filter((l) => l.startDate != null)
+        .sort((a, b) => {
+          const da = a.startDate ? new Date(a.startDate).getTime() : 0;
+          const db = b.startDate ? new Date(b.startDate).getTime() : 0;
+          return db - da;
+        })
+        .map((l) => ({ name: l.name, hasData: true })),
+    [leagues]
+  );
 
   const updateScenario = useCallback(
     (id: string, patch: Partial<Scenario>) => {
@@ -119,12 +196,18 @@ export function ScenarioTester({
         incrementPerDay: 1,
         startBots: 1,
         startDay,
+        price: { league: null, source: "median", startDay: 1 },
       },
     ]);
   }, [simulation]);
 
   const applyScenario = useCallback(
     async (s: Scenario) => {
+      if (s.price.league !== null) {
+        toast.info(
+          "Apenas a progressão de bots será persistida. Os preços ficam somente no preview."
+        );
+      }
       setApplyingId(s.id);
       try {
         const res = await fetch(
@@ -166,8 +249,8 @@ export function ScenarioTester({
             <p className="font-semibold">Testador de cenários</p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Edite os parâmetros — recálculo é instantâneo. "Aplicar" sobrescreve
-            os bots da simulação atual.
+            Recálculo é instantâneo. "Aplicar" persiste a progressão de bots
+            (não os preços).
           </p>
         </div>
 
@@ -180,6 +263,7 @@ export function ScenarioTester({
                 <TableHead className="w-20">Incr/dia</TableHead>
                 <TableHead className="w-20">Inicial</TableHead>
                 <TableHead className="w-20">Dia início</TableHead>
+                <TableHead className="w-44">Preços</TableHead>
                 <TableHead className="text-right">Receita</TableHead>
                 <TableHead className="text-right">Custo</TableHead>
                 <TableHead className="text-right">Lucro</TableHead>
@@ -195,8 +279,8 @@ export function ScenarioTester({
                     Baseline (atual)
                   </Badge>
                 </TableCell>
-                <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                  Bots como estão na simulação hoje
+                <TableCell colSpan={5} className="text-xs text-muted-foreground">
+                  Bots e preços como estão na simulação hoje
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {formatMoney(baseline.revenueUsd, "usd")}
@@ -224,133 +308,25 @@ export function ScenarioTester({
                 <TableCell />
               </TableRow>
 
-              {results.map(({ scenario: s, totals, dayReachingMax }) => {
-                const delta = calcDelta(baseline, totals);
-                const dPositive = delta.profit >= 0;
+              {results.map((result) => {
+                const s = result.scenario;
+                const priceLoading =
+                  s.price.league !== null && !priceCache[s.price.league];
                 return (
-                  <TableRow key={s.id}>
-                    <TableCell>
-                      <Input
-                        value={s.label}
-                        onChange={(e) =>
-                          updateScenario(s.id, { label: e.target.value })
-                        }
-                        className="h-8 text-xs"
-                      />
-                      {dayReachingMax && (
-                        <span className="block text-[10px] text-muted-foreground mt-1">
-                          atinge max em D{dayReachingMax}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={s.maxBots}
-                        onChange={(e) =>
-                          updateScenario(s.id, {
-                            maxBots: Number(e.target.value) || 1,
-                          })
-                        }
-                        className="h-8 text-xs font-mono"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={s.incrementPerDay}
-                        onChange={(e) =>
-                          updateScenario(s.id, {
-                            incrementPerDay: Number(e.target.value) || 1,
-                          })
-                        }
-                        className="h-8 text-xs font-mono"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={s.startBots}
-                        onChange={(e) =>
-                          updateScenario(s.id, {
-                            startBots: Number(e.target.value) || 0,
-                          })
-                        }
-                        className="h-8 text-xs font-mono"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={totalDays}
-                        value={s.startDay}
-                        onChange={(e) =>
-                          updateScenario(s.id, {
-                            startDay: Number(e.target.value) || 1,
-                          })
-                        }
-                        className="h-8 text-xs font-mono"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      {formatMoney(totals.revenueUsd, "usd")}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                      {formatMoney(totals.totalCost, "usd")}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-mono text-xs font-semibold",
-                        totals.profit >= 0 ? "text-green-500" : "text-destructive"
-                      )}
-                    >
-                      {formatMoney(totals.profit, "usd")}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-mono text-xs",
-                        totals.roi >= 0 ? "text-green-500" : "text-destructive"
-                      )}
-                    >
-                      {fmtNum(totals.roi, 1)}%
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right font-mono text-xs font-semibold",
-                        dPositive ? "text-green-500" : "text-destructive"
-                      )}
-                    >
-                      {dPositive ? "+" : ""}
-                      {formatMoney(delta.profit, "usd")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => applyScenario(s)}
-                          disabled={applyingId === s.id}
-                          title="Aplicar este cenário à simulação"
-                        >
-                          <Save className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => removeScenario(s.id)}
-                          title="Remover cenário"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <ScenarioRow
+                    key={s.id}
+                    scenario={s}
+                    result={result}
+                    baseline={baseline}
+                    totalDays={totalDays}
+                    leagueOptions={leagueOptions}
+                    applyingId={applyingId}
+                    priceLoading={priceLoading}
+                    formatMoney={formatMoney}
+                    onUpdate={(patch) => updateScenario(s.id, patch)}
+                    onRemove={() => removeScenario(s.id)}
+                    onApply={() => applyScenario(s)}
+                  />
                 );
               })}
             </TableBody>
@@ -368,7 +344,7 @@ export function ScenarioTester({
             Adicionar cenário
           </Button>
           <p className="text-xs text-muted-foreground">
-            Comparação 100% local — só "Aplicar" persiste no banco.
+            Comparação 100% local. Preços por liga vêm do histórico do Discord.
           </p>
         </div>
       </CardContent>

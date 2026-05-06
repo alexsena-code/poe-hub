@@ -1,5 +1,5 @@
 // Pure helpers for the what-if scenario tester. Forks the simulation tree
-// in-memory by overriding activeBots according to a progression formula and
+// in-memory along two orthogonal axes (bot progression + price overlay) and
 // runs the existing calcTotals — never persists anything to the DB.
 
 import type { SimulationWeek } from "../week-editor";
@@ -14,9 +14,32 @@ export interface BotProgressionParams {
   startDay: number;
 }
 
+export interface PriceOverlayParams {
+  /** League name to pull DailyPrice from. null = no overlay (use sim prices as-is). */
+  league: string | null;
+  source: "median" | "cnl";
+  /** 1-based day of the chosen league that maps to sim day 1. */
+  startDay: number;
+}
+
+/** Daily-price row from /api/prices/daily — narrow shape used by the overlay. */
+export interface DailyPriceRow {
+  /** "yyyy-mm-dd" date string. */
+  date: string;
+  median: number;
+  cnlPrice: number | null;
+}
+
+export interface PriceLeagueData {
+  /** "yyyy-mm-dd" of the league's official start date. */
+  leagueStartDate: string;
+  rows: DailyPriceRow[];
+}
+
 export interface Scenario extends BotProgressionParams {
   id: string;
   label: string;
+  price: PriceOverlayParams;
 }
 
 export interface ScenarioResult {
@@ -52,13 +75,77 @@ export function applyProgression(
   return { ...simulation, weeks: newWeeks };
 }
 
+/**
+ * Overlays historical daily prices onto the simulation. Each sim day is
+ * mapped to a real date = leagueStartDate + (priceStartDay-1) + globalDayIdx,
+ * then divinePriceBrl/Usd are set from the priceMap. Days without a match
+ * AND week defaults are cleared, so calcTotals computes revenue exclusively
+ * from overlay-matched days.
+ *
+ * USD per day is derived as BRL/exchangeRate using the *current* rate (we
+ * don't have historical FX). This is fine because calcTotals also uses the
+ * BRL→USD path with the same rate when USD is missing.
+ */
+export function applyPriceOverlay(
+  simulation: Simulation,
+  data: PriceLeagueData,
+  overlay: PriceOverlayParams,
+  exchangeRate: number
+): Simulation {
+  if (overlay.league === null) return simulation;
+
+  const priceMap = new Map<string, number>();
+  for (const row of data.rows) {
+    const price =
+      overlay.source === "cnl" && row.cnlPrice != null && row.cnlPrice > 0
+        ? row.cnlPrice
+        : row.median;
+    if (price > 0) priceMap.set(row.date, price);
+  }
+
+  const day1 = new Date(data.leagueStartDate);
+  day1.setUTCDate(day1.getUTCDate() + (overlay.startDay - 1));
+
+  const newWeeks: SimulationWeek[] = simulation.weeks.map((week) => ({
+    ...week,
+    defaultDivinePriceBrl: null,
+    defaultDivinePriceUsd: null,
+    days: week.days.map((day) => {
+      const globalIdx = (week.weekNumber - 1) * 7 + (day.dayNumber - 1); // 0-based
+      const realDate = new Date(day1);
+      realDate.setUTCDate(realDate.getUTCDate() + globalIdx);
+      const dateKey = realDate.toISOString().split("T")[0];
+      const matched = priceMap.get(dateKey);
+
+      if (matched != null) {
+        return {
+          ...day,
+          divinePriceBrl: matched,
+          divinePriceUsd: exchangeRate > 0 ? matched / exchangeRate : null,
+        };
+      }
+      return { ...day, divinePriceBrl: null, divinePriceUsd: null };
+    }),
+  }));
+
+  return { ...simulation, weeks: newWeeks };
+}
+
 export function calcScenario(
   simulation: Simulation,
   costConfig: CostConfig | null,
   exchangeRate: number,
-  scenario: Scenario
+  scenario: Scenario,
+  priceData: PriceLeagueData | null
 ): ScenarioResult {
-  const forked = applyProgression(simulation, scenario);
+  // Order matters: price overlay first (resets per-day prices), then bot
+  // progression (only touches activeBots, leaving prices alone).
+  let forked = simulation;
+  if (scenario.price.league !== null && priceData) {
+    forked = applyPriceOverlay(forked, priceData, scenario.price, exchangeRate);
+  }
+  forked = applyProgression(forked, scenario);
+
   const totals = calcTotals(forked, costConfig, exchangeRate);
 
   const totalDays = simulation.durationWeeks * 7;

@@ -93,6 +93,38 @@ accordion, ambos colapsados por default pra não poluir.
 Tamanhos: scenarios.ts 98L, cohorts.ts 226L, cohort-breakdown.tsx
 172L, scenario-tester.tsx 377L — todos < 500L.
 
+## Price overlay nos cenários (chunk 3)
+
+`Scenario` ganhou eixo ortogonal: além da progressão de bots, agora
+aceita um overlay de preços históricos. Cada cenário tem
+`price: { league, source, startDay }` onde `league=null` significa
+"usar preços atuais da sim".
+
+Helper novo `applyPriceOverlay` em `scenarios.ts`: forka a sim
+sobrescrevendo `divinePriceBrl/Usd` por dia mapeando cada dia do sim
+a uma data real (`leagueStartDate + (priceStartDay-1) +
+globalDayIdx`). Limpa week defaults pra forçar o cálculo a usar só os
+dias com match no priceMap. `calcScenario` agora aplica overlay
+primeiro (reseta preços) e depois progression (que só toca
+activeBots).
+
+Cache de preços com lazy-fetch: quando o usuário escolhe uma liga em
+algum cenário, o tester chama `GET /api/prices/daily?league=X&item=
+divine` e armazena no `priceCache`. Linhas mostram "…" enquanto
+carrega.
+
+UI da row extraída pra `scenario-row.tsx` (246L) — antes ia explodir
+o tester acima de 500L. Coluna nova "Preços" com select compacto que
+encoda `(liga, fonte)` num único valor (`Mirage::median` etc.) e um
+input "Dia liga" condicional quando overlay ativo.
+
+Apply continua chamando só o endpoint `bot-progression` — preços
+ficam apenas no preview. Toast informa quando o cenário tem overlay
+de preços que a Apply não vai persistir.
+
+Tamanhos finais: scenarios.ts 185L, scenario-tester.tsx 353L,
+scenario-row.tsx 246L.
+
 ## O que ficou pra depois
 
 - Testes de unidade pra `calcBuildCostBrl` cobrindo: rampa diária com
