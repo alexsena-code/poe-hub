@@ -38,6 +38,8 @@ interface ScenarioRowProps {
   leagueOptions: LeagueOption[];
   applyingId: string | null;
   priceLoading: boolean;
+  /** True when the chosen league's DailyPrice query returned 0 rows. */
+  priceNoData: boolean;
   formatMoney: (value: number, fromCurrency: "usd" | "brl") => string;
   onUpdate: (patch: Partial<Scenario>) => void;
   onRemove: () => void;
@@ -54,6 +56,7 @@ export function ScenarioRow({
   leagueOptions,
   applyingId,
   priceLoading,
+  priceNoData,
   formatMoney,
   onUpdate,
   onRemove,
@@ -62,6 +65,7 @@ export function ScenarioRow({
   const { totals, dayReachingMax } = result;
   const delta = calcDelta(baseline, totals);
   const dPositive = delta.profit >= 0;
+  const placeholder = priceLoading ? "…" : priceNoData ? "sem dados" : null;
 
   // Encode (league, source) as a single select value to keep the cell compact.
   const priceValue =
@@ -178,40 +182,50 @@ export function ScenarioRow({
         )}
       </TableCell>
       <TableCell className="text-right font-mono text-xs">
-        {priceLoading ? (
-          <span className="text-muted-foreground">…</span>
+        {placeholder ? (
+          <span className="text-muted-foreground">{placeholder}</span>
         ) : (
           formatMoney(totals.revenueUsd, "usd")
         )}
       </TableCell>
       <TableCell className="text-right font-mono text-xs text-muted-foreground">
-        {priceLoading ? "…" : formatMoney(totals.totalCost, "usd")}
+        {placeholder ?? formatMoney(totals.totalCost, "usd")}
       </TableCell>
       <TableCell
         className={cn(
           "text-right font-mono text-xs font-semibold",
-          totals.profit >= 0 ? "text-green-500" : "text-destructive"
+          placeholder
+            ? "text-muted-foreground"
+            : totals.profit >= 0
+              ? "text-green-500"
+              : "text-destructive"
         )}
       >
-        {priceLoading ? "…" : formatMoney(totals.profit, "usd")}
+        {placeholder ?? formatMoney(totals.profit, "usd")}
       </TableCell>
       <TableCell
         className={cn(
           "text-right font-mono text-xs",
-          totals.roi >= 0 ? "text-green-500" : "text-destructive"
+          placeholder
+            ? "text-muted-foreground"
+            : totals.roi >= 0
+              ? "text-green-500"
+              : "text-destructive"
         )}
       >
-        {priceLoading ? "…" : `${fmtNum(totals.roi, 1)}%`}
+        {placeholder ?? `${fmtNum(totals.roi, 1)}%`}
       </TableCell>
       <TableCell
         className={cn(
           "text-right font-mono text-xs font-semibold",
-          dPositive ? "text-green-500" : "text-destructive"
+          placeholder
+            ? "text-muted-foreground"
+            : dPositive
+              ? "text-green-500"
+              : "text-destructive"
         )}
       >
-        {priceLoading ? (
-          "…"
-        ) : (
+        {placeholder ?? (
           <>
             {dPositive ? "+" : ""}
             {formatMoney(delta.profit, "usd")}

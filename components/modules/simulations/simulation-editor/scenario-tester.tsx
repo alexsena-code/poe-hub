@@ -6,7 +6,7 @@
 // Recomputes totals client-side via calcScenario — only the "Aplicar" button
 // persists, and even then only the bot progression (not the price overlay).
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Plus, FlaskConical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,60 +80,63 @@ export function ScenarioTester({
   const [priceCache, setPriceCache] = useState<
     Record<string, PriceLeagueData>
   >({});
-  const [fetchingLeagues, setFetchingLeagues] = useState<Set<string>>(
-    new Set()
-  );
+  // Refs because mutating these can't trigger re-renders — we'd race with the
+  // effect's cleanup and abort our own in-flight fetches.
+  const fetchingRef = useRef<Set<string>>(new Set());
+  const cacheRef = useRef<Record<string, PriceLeagueData>>({});
 
   // Lazy-fetch price data when a scenario references a league we don't have yet.
+  // On error or empty response we still cache an empty PriceLeagueData so the
+  // UI can show "sem dados" instead of looping forever in the loading state.
   useEffect(() => {
-    const needed = new Set<string>();
     for (const s of scenarios) {
-      if (s.price.league && !priceCache[s.price.league]) {
-        needed.add(s.price.league);
-      }
-    }
-    if (needed.size === 0) return;
+      const league = s.price.league;
+      if (!league) continue;
+      if (cacheRef.current[league]) continue;
+      if (fetchingRef.current.has(league)) continue;
 
-    let cancelled = false;
-    for (const leagueName of needed) {
-      if (fetchingLeagues.has(leagueName)) continue;
-      const lg = leagues.find((l) => l.name === leagueName);
+      const lg = leagues.find((l) => l.name === league);
       if (!lg?.startDate) continue;
 
-      setFetchingLeagues((prev) => new Set(prev).add(leagueName));
-      fetch(`/api/prices/daily?league=${encodeURIComponent(leagueName)}&item=divine`)
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((rows: Array<{ date: string; median: number; cnlPrice: number | null }>) => {
-          if (cancelled) return;
-          setPriceCache((prev) => ({
-            ...prev,
-            [leagueName]: {
-              leagueStartDate: lg.startDate as string,
+      fetchingRef.current.add(league);
+      const startDate = lg.startDate;
+
+      fetch(
+        `/api/prices/daily?league=${encodeURIComponent(league)}&item=divine`
+      )
+        .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+        .then(
+          (rows: Array<{ date: string; median: number; cnlPrice: number | null }>) => {
+            const data: PriceLeagueData = {
+              leagueStartDate: startDate,
               rows: rows.map((r) => ({
                 date: r.date,
                 median: Number(r.median),
                 cnlPrice: r.cnlPrice == null ? null : Number(r.cnlPrice),
               })),
-            },
-          }));
-        })
+            };
+            cacheRef.current[league] = data;
+            setPriceCache((prev) => ({ ...prev, [league]: data }));
+            if (rows.length === 0) {
+              toast.warning(`Sem dados de preço para ${league}`);
+            }
+          }
+        )
         .catch(() => {
-          if (cancelled) return;
-          toast.error(`Erro ao buscar preços de ${leagueName}`);
+          // Cache an empty result so we don't retry on every re-render.
+          const empty: PriceLeagueData = {
+            leagueStartDate: startDate,
+            rows: [],
+          };
+          cacheRef.current[league] = empty;
+          setPriceCache((prev) => ({ ...prev, [league]: empty }));
+          toast.error(`Erro ao buscar preços de ${league}`);
         })
         .finally(() => {
-          if (cancelled) return;
-          setFetchingLeagues((prev) => {
-            const next = new Set(prev);
-            next.delete(leagueName);
-            return next;
-          });
+          fetchingRef.current.delete(league);
         });
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [scenarios, leagues, priceCache, fetchingLeagues]);
+  }, [scenarios, leagues]);
 
   const baseline = useMemo(
     () => calcTotals(simulation, costConfig, exchangeRate),
@@ -310,8 +313,12 @@ export function ScenarioTester({
 
               {results.map((result) => {
                 const s = result.scenario;
-                const priceLoading =
-                  s.price.league !== null && !priceCache[s.price.league];
+                const cached = s.price.league
+                  ? priceCache[s.price.league]
+                  : null;
+                const priceLoading = s.price.league !== null && !cached;
+                const priceNoData =
+                  s.price.league !== null && !!cached && cached.rows.length === 0;
                 return (
                   <ScenarioRow
                     key={s.id}
@@ -322,6 +329,7 @@ export function ScenarioTester({
                     leagueOptions={leagueOptions}
                     applyingId={applyingId}
                     priceLoading={priceLoading}
+                    priceNoData={priceNoData}
                     formatMoney={formatMoney}
                     onUpdate={(patch) => updateScenario(s.id, patch)}
                     onRemove={() => removeScenario(s.id)}
