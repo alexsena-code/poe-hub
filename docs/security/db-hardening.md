@@ -225,6 +225,83 @@ de `CREATE TABLE`. Migrations continuam rodando manualmente via SSH com user
 
 ---
 
+## Passo 4.5 — Apps locais (engine, hardware-deals) usam `localhost`
+
+> ⚠️ **Pegadinha que custou ~1h de debug em 2026-05-07.**
+> Apps que rodam **na própria VPS** (engine `poe-api` via PM2,
+> hardware-deals via FastAPI) **devem** usar `localhost` no
+> `DATABASE_URL`, não o IP público `77.42.47.106`.
+
+**Por quê.** Quando um app na host conecta em `77.42.47.106:5432`, o pacote
+sai pela WAN e volta. O Postgres dentro do container vê o cliente como
+vindo do **IP público da VPS**, não do gateway da Docker network
+(`172.18.0.1`). A regra `host all poe 172.18.0.0/16 scram-sha-256` do
+`pg_hba.conf` **não bate** — o Postgres rejeita com:
+
+```
+no pg_hba.conf entry for host "77.42.47.106", user "poe", database "poe_content"
+```
+
+O Prisma (com adapter-pg) traduz isso pra `P1010 — DatabaseAccessDenied`,
+que parece um erro de permissão mas é na verdade falta de regra no `pg_hba`.
+
+**Forma correta** — em cada `.env` de app local:
+
+```
+DATABASE_URL=postgresql://poe:<SENHA_POE>@localhost:5432/<nome_do_db>
+                                          ^^^^^^^^^
+```
+
+Conexão via `localhost` → Docker NAT → Postgres vê cliente como
+`172.18.0.1` (gateway docker) → bate na regra `host all poe 172.18.0.0/16` ✓
+
+**Por que a Vercel usa IP público:** Vercel está fora da VPS — não tem
+escolha senão atravessar a internet. Por isso a Vercel:
+- Usa `77.42.47.106` no host
+- Usa `poth_app` (não `poe`)
+- Bate na regra `host poth poth_app 0.0.0.0/0 scram-sha-256`
+
+**Resumo de qual user/host cada app usa:**
+
+| App                 | Host                 | User      | DB              | Regra do `pg_hba.conf`                       |
+|---------------------|----------------------|-----------|-----------------|----------------------------------------------|
+| Hub (Vercel)        | `77.42.47.106:5432`  | `poth_app`| `poth`          | `host poth poth_app 0.0.0.0/0`               |
+| Engine (PM2 local)  | `localhost:5432`     | `poe`     | `poe_content`   | `host all poe 172.18.0.0/16` (via NAT)       |
+| Hardware-deals (local)| `localhost:5432`   | `poe`     | `hardware_deals`| `host all poe 172.18.0.0/16` (via NAT)       |
+
+**Smoke test pra confirmar `.env` de um app local antes de subir:**
+
+```bash
+cd /opt/<app>/<package>
+node -e "
+require('dotenv').config();
+const { Pool } = require('pg');
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+pool.query('SELECT current_user, current_database()', (err, res) => {
+  if (err) console.error('FAIL:', err.message);
+  else console.log('OK:', res.rows);
+  pool.end();
+});
+"
+# Esperado: OK: [{ current_user: 'poe', current_database: '<nome>' }]
+# Se aparecer "no pg_hba.conf entry" — você está usando IP público em vez de localhost.
+```
+
+**Encontrar todos os apps com o bug:**
+
+```bash
+sudo grep -rl "@77.42.47.106:5432" /opt/ 2>/dev/null | grep -v node_modules
+# Lista todos os .env que fazem o roundtrip desnecessário pela WAN.
+# Trocar 77.42.47.106 → localhost em cada um, depois pm2 delete + start (ou equivalente).
+```
+
+> **Nota PM2:** `pm2 restart --update-env` **não relê** o `env_file`
+> declarado no `ecosystem.config.js` — só atualiza o bloco `env: {}`
+> hardcoded. Pra que mudanças no `.env` peguem, precisa
+> `pm2 delete <app> && pm2 start ecosystem.config.js`.
+
+---
+
 ## Passo 5 — Logs de auth no Postgres
 
 Pra fail2ban detectar tentativas falhas, o Postgres precisa logar conexões

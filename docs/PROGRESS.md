@@ -1,6 +1,14 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-05-06 (session 20 — DB hardening Postgres na VPS:
+Last updated: 2026-05-07 (session 21 — Sanity image preview fix +
+DB connection lessons. Bug do preview era envs `NEXT_PUBLIC_SANITY_*`
+marcadas como "Sensitive" no Vercel (não expostas em build) → fix:
+desmarcar Sensitive + `getSanityPublicConfig()` lazy validador. Bug
+do engine `poe-api` em crash loop era `.env` com IP público
+`77.42.47.106` em vez de `localhost` (Postgres no container não vê o
+gateway docker quando tráfego dá roundtrip pela WAN, então o
+`pg_hba.conf` rejeita) — runbook em `docs/security/db-hardening.md`
+ganhou Passo 4.5 documentando isso. Session 20 anterior — DB hardening:
 senha forte do `poe`, user `poth_app` CRUD only pro Vercel, `pg_hba.conf`
 restringindo `poe` à Docker network, fail2ban via chain `DOCKER-USER`
 banindo brute force em 5432. Decisão de manter VPS em vez de migrar pra
@@ -130,6 +138,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [21](progress/session-21.md) | 2026-05-07 | Sanity image preview fix + DB connection lessons — preview de imagem 404 em prod por envs `NEXT_PUBLIC_SANITY_*` marcadas como "Sensitive" no Vercel (não ficam disponíveis em build → string vazia no bundle do client → URLs `cdn.sanity.io/images///hash.webp`). Fix: desmarcar Sensitive + `getSanityPublicConfig()` lazy validador que lança erro claro quando vazio + try/catch no `imageUrlFor` do preview com placeholder visual em vez de derrubar a árvore React. Engine `poe-api` em crash loop por `.env` apontando pro DB errado primeiro (`poth` em vez de `poe_content`) e depois pelo IP público `77.42.47.106` em vez de `localhost` (Postgres no container vê tráfego pela WAN como vindo do IP público, não do gateway docker, e `pg_hba.conf` rejeita). `docs/security/db-hardening.md` ganhou Passo 4.5 documentando localhost-vs-IP-público + tabela de qual user/host cada app usa + smoke test em node + nota sobre PM2 `--update-env` não relê `env_file` |
 | [20](progress/session-20.md) | 2026-05-06 | DB hardening — Postgres exposto na VPS após report do BSI/Hetzner: senha forte do superuser `poe`, user novo `poth_app` CRUD only no DB `poth` pra Vercel (não mais conexão como superuser), `pg_hba.conf` restringe `poe` à Docker network 172.18.0.0/16, cross-DB isolation (REVOKE/GRANT em poth/poe_content/hardware_deals), Postgres logging em arquivo com `client=%h`, fail2ban com `chain = DOCKER-USER` + `banaction = iptables-multiport` + `backend = polling` + `ignoreip` do gateway Docker. Validado com 6 falhas → ban → `Connection refused`. Decisão: manter VPS em vez de migrar pra Neon. Runbook em `docs/security/db-hardening.md` |
 | [19](progress/session-19.md) | 2026-05-06 | Simulations — botão de progressão automática de bots (rampa linear `startBots → maxBots` em todos os dias da simulação via `POST /api/simulations/[id]/bot-progression` numa transação só) + refatoração do build cost pra travar valor em BRL no dia em que cada bot entra (em vez de usar preço da divine da semana, que oscilava o custo retroativamente) |
 | [18](progress/session-18.md) | 2026-05-06 | Editor image insertion — destrava upload/paste/drop/`/image` no editor de blog (toda infra existia mas `useTiptapEditor` ignorava `useSlashCommands`). Pipeline WebP no upload + captura de dimensões naturais + layout responsivo no preview com breakout das imagens estourando coluna prose em viewports grandes + CSS espelhado no `poetrade-dev` pra parity |

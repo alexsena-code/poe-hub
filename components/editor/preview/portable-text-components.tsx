@@ -208,10 +208,29 @@ function ImageComponent({ value, isInline }: { value: Record<string, unknown>; i
   const width = blockWidth ?? metaDims?.width ?? 1280;
   const height = blockHeight ?? metaDims?.height ?? 720;
 
-  const src = imageUrlFor(value as Parameters<typeof imageUrlFor>[0])
-    .fit("max")
-    .auto("format")
-    .url();
+  // imageUrlFor throws when NEXT_PUBLIC_SANITY_PROJECT_ID/DATASET are missing
+  // or when the asset _ref is malformed (e.g. a CDN URL was stored instead of
+  // an image-...-WxH-format ref). Render a visible placeholder so the rest of
+  // the preview still renders and the operator sees the actual reason.
+  let src: string | null = null;
+  let buildError: string | null = null;
+  try {
+    src = imageUrlFor(value as Parameters<typeof imageUrlFor>[0])
+      .fit("max")
+      .auto("format")
+      .url();
+  } catch (err) {
+    buildError = err instanceof Error ? err.message : String(err);
+  }
+
+  if (!src) {
+    return (
+      <div className="my-10 rounded-md border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+        <strong className="font-semibold">Falha ao montar URL da imagem.</strong>
+        <div className="mt-1 font-mono text-xs text-red-200/80">{buildError ?? "unknown error"}</div>
+      </div>
+    );
+  }
 
   // Layout strategy:
   //  - width:100% + height:auto so small uploads still fill the article column

@@ -72,10 +72,43 @@ export const sanityClient = {
 /**
  * Public config for client-side imageBuilder (no token, uses NEXT_PUBLIC_ vars).
  * Safe to import in browser bundles.
+ *
+ * Lazy-validated: throws a precise error when projectId or dataset are missing
+ * or empty. Common cause is marking the NEXT_PUBLIC_SANITY_* envs as
+ * "Sensitive" in Vercel, which removes them from the build-time bundle and
+ * silently inlines empty strings — producing CDN URLs like
+ * https://cdn.sanity.io/images/// (404). Failing visibly here surfaces that
+ * misconfiguration instead of letting Next/Image return a misleading 404.
  */
-export const sanityPublicConfig = {
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID ?? "",
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET ?? "production",
-  apiVersion: process.env.NEXT_PUBLIC_SANITY_API_VERSION ?? "2025-05-21",
-  useCdn: true,
-};
+export interface SanityPublicConfig {
+  projectId: string;
+  dataset: string;
+  apiVersion: string;
+  useCdn: boolean;
+}
+
+export function getSanityPublicConfig(): SanityPublicConfig {
+  const projectId = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID;
+  const dataset = process.env.NEXT_PUBLIC_SANITY_DATASET;
+
+  if (!projectId) {
+    throw new Error(
+      `Missing or empty environment variable: NEXT_PUBLIC_SANITY_PROJECT_ID (got ${JSON.stringify(projectId)}). ` +
+        `In Vercel, ensure this var is NOT marked "Sensitive" — Sensitive envs are stripped from the client bundle ` +
+        `at build time, which produces broken CDN URLs like https://cdn.sanity.io/images///hash.webp.`,
+    );
+  }
+  if (!dataset) {
+    throw new Error(
+      `Missing or empty environment variable: NEXT_PUBLIC_SANITY_DATASET (got ${JSON.stringify(dataset)}). ` +
+        `In Vercel, ensure this var is NOT marked "Sensitive" — Sensitive envs are stripped from the client bundle.`,
+    );
+  }
+
+  return {
+    projectId,
+    dataset,
+    apiVersion: process.env.NEXT_PUBLIC_SANITY_API_VERSION ?? "2025-05-21",
+    useCdn: true,
+  };
+}
