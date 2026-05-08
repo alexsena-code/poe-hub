@@ -187,8 +187,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   const { meta, body } = parsed.data as DraftPutBody;
 
-  // Build the Sanity draft document with partial fields.
-  // Only include reference fields when the corresponding ID is present.
+  // Build the partial fields to write — only include what the caller sent.
+  // Reference fields are wrapped only when their corresponding ID is present.
   const baseId = id.replace(/^drafts\./, "");
   const draftId = `drafts.${baseId}`;
 
@@ -196,9 +196,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
   const authorRef = toRef(meta.authorId);
   const mainImage = toMainImage(meta.mainImageAssetId);
 
-  const draftDoc: Record<string, unknown> = {
-    _id: draftId,
-    _type: "post",
+  const fields: Record<string, unknown> = {
     language: meta.language,
     ...(meta.title !== undefined ? { title: meta.title } : {}),
     ...(meta.metadata !== undefined ? { metadata: meta.metadata } : {}),
@@ -216,9 +214,45 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
   try {
     const client = getSanityClient();
-    await client.createOrReplace(
-      draftDoc as Parameters<typeof client.createOrReplace>[0],
-    );
+
+    // Strategy — preserve any field not explicitly in the patch payload:
+    //  1. Draft already exists → patch().set(fields). Untouched fields
+    //     (notably `body` when publish-form patches only meta) stay intact.
+    //  2. Draft doesn't exist but published does → clone published into a
+    //     draft first (so the new draft starts with the published body /
+    //     other fields), then patch the editor fields on top. Without this
+    //     step, editing a published-only post via /publish silently wipes
+    //     the body to nothing on the first meta-only patch.
+    //  3. Neither exists (fresh /new draft) → createIfNotExists with the
+    //     fields we have. Sanity tolerates partial draft documents.
+    const existingDraft = await client.getDocument(draftId);
+    if (!existingDraft) {
+      const published = await client.getDocument(baseId);
+      if (published) {
+        // Clone published doc structure into the draft, stripping system
+        // fields that Sanity manages itself.
+        const cloned: Record<string, unknown> = { ...(published as Record<string, unknown>) };
+        delete cloned._id;
+        delete cloned._rev;
+        delete cloned._createdAt;
+        delete cloned._updatedAt;
+        await client.createIfNotExists({
+          _id: draftId,
+          _type: "post",
+          ...cloned,
+        } as Parameters<typeof client.createIfNotExists>[0]);
+        // Apply the editor's patch on top of the cloned content.
+        await client.patch(draftId).set(fields).commit();
+      } else {
+        await client.createIfNotExists({
+          _id: draftId,
+          _type: "post",
+          ...fields,
+        } as Parameters<typeof client.createIfNotExists>[0]);
+      }
+    } else {
+      await client.patch(draftId).set(fields).commit();
+    }
 
     return NextResponse.json(
       { ok: true, draftId: baseId, savedAt: new Date().toISOString() },

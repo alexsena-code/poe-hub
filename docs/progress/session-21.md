@@ -170,3 +170,32 @@ Validado via Playwright em produção: doc `ebJsD6uVuolZMs6YRDTzw`
 re-fetch confirmou `meta.language: "pt-br"` (`healed: true`).
 Mesma checagem no irmão EN também passou. Toggle agora mostra
 "PT-BR" + "EN" corretamente.
+
+**6. Bug crítico: PUT draft com `createOrReplace` apagava body.**
+Operador relatou perda de conteúdo PT após navegar pelo toggle do
+`/publish` e clicar Publicar. Causa raiz: `app/api/sanity/draft/[id]/
+route.ts` PUT usava `client.createOrReplace(draftDoc)` que substitui
+o doc inteiro, removendo qualquer campo não enviado. O publish-form
+tem um `patchDraft` debounced (1s) que envia apenas `meta` em todo
+blur — sem `body`. Cada keystroke de meta wipea o body inteiro do
+draft. Operador chega em `/publish`, edita slug, clica Publicar →
+falha porque body está vazio (viola `body: z.array(...).min(1)`).
+
+Reproduzido via Playwright: PUT `{meta: {...}}` em
+`hUQldyBdGZYNdcICGjwF9` levou body de 52 → 0 blocks.
+
+Fix: trocar a estratégia de write por uma que preserva o estado:
+- Draft já existe → `client.patch(draftId).set(fields).commit()`.
+  Campos não no patch ficam intactos.
+- Draft não existe mas published existe → clonar published como
+  draft (com body), depois aplicar o patch. Sem isso, editar
+  published-only via `/publish` apaga o body na primeira patch.
+- Nem draft nem published → `createIfNotExists` com os fields que
+  o caller mandou (caso `/new` fresh).
+
+Regression test em `draft.test.ts` cobre PUT meta-only sem body
+no payload — verifica que `patch.set` é chamado sem `body` field.
+Mock estendido com `client.createIfNotExists` e `client.patch` builder.
+
+Validado via Playwright após fix: `NEnBG1-zfIvWiW3P1u12L` (body=59
+blocks) sofreu PUT meta-only → body permaneceu 59 blocks.

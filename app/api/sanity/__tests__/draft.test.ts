@@ -24,17 +24,22 @@ const mockGetServerSession = vi.mocked(getServerSession);
 // ─── Sanity client mock ───────────────────────────────────────────────────────
 
 const mockCreateOrReplace = vi.fn();
+const mockCreateIfNotExists = vi.fn();
 const mockGetDocument = vi.fn();
 const mockDelete = vi.fn();
 const mockFetch = vi.fn();
 const mockTransactionCommit = vi.fn();
 const mockPatchCommit = vi.fn();
+const mockPatchSet = vi.fn();
+const mockPatchId = vi.fn();
 
-// GET self-heal: client.patch(id).set({...}).commit(). Same chain pattern as
-// transaction — set returns the same patch builder so chaining works.
-function makePatchStub() {
+// GET self-heal + PUT incremental update both use:
+//   client.patch(id).set({...}).commit()
+// `set` must return the same patch builder so chaining works.
+function makePatchStub(id: string) {
+  mockPatchId(id);
   const patch: { set: ReturnType<typeof vi.fn>; commit: ReturnType<typeof vi.fn> } = {
-    set: vi.fn(),
+    set: mockPatchSet,
     commit: mockPatchCommit,
   };
   patch.set.mockReturnValue(patch);
@@ -57,10 +62,11 @@ function makeTransactionStub() {
 vi.mock("@/lib/sanity/client", () => ({
   getSanityClient: () => ({
     createOrReplace: mockCreateOrReplace,
+    createIfNotExists: mockCreateIfNotExists,
     getDocument: mockGetDocument,
     delete: mockDelete,
     fetch: mockFetch,
-    patch: () => makePatchStub(),
+    patch: (id: string) => makePatchStub(id),
     transaction: () => makeTransactionStub(),
   }),
 }));
@@ -113,6 +119,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetServerSession.mockResolvedValue({ user: { email: "test@test.com" } });
   mockCreateOrReplace.mockResolvedValue({ _id: "drafts.post-abc123" });
+  mockCreateIfNotExists.mockResolvedValue({ _id: "drafts.post-abc123" });
   mockGetDocument.mockResolvedValue(sanityDraftDoc);
   mockDelete.mockResolvedValue({});
   mockFetch.mockResolvedValue(null);
@@ -145,16 +152,31 @@ describe("PUT /api/sanity/draft/[id]", () => {
     expect(data.error).toBe("Validation failed");
   });
 
-  it("creates draft with drafts.<id> _id in Sanity", async () => {
+  it("patches existing draft via patch().set() (preserves untouched fields)", async () => {
+    // Default mock returns sanityDraftDoc, so the doc "exists" — PUT should
+    // patch instead of replace, preserving body when only meta is sent.
     const res = await PUT(
       buildPutRequest({ meta: partialMeta, body: [] }),
       makeContext("post-abc123"),
     );
 
     expect(res.status).toBe(200);
-    expect(mockCreateOrReplace).toHaveBeenCalledOnce();
+    expect(mockPatchSet).toHaveBeenCalledOnce();
+    expect(mockPatchId).toHaveBeenCalledWith("drafts.post-abc123");
+    expect(mockCreateOrReplace).not.toHaveBeenCalled();
+  });
 
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+  it("creates draft via createIfNotExists when doc does not exist", async () => {
+    mockGetDocument.mockResolvedValueOnce(null);
+
+    const res = await PUT(
+      buildPutRequest({ meta: partialMeta, body: [] }),
+      makeContext("post-abc123"),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateIfNotExists).toHaveBeenCalledOnce();
+    const arg = mockCreateIfNotExists.mock.calls[0][0] as Record<string, unknown>;
     expect(arg._id).toBe("drafts.post-abc123");
     expect(arg._type).toBe("post");
   });
@@ -165,7 +187,7 @@ describe("PUT /api/sanity/draft/[id]", () => {
       makeContext("post-abc123"),
     );
 
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+    const arg = mockPatchSet.mock.calls[0][0] as Record<string, unknown>;
     expect(arg.category).toEqual({ _type: "reference", _ref: "cat-001" });
     expect(arg.author).toEqual({ _type: "reference", _ref: "author-001" });
   });
@@ -178,9 +200,21 @@ describe("PUT /api/sanity/draft/[id]", () => {
       makeContext("post-abc123"),
     );
 
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
+    const arg = mockPatchSet.mock.calls[0][0] as Record<string, unknown>;
     expect("category" in arg).toBe(false);
     expect("author" in arg).toBe(false);
+  });
+
+  it("does not include body in patch when caller omits it (preserves existing body)", async () => {
+    // This is the regression test for the body-wipe bug: publish-form patches
+    // only meta (no body) on every keystroke; createOrReplace was wiping body.
+    await PUT(
+      buildPutRequest({ meta: partialMeta }), // no body field at all
+      makeContext("post-abc123"),
+    );
+
+    const arg = mockPatchSet.mock.calls[0][0] as Record<string, unknown>;
+    expect("body" in arg).toBe(false);
   });
 
   it("returns ok, draftId, savedAt on success", async () => {
@@ -201,8 +235,9 @@ describe("PUT /api/sanity/draft/[id]", () => {
       makeContext("drafts.post-abc123"),
     );
 
-    const arg = mockCreateOrReplace.mock.calls[0][0] as Record<string, unknown>;
-    expect(arg._id).toBe("drafts.post-abc123");
+    // patch.set is called against client.patch(draftId) — the id passed to
+    // the patch() builder is captured by mockPatchId.
+    expect(mockPatchId).toHaveBeenCalledWith("drafts.post-abc123");
   });
 });
 
