@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { z } from "zod/v4";
 import { authOptions } from "@/lib/auth";
 import { getSanityClient } from "@/lib/sanity/client";
-import { deleteDraft } from "@/lib/sanity/publish";
+import { deletePost } from "@/lib/sanity/publish";
 import { sanityPostToEditorMeta } from "@/lib/sanity/transform";
 import { editorDraftMetaSchema } from "@/components/editor/editor-meta-schema";
 import type { SanityReference, SanityImageRef } from "@/lib/sanity/types";
@@ -47,14 +47,18 @@ function toMainImage(assetId: string | undefined): SanityImageRef | undefined {
 /**
  * GET /api/sanity/draft/[id]
  *
- * Fetches a draft and returns EditorMetaForm-friendly values:
+ * Fetches a post and returns EditorMetaForm-friendly values:
  * - category._ref → categoryId
  * - author._ref → authorId
  * - mainImage.asset._ref → mainImageAssetId
  * - slug.current → slug (string)
  *
- * Session 10.c: added reverse transform so caller gets form-ready values
- * instead of raw Sanity shapes.
+ * Lookup precedence: `drafts.<id>` first (in-progress edits) → `<id>`
+ * (published doc) as fallback. Without the fallback, posts that have only a
+ * published variant (no draft yet) returned 404, blocking the operator from
+ * opening them in the editor. With the fallback, opening a published-only
+ * post loads its content; the next autosave PUT writes to `drafts.<id>` so
+ * the published doc stays untouched until republish.
  */
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const session = await getServerSession(authOptions);
@@ -64,25 +68,32 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   const { id } = await params;
   const client = getSanityClient();
-  const draftId = `drafts.${id.replace(/^drafts\./, "")}`;
+  const baseId = id.replace(/^drafts\./, "");
+  const draftId = `drafts.${baseId}`;
 
-  let draft: Record<string, unknown> | null = null;
+  let doc: Record<string, unknown> | null = null;
   try {
-    const fetched = await client.getDocument(draftId);
-    draft = (fetched as Record<string, unknown> | null | undefined) ?? null;
+    const draftDoc = await client.getDocument(draftId);
+    doc = (draftDoc as Record<string, unknown> | null | undefined) ?? null;
+    if (!doc) {
+      const publishedDoc = await client.getDocument(baseId);
+      doc = (publishedDoc as Record<string, unknown> | null | undefined) ?? null;
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[sanity.draft] GET draft "${draftId}" failed: ${message}`);
+    console.error(`[sanity.draft] GET "${baseId}" failed: ${message}`);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  if (!draft) {
-    return NextResponse.json({ error: `Draft not found: ${draftId}` }, { status: 404 });
+  if (!doc) {
+    return NextResponse.json(
+      { error: `Post not found (tried both ${draftId} and ${baseId})` },
+      { status: 404 },
+    );
   }
 
-  // Transform to editor-friendly shape before returning.
-  const meta = sanityPostToEditorMeta(draft);
-  const body = (draft.body as unknown[] | undefined) ?? [];
+  const meta = sanityPostToEditorMeta(doc);
+  const body = (doc.body as unknown[] | undefined) ?? [];
 
   return NextResponse.json({ meta, body, draftId: id }, { status: 200 });
 }
@@ -171,8 +182,12 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 /**
  * DELETE /api/sanity/draft/[id]
  *
- * Deletes a draft from Sanity. Accepts bare ID or `drafts.`-prefixed ID.
- * Returns 204 No Content on success.
+ * Removes BOTH the draft (`drafts.<id>`) and the published (`<id>`) variants
+ * of the post in a single Sanity transaction. The route name is historical
+ * (it predates the published-delete capability) — the operation is now
+ * "delete the entire post regardless of which variants exist."
+ *
+ * Accepts bare ID or `drafts.`-prefixed ID. Returns 204 No Content on success.
  */
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const session = await getServerSession(authOptions);
@@ -183,11 +198,11 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
 
   try {
-    await deleteDraft(id);
+    await deletePost(id);
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error(`[sanity.draft] DELETE draft "${id}" failed: ${message}`);
+    console.error(`[sanity.draft] DELETE post "${id}" failed: ${message}`);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

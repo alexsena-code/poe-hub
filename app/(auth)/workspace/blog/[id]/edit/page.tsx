@@ -31,9 +31,13 @@ interface DraftResponse {
   draftId: string;
 }
 
+interface SiblingResponse extends DraftResponse {
+  language: 'pt-br' | 'en';
+}
+
 type LoadState =
   | { status: "loading" }
-  | { status: "found"; draft: DraftResponse }
+  | { status: "found"; draft: DraftResponse; sibling: SiblingResponse | null }
   | { status: "not-found" }
   | { status: "error"; message: string };
 
@@ -61,23 +65,35 @@ export default function EditBlogPostPage() {
 
     async function fetchDraft() {
       try {
-        const res = await fetch(`/api/sanity/draft/${id}`, {
-          cache: "no-store",
-        });
+        // Fetch the primary draft + its translation sibling in parallel.
+        // Sibling failures are non-fatal — the editor falls back to single mode.
+        const [primaryRes, siblingRes] = await Promise.all([
+          fetch(`/api/sanity/draft/${id}`, { cache: "no-store" }),
+          fetch(`/api/sanity/draft/${id}/sibling`, { cache: "no-store" }),
+        ]);
 
         if (cancelled) return;
 
-        if (res.status === 404) {
+        if (primaryRes.status === 404) {
           setState({ status: "not-found" });
           return;
         }
-        if (!res.ok) {
-          setState({ status: "error", message: `HTTP ${res.status}` });
+        if (!primaryRes.ok) {
+          setState({ status: "error", message: `HTTP ${primaryRes.status}` });
           return;
         }
 
-        const data = (await res.json()) as DraftResponse;
-        setState({ status: "found", draft: data });
+        const draft = (await primaryRes.json()) as DraftResponse;
+
+        let sibling: SiblingResponse | null = null;
+        if (siblingRes.ok) {
+          const siblingData = (await siblingRes.json()) as
+            | SiblingResponse
+            | { sibling: null };
+          if ('draftId' in siblingData) sibling = siblingData;
+        }
+
+        setState({ status: "found", draft, sibling });
       } catch (err) {
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -120,7 +136,7 @@ export default function EditBlogPostPage() {
     );
   }
 
-  const { draft } = state;
+  const { draft, sibling } = state;
 
   return (
     <EditorShell
@@ -128,6 +144,16 @@ export default function EditBlogPostPage() {
       initialBody={draft.body}
       draftId={id}
       defaultLanguage={(draft.meta.language as 'pt-br' | 'en') ?? 'pt-br'}
+      sibling={
+        sibling
+          ? {
+              initialMeta: sibling.meta,
+              initialBody: sibling.body,
+              draftId: sibling.draftId,
+              language: sibling.language,
+            }
+          : undefined
+      }
     />
   );
 }

@@ -77,6 +77,8 @@ export function PostRow({ post, isDraft }: PostRowProps) {
   const lang = post.language ?? "?";
   const date = isDraft ? post._updatedAt : post.publishedAt;
 
+  const deleteLabel = isDraft ? "rascunho" : "post publicado";
+
   function handleConfirmDelete() {
     startDeleting(async () => {
       try {
@@ -85,16 +87,16 @@ export function PostRow({ post, isDraft }: PostRowProps) {
           const data = (await res.json().catch(() => ({ error: res.statusText }))) as {
             error?: string;
           };
-          toast.error("Falha ao deletar rascunho", {
+          toast.error(`Falha ao deletar ${deleteLabel}`, {
             description: data.error ?? res.statusText,
           });
           return;
         }
-        toast.success("Rascunho deletado");
+        toast.success(`${isDraft ? "Rascunho" : "Post"} deletado`);
         setConfirmOpen(false);
         router.refresh();
       } catch (err) {
-        toast.error("Erro ao deletar rascunho", {
+        toast.error(`Erro ao deletar ${deleteLabel}`, {
           description: err instanceof Error ? err.message : "Erro desconhecido",
         });
       }
@@ -128,47 +130,50 @@ export function PostRow({ post, isDraft }: PostRowProps) {
         </div>
       </Link>
 
-      {isDraft && (
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setConfirmOpen(true);
-            }}
-            disabled={isDeleting}
-            aria-label="Deletar rascunho"
-            className={cn(
-              "mr-2 rounded-md p-1.5 text-muted-foreground transition-opacity",
-              "opacity-0 group-hover:opacity-100",
-              "hover:bg-destructive/10 hover:text-destructive",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Deletar rascunho?</AlertDialogTitle>
-              <AlertDialogDescription>
-                &ldquo;{post.title ?? "(sem título)"}&rdquo; será removido do Sanity.
-                Essa ação é irreversível.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {isDeleting ? "Deletando..." : "Deletar"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setConfirmOpen(true);
+          }}
+          disabled={isDeleting}
+          aria-label={`Deletar ${deleteLabel}`}
+          className={cn(
+            "mr-2 rounded-md p-1.5 text-muted-foreground transition-opacity",
+            "opacity-0 group-hover:opacity-100",
+            "hover:bg-destructive/10 hover:text-destructive",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+          )}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Deletar {isDraft ? "rascunho" : "post publicado"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{post.title ?? "(sem título)"}&rdquo; será removido do Sanity
+              {isDraft
+                ? "."
+                : " — incluindo a versão publicada e qualquer rascunho associado."}{" "}
+              Essa ação é irreversível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Deletando..." : "Deletar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

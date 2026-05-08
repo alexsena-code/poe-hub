@@ -60,3 +60,61 @@ em crash loop que terminou descobrindo que apps locais devem usar
 - Atualizar Vercel: as envs `NEXT_PUBLIC_SANITY_*` precisam ficar
   desmarcadas como Sensitive **permanentemente** — qualquer recriação
   acidental quebra o preview de novo.
+
+---
+
+### Editor: paste de imagens, modo bilingue, edit/delete de publicados
+
+Sessão de trabalho 2026-05-07 noite, motivada por reclamação do user
+de que o post EN publicado tinha apenas 1 imagem enquanto o PT tinha
+5 (bug observado em produção via Playwright). Investigação revelou
+três problemas distintos.
+
+**1. Paste consecutivo de imagens sobrescrevia a anterior.**
+`insertImageNode` em `components/editor/extensions/image-upload.ts`
+chamava `tr.replaceSelectionWith(node)`, que deixa a seleção como
+`NodeSelection` no nó inserido. Próximo Ctrl+V substituía em vez de
+acumular. Fix: após inserir, mover cursor pra `TextSelection.near` da
+posição depois do nó; se imagem caiu no fim do doc, anexar parágrafo
+vazio. Função exportada pra teste. 2 testes de regressão em
+`__tests__/image-upload.test.ts` (3 pastes consecutivos = 3 imagens
+no doc; imagem no fim do doc gera parágrafo).
+
+**2. Editor bilingue (toggle PT/EN).** User pediu pra editar PT e EN
+no mesmo lugar sem duplicar trabalho. Pareamento via
+`translation.metadata` (plugin i18n do Sanity) — schema do post em
+`poetrade-dev/sanity/schemas/post.ts` não tem campo `translationOf`,
+a relação fica num doc separado consultável via GROQ
+`*[_type == "translation.metadata" && references(^._id)]`. Novo
+endpoint `app/api/sanity/draft/[id]/sibling/route.ts` retorna o
+draft do irmão. Página `[id]/edit/page.tsx` faz fetch paralelo
+primary + sibling. EditorShell aceita prop `sibling` e monta dois
+`useEditorPane` (novo hook em `hooks/use-editor-pane.ts`); ambos
+Tiptaps ficam montados pra autosave independente, mas só um é
+visível por vez via toggle PT-BR/EN no header. Tentei broadcast de
+imagem entre panes — descartado por inserir no fim do doc passivo
+(UX confusa); paste continua per-idioma.
+
+**3. Posts publicados não editáveis nem deletáveis.**
+`GET /api/sanity/draft/[id]` só procurava `drafts.<id>`, retornava
+404 pra published-only. Fix: tentar draft, fallback pra published.
+Editar publicado dispara autosave que cria `drafts.<id>` automa-
+ticamente; publish promove draft de volta numa transaction. Pra
+deletar, adicionei `deletePost(id)` em `lib/sanity/publish.ts` que
+apaga draft + published em transaction. `DELETE` handler usa
+`deletePost`; nome da rota mantido por inércia. `PostRow` mostra
+botão Trash em ambas as seções com copy adaptada (rascunho vs post
+publicado). Mock do Sanity client em `draft.test.ts` estendido com
+`transaction()` builder pra cobrir o novo caminho.
+
+**Validação:**
+- Vitest: `npx vitest run components/editor` (202/202),
+  `npx vitest run lib/sanity/__tests__/publish.test.ts
+  app/api/sanity/__tests__/draft.test.ts` (51/51).
+- Typecheck: `npx tsc --noEmit` — zero erros novos nos arquivos
+  tocados.
+- Smoke via Playwright em `localhost:3000`: post EN publicado
+  `X9x3hBipkhUy0zLYA16wm` que dava 404 agora carrega; lista do
+  blog mostra 39 botões Trash (8 rascunho + 31 publicado); toggle
+  PT-BR/EN troca conteúdo e título do EditorTitleBar conforme pane
+  ativo.

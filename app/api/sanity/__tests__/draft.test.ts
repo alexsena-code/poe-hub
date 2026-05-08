@@ -26,12 +26,27 @@ const mockGetServerSession = vi.mocked(getServerSession);
 const mockCreateOrReplace = vi.fn();
 const mockGetDocument = vi.fn();
 const mockDelete = vi.fn();
+const mockTransactionCommit = vi.fn();
+
+// deletePost (used by DELETE handler) uses a transaction:
+// `client.transaction().delete(draftId).delete(baseId).commit()`. The chained
+// .delete() returns the same transaction object so each call must be reachable
+// via that object, hence the self-referential builder below.
+function makeTransactionStub() {
+  const tx: { delete: ReturnType<typeof vi.fn>; commit: ReturnType<typeof vi.fn> } = {
+    delete: vi.fn(),
+    commit: mockTransactionCommit,
+  };
+  tx.delete.mockReturnValue(tx);
+  return tx;
+}
 
 vi.mock("@/lib/sanity/client", () => ({
   getSanityClient: () => ({
     createOrReplace: mockCreateOrReplace,
     getDocument: mockGetDocument,
     delete: mockDelete,
+    transaction: () => makeTransactionStub(),
   }),
 }));
 
@@ -85,6 +100,7 @@ beforeEach(() => {
   mockCreateOrReplace.mockResolvedValue({ _id: "drafts.post-abc123" });
   mockGetDocument.mockResolvedValue(sanityDraftDoc);
   mockDelete.mockResolvedValue({});
+  mockTransactionCommit.mockResolvedValue({});
 });
 
 // ─── PUT tests ────────────────────────────────────────────────────────────────

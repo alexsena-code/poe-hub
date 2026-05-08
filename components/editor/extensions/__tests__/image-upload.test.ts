@@ -180,6 +180,69 @@ describe('buildImageUploadExtension', () => {
   });
 });
 
+describe('insertImageNode (consecutive paste regression)', () => {
+  // Reproduces the bug where Ctrl+V pasting multiple images one-by-one only
+  // kept the last image — replaceSelectionWith leaves a NodeSelection on the
+  // inserted block, and the next paste overwrites it. The fix moves the cursor
+  // to a TextSelection past the node so consecutive inserts accumulate.
+  it('inserts three images consecutively without overwriting prior ones', async () => {
+    const { Editor } = await import('@tiptap/core');
+    const { StarterKit } = await import('@tiptap/starter-kit');
+    const { Image } = await import('@tiptap/extension-image');
+    const { insertImageNode } = await import('../image-upload');
+
+    const editor = new Editor({
+      extensions: [StarterKit, Image],
+      element: document.createElement('div'),
+    });
+
+    const refs = ['asset-aaa', 'asset-bbb', 'asset-ccc'];
+    for (const id of refs) {
+      insertImageNode(editor.view, {
+        src: `https://cdn.sanity.io/${id}.jpg`,
+        filename: `${id}.jpg`,
+        assetId: id,
+      });
+    }
+
+    const imageNodes: { src: string }[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'image') imageNodes.push({ src: node.attrs.src as string });
+    });
+
+    expect(imageNodes).toHaveLength(3);
+    expect(imageNodes.map((n) => n.src)).toEqual(refs.map((id) => `https://cdn.sanity.io/${id}.jpg`));
+
+    editor.destroy();
+  });
+
+  it('appends a paragraph when image is inserted at end of doc so cursor has somewhere to land', async () => {
+    const { Editor } = await import('@tiptap/core');
+    const { StarterKit } = await import('@tiptap/starter-kit');
+    const { Image } = await import('@tiptap/extension-image');
+    const { insertImageNode } = await import('../image-upload');
+
+    const editor = new Editor({
+      extensions: [StarterKit, Image],
+      element: document.createElement('div'),
+      content: '',
+    });
+
+    insertImageNode(editor.view, {
+      src: 'https://cdn.sanity.io/x.jpg',
+      filename: 'x.jpg',
+      assetId: 'x',
+    });
+
+    // After insert, the last child of the doc should be the synthetic paragraph
+    // — not the image — so the caret can sit there for the next paste.
+    const lastChild = editor.state.doc.lastChild;
+    expect(lastChild?.type.name).toBe('paragraph');
+
+    editor.destroy();
+  });
+});
+
 describe('clampDimensions', () => {
   it('passes through when both dimensions are below the cap', async () => {
     const { clampDimensions } = await import('../image-upload');

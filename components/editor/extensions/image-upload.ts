@@ -254,8 +254,8 @@ interface InsertImageOptions {
   height?: number;
 }
 
-function insertImageNode(view: EditorView, opts: InsertImageOptions): void {
-  const { schema, tr } = view.state;
+export function insertImageNode(view: EditorView, opts: InsertImageOptions): void {
+  const { schema } = view.state;
   const imageNode = schema.nodes.image;
   if (!imageNode) return;
 
@@ -268,7 +268,24 @@ function insertImageNode(view: EditorView, opts: InsertImageOptions): void {
   if (opts.height && opts.height > 0) attrs.height = opts.height;
 
   const node = imageNode.create(attrs);
-  view.dispatch(tr.replaceSelectionWith(node));
+  const tr = view.state.tr.replaceSelectionWith(node);
+
+  // After replaceSelectionWith, ProseMirror leaves a NodeSelection on the
+  // inserted block — meaning the next replaceSelectionWith call (e.g. a second
+  // Ctrl+V image paste) overwrites this one instead of inserting after it.
+  // Move the cursor to a TextSelection just past the node so consecutive
+  // pastes accumulate rather than replacing each other.
+  const afterPos = tr.selection.to;
+  const paragraphType = schema.nodes.paragraph;
+  if (paragraphType && afterPos >= tr.doc.content.size) {
+    // Image landed at the very end of the doc — no node follows to host the
+    // cursor. Append an empty paragraph so the caret has somewhere to land
+    // and the next paste isn't forced to replace the image.
+    tr.insert(afterPos, paragraphType.create());
+  }
+  tr.setSelection(TextSelection.near(tr.doc.resolve(afterPos), 1));
+  tr.scrollIntoView();
+  view.dispatch(tr);
 }
 
 // ---------------------------------------------------------------------------

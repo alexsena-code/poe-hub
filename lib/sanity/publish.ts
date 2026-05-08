@@ -285,6 +285,34 @@ export async function deleteDraft(id: string): Promise<void> {
 }
 
 /**
+ * Deletes both the draft (`drafts.<id>`) and the published (`<id>`) variants
+ * of a post in a single Sanity transaction.
+ *
+ * Why a transaction: leaving one variant alive while removing the other
+ * produces zombie state — Sanity Studio renders `drafts.*` on top of the
+ * published doc, so a published with no draft and a draft without a
+ * published behave very differently in the UI. Atomic delete avoids that.
+ *
+ * Accepts either the bare ID or the `drafts.`-prefixed ID. Sanity ignores
+ * delete operations for non-existent documents, so calling this on a
+ * post-with-only-draft (or only-published) is safe.
+ */
+export async function deletePost(id: string): Promise<void> {
+  const client = getSanityClient();
+  const baseId = id.replace(/^drafts\./, "");
+  const draftId = `drafts.${baseId}`;
+
+  try {
+    await client.transaction().delete(draftId).delete(baseId).commit();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `[sanity.publish] deletePost failed for "${baseId}" (draft + published): ${message}`,
+    );
+  }
+}
+
+/**
  * Publishes a draft to production:
  * 1. Fetches the draft document by ID.
  * 2. Validates it and atomically publishes + deletes the draft via publishPost.
