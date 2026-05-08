@@ -118,3 +118,20 @@ publicado). Mock do Sanity client em `draft.test.ts` estendido com
   blog mostra 39 botões Trash (8 rascunho + 31 publicado); toggle
   PT-BR/EN troca conteúdo e título do EditorTitleBar conforme pane
   ativo.
+
+**4. Bilingue desde a criação (`/new`).** Após o primeiro commit, o
+toggle só aparecia em posts existentes pareados via i18n. User pediu
+pra `/new` também ter o toggle desde o primeiro click. Solução: nova
+rota `POST /api/sanity/translation-pair` cria um doc
+`translation.metadata` (formato do plugin `@sanity/document-
+internationalization`) linkando dois drafts ainda não-existentes via
+weak refs. Página `app/(auth)/workspace/blog/new/page.tsx` gera dois
+nanoids no mount, chama a rota uma vez (gated por `useRef`), e só
+renderiza `EditorShell` com `sibling` quando o pareamento está
+pronto. Re-mount cria órfão (aceitável MVP — Sanity drops orphan
+metadata quando nenhum ref resolve).
+
+Confirmação per-idioma: cada `useEditorPane` mantém `meta` próprio
+(title, metadata SEO, slug, tags, mainImage), `useAutosave` recebe o
+`meta` daquele pane, e `EditorTitleBar` lê via context que aponta
+sempre pro pane ativo. Metadata nunca cruza entre idiomas.
