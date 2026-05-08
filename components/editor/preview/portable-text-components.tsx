@@ -186,8 +186,11 @@ function processNormalBlock(children: React.ReactNode): React.ReactNode {
     }
   }
 
+  // text-justify mirrors the public blog (poetrade-dev) — without it, the
+  // operator sees left-aligned paragraphs in the preview but the published
+  // article is justified, creating a constant "looks different" surprise.
   return (
-    <p className="leading-relaxed mb-4 whitespace-pre-wrap">
+    <p className="leading-relaxed mb-4 whitespace-pre-wrap text-justify">
       {processChildren(children)}
     </p>
   );
@@ -239,19 +242,22 @@ function ImageComponent({ value, isInline }: { value: Record<string, unknown>; i
   //    don't dominate the viewport; the image is letterboxed inside a centered
   //    box that keeps the aspect ratio.
   //  - aspectRatio CSS reserves space pre-load (no CLS).
-  //  - Negative horizontal margins (lg+) let images break out of the
-  //    max-w-3xl prose column (~768px) while text stays compact. Effective
-  //    image widths: lg ≈1088px, xl ≈1344px — covers ultrawide nicely without
-  //    needing JS for breakout positioning.
+  //  - Breakout: with the article container now at max-w-7xl (1280px), the
+  //    older lg/xl negative margins all hit a no-op (the resulting width
+  //    exceeds the viewport, so the image clamps back to viewport width).
+  //    Only ultrawide (≥1920px) has room to breakout meaningfully — 1280 +
+  //    576 = 1856px fits comfortably inside a 1920px viewport. Adding the
+  //    smaller breakpoints back would create the illusion of a wider image
+  //    that the viewport then truncates.
   return (
-    <div className="my-10 flex justify-center overflow-hidden rounded-[15px] lg:-mx-40 xl:-mx-72">
+    <div className="my-10 flex justify-center overflow-hidden rounded-[15px] min-[1920px]:-mx-72">
       <Image
         src={src}
         width={width}
         height={height}
         alt={(value.alt as string) || "blog image"}
         loading="lazy"
-        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 768px, (max-width: 1280px) 1088px, 1344px"
+        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1024px, (max-width: 1920px) 1280px, 1856px"
         style={{
           display: isInline ? "inline-block" : "block",
           width: "100%",
