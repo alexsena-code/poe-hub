@@ -29,6 +29,11 @@ import { PublishForm } from '@/components/editor/publish/publish-form';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface PairStatus {
+  draft: boolean;
+  published: boolean;
+}
+
 interface DraftResponse {
   meta: Partial<EditorMetaForm>;
   // GET /api/sanity/draft/[id] returns Portable Text (canonical Sanity format),
@@ -38,6 +43,7 @@ interface DraftResponse {
   body: PortableTextContent[];
   draftId: string;
   languageFromI18n?: 'pt-br' | 'en' | null;
+  status?: PairStatus;
 }
 
 interface SiblingResponse extends DraftResponse {
@@ -183,6 +189,8 @@ export default function PublishBlogPostPage() {
           currentLanguage={currentLanguage}
           siblingLanguage={sibling.language}
           siblingDraftId={sibling.draftId}
+          currentStatus={draft.status}
+          siblingStatus={sibling.status}
         />
       )}
 
@@ -206,6 +214,8 @@ interface PublishLanguageToggleProps {
   currentLanguage: 'pt-br' | 'en';
   siblingLanguage: 'pt-br' | 'en';
   siblingDraftId: string;
+  currentStatus?: PairStatus;
+  siblingStatus?: PairStatus;
 }
 
 /**
@@ -213,46 +223,84 @@ interface PublishLanguageToggleProps {
  * has its own draft with independent metadata — switching navigates rather
  * than toggling local state, so unsaved form values in the current language
  * trigger the autosave debounce on the next blur (1s) before navigation.
+ *
+ * Status pills next to each language label communicate the publish state
+ * for that side: `published` (green) means a published doc exists in the
+ * dataset; `rascunho` (amber) means only a draft exists; `não criado` (zinc)
+ * means neither. Without this, operators couldn't tell whether they had
+ * already published the sibling — e.g. publishing PT and forgetting EN
+ * would leave EN as an unpublished draft with no visual indicator.
  */
 function PublishLanguageToggle({
   currentLanguage,
   siblingLanguage,
   siblingDraftId,
+  currentStatus,
+  siblingStatus,
 }: PublishLanguageToggleProps) {
   const router = useRouter();
   const labelOf = (lang: 'pt-br' | 'en') => (lang === 'pt-br' ? 'PT-BR' : 'EN');
 
-  const handleToggle = (target: 'current' | 'sibling') => {
-    if (target === 'sibling') {
-      router.push(`/workspace/blog/${siblingDraftId}/publish`);
-    }
+  const handleSiblingClick = () => {
+    router.push(`/workspace/blog/${siblingDraftId}/publish`);
   };
 
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-6 py-2">
+    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-6 py-2">
       <span className="text-xs uppercase tracking-wide text-zinc-500">Idioma:</span>
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        className="h-7 text-xs"
-        onClick={() => handleToggle('current')}
-      >
-        {labelOf(currentLanguage)}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 text-xs"
-        onClick={() => handleToggle('sibling')}
-      >
-        {labelOf(siblingLanguage)}
-      </Button>
+      <LangButton
+        label={labelOf(currentLanguage)}
+        active
+        status={currentStatus}
+        onClick={() => {}}
+      />
+      <LangButton
+        label={labelOf(siblingLanguage)}
+        active={false}
+        status={siblingStatus}
+        onClick={handleSiblingClick}
+      />
       <span className="ml-2 text-xs text-zinc-500">
-        Cada idioma tem seus próprios metadados — alternar navega entre as duas
-        páginas de publicação.
+        Metadados independentes por idioma — confirme que ambos estão publicados.
       </span>
     </div>
+  );
+}
+
+interface LangButtonProps {
+  label: string;
+  active: boolean;
+  status?: PairStatus;
+  onClick: () => void;
+}
+
+function LangButton({ label, active, status, onClick }: LangButtonProps) {
+  return (
+    <Button
+      type="button"
+      variant={active ? 'secondary' : 'ghost'}
+      size="sm"
+      className="h-7 gap-2 text-xs"
+      onClick={onClick}
+    >
+      {label}
+      <StatusPill status={status} />
+    </Button>
+  );
+}
+
+function StatusPill({ status }: { status?: PairStatus }) {
+  if (!status) return null;
+  const { published, draft } = status;
+  const text = published ? 'publicado' : draft ? 'rascunho' : 'não criado';
+  const tone = published
+    ? 'bg-emerald-500/15 text-emerald-300'
+    : draft
+      ? 'bg-amber-500/15 text-amber-300'
+      : 'bg-zinc-700/40 text-zinc-400';
+  return (
+    <span className={`rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${tone}`}>
+      {text}
+    </span>
   );
 }

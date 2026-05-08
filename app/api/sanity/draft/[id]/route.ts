@@ -82,13 +82,17 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
   let doc: Record<string, unknown> | null = null;
   let languageFromI18n: "pt-br" | "en" | null = null;
+  let draftExists = false;
+  let publishedExists = false;
   try {
     const draftDoc = await client.getDocument(draftId);
-    doc = (draftDoc as Record<string, unknown> | null | undefined) ?? null;
-    if (!doc) {
-      const publishedDoc = await client.getDocument(baseId);
-      doc = (publishedDoc as Record<string, unknown> | null | undefined) ?? null;
-    }
+    const publishedDoc = await client.getDocument(baseId);
+    draftExists = !!draftDoc;
+    publishedExists = !!publishedDoc;
+    doc =
+      (draftDoc as Record<string, unknown> | null | undefined) ??
+      (publishedDoc as Record<string, unknown> | null | undefined) ??
+      null;
 
     // Look up the translation.metadata entry pointing at this post and return
     // its _key as the authoritative language.
@@ -145,7 +149,13 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   }
 
   return NextResponse.json(
-    { meta, body, draftId: id, languageFromI18n },
+    {
+      meta,
+      body,
+      draftId: id,
+      languageFromI18n,
+      status: { draft: draftExists, published: publishedExists },
+    },
     { status: 200 },
   );
 }

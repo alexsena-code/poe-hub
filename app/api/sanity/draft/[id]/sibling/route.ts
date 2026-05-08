@@ -73,13 +73,17 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const siblingDraftId = `drafts.${siblingBaseId}`;
 
   let doc: Record<string, unknown> | null = null;
+  let draftExists = false;
+  let publishedExists = false;
   try {
     const draftDoc = await client.getDocument(siblingDraftId);
-    doc = (draftDoc as Record<string, unknown> | null | undefined) ?? null;
-    if (!doc) {
-      const publishedDoc = await client.getDocument(siblingBaseId);
-      doc = (publishedDoc as Record<string, unknown> | null | undefined) ?? null;
-    }
+    const publishedDoc = await client.getDocument(siblingBaseId);
+    draftExists = !!draftDoc;
+    publishedExists = !!publishedDoc;
+    doc =
+      (draftDoc as Record<string, unknown> | null | undefined) ??
+      (publishedDoc as Record<string, unknown> | null | undefined) ??
+      null;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error(
@@ -101,6 +105,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       body,
       draftId: siblingBaseId,
       language: sibling.language as Language,
+      status: { draft: draftExists, published: publishedExists },
     },
     { status: 200 },
   );
