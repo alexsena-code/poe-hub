@@ -173,8 +173,24 @@ const HEADING_CLASSES: Record<number, string> = {
   4: "text-lg font-semibold mt-4 mb-2 text-white",
 };
 
+/**
+ * Threshold above which a paragraph is treated as "long" enough to also
+ * justify its last line (text-align-last:justify). Short paragraphs (1-2
+ * visual lines, ≤200 chars) skip that rule because forcing justification on
+ * a final line with 2-3 words produces absurd word gaps. CSS has no native
+ * "skip last-line if <X% wide" toggle so length is used as a proxy.
+ */
+const LONG_PARAGRAPH_CHARS = 200;
+
+function justifyClassFor(textLength: number): string {
+  const base = "leading-relax mb-4 text-justify hyphens-auto [text-wrap:pretty]";
+  return textLength > LONG_PARAGRAPH_CHARS
+    ? `${base} [text-align-last:justify]`
+    : base;
+}
+
 function processNormalBlock(children: React.ReactNode): React.ReactNode {
-  const { first: firstText } = getTextContent(children);
+  const { first: firstText, full: fullText } = getTextContent(children);
 
   if (firstText) {
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(firstText)) {
@@ -186,11 +202,12 @@ function processNormalBlock(children: React.ReactNode): React.ReactNode {
     }
   }
 
-  // text-justify mirrors the public blog (poetrade-dev) — without it, the
-  // operator sees left-aligned paragraphs in the preview but the published
-  // article is justified, creating a constant "looks different" surprise.
+  // Justification mirrors poetrade-dev. Without text-justify, the preview
+  // shows left-aligned paragraphs while the published article is justified —
+  // a constant "looks different" surprise for the operator.
+  const length = fullText?.length ?? 0;
   return (
-    <p className="leading-relaxed mb-4 whitespace-pre-wrap text-justify">
+    <p className={`${justifyClassFor(length)} whitespace-pre-wrap`}>
       {processChildren(children)}
     </p>
   );
@@ -242,22 +259,20 @@ function ImageComponent({ value, isInline }: { value: Record<string, unknown>; i
   //    don't dominate the viewport; the image is letterboxed inside a centered
   //    box that keeps the aspect ratio.
   //  - aspectRatio CSS reserves space pre-load (no CLS).
-  //  - Breakout: with the article container now at max-w-7xl (1280px), the
-  //    older lg/xl negative margins all hit a no-op (the resulting width
-  //    exceeds the viewport, so the image clamps back to viewport width).
-  //    Only ultrawide (≥1920px) has room to breakout meaningfully — 1280 +
-  //    576 = 1856px fits comfortably inside a 1920px viewport. Adding the
-  //    smaller breakpoints back would create the illusion of a wider image
-  //    that the viewport then truncates.
+  //  - Breakout: article container is max-w-6xl (1152px). Negative margins
+  //    push images wider than the prose column. Effective image widths:
+  //      xl  (1280-1535) → 1344px (1152 +  96·2)
+  //      2xl (1536-1919) → 1536px (1152 + 192·2)
+  //      ≥1920 ultrawide → 1728px (1152 + 288·2)
   return (
-    <div className="my-10 flex justify-center overflow-hidden rounded-[15px] min-[1920px]:-mx-72">
+    <div className="my-10 flex justify-center overflow-hidden rounded-[15px] xl:-mx-24 2xl:-mx-48 min-[1920px]:-mx-72">
       <Image
         src={src}
         width={width}
         height={height}
         alt={(value.alt as string) || "blog image"}
         loading="lazy"
-        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 1024px, (max-width: 1920px) 1280px, 1856px"
+        sizes="(max-width: 1024px) 100vw, (max-width: 1280px) 1152px, (max-width: 1536px) 1344px, (max-width: 1920px) 1536px, 1728px"
         style={{
           display: isInline ? "inline-block" : "block",
           width: "100%",

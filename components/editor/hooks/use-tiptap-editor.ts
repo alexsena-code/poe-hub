@@ -236,11 +236,13 @@ export function useTiptapEditor({
       content: initialContent,
       editorProps: {
         attributes: {
-          // Applied to the contenteditable div — markdown-body for typography,
-          // min-h so the editor is always clickable even when empty.
+          // markdown-body for typography. max-w-6xl + mx-auto + px-4 mirrors
+          // the public blog wrapper (poetrade-dev) so the operator's typing
+          // wraps at the same column width that will publish — no surprise
+          // line-break shifts when toggling Draft↔Preview.
           class: [
-            'markdown-body max-w-none',
-            'min-h-[400px] px-6 py-4',
+            'markdown-body max-w-6xl mx-auto w-full',
+            'min-h-[400px] px-4 py-4',
             'focus:outline-none',
           ].join(' '),
         },

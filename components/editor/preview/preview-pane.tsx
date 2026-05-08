@@ -145,11 +145,11 @@ export function PreviewPane({
   }
 
   // ── Resolved state ───────────────────────────────────────────────────────────
-  // max-w-7xl mirrors the public blog page (poetrade-dev) — was max-w-3xl
-  // before, then max-w-5xl, then 7xl. Keep in sync so the operator sees the
-  // same line widths as the published article.
+  // max-w-6xl (1152px) mirrors the public blog page (poetrade-dev). Keep in
+  // sync so the operator sees the same line widths as the published article.
+  // Earlier iterations: 3xl → 5xl → 7xl → 6xl (current).
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12">
+    <div className="max-w-6xl mx-auto px-4 py-12">
       <ArticleHeader title={title} metadata={metadata} mainImageUrl={mainImageUrl} />
       <article className="markdown-body max-w-none mt-8">
         <PreviewRenderer value={resolved ?? body} />
