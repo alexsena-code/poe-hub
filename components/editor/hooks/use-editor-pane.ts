@@ -68,10 +68,16 @@ export function useEditorPane({
   defaultLanguage = 'pt-br',
   enabled = true,
 }: UseEditorPaneOptions): EditorPane {
+  // language MUST come from `defaultLanguage` (the pane's intent), NOT from
+  // `initialMeta.language` (the doc's stored value). When the two disagree
+  // — usually because a draft was saved with the wrong language at some
+  // point — letting initialMeta win produces a "two EN" or "two PT" toggle
+  // since both panes report the same language. Forcing defaultLanguage at
+  // mount and bypassing the doc's value heals the data on the next autosave.
   const [meta, setMetaState] = useState<EditorMetaForm>({
     ...editorMetaDefaults,
-    language: defaultLanguage,
     ...initialMeta,
+    language: defaultLanguage,
   });
   const [bodyJson, setBodyJson] = useState<JSONContent>({ type: 'doc', content: [] });
   const [initialContentLoaded, setInitialContentLoaded] = useState(false);

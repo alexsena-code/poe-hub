@@ -29,6 +29,12 @@ interface DraftResponse {
   meta: Partial<EditorMetaForm>;
   body: PortableTextContent[];
   draftId: string;
+  /**
+   * Language inferred from the translation.metadata `_key` for this doc.
+   * Authoritative — `meta.language` can drift when autosave persists a
+   * stale value. Use this when present.
+   */
+  languageFromI18n?: 'pt-br' | 'en' | null;
 }
 
 interface SiblingResponse extends DraftResponse {
@@ -138,12 +144,18 @@ export default function EditBlogPostPage() {
 
   const { draft, sibling } = state;
 
+  // Prefer the i18n-derived language over `meta.language`. When both disagree,
+  // the i18n key wins because it's set by the plugin at pair creation and
+  // can't drift; meta.language has historical bugs that produced wrong values.
+  const primaryLanguage =
+    draft.languageFromI18n ?? (draft.meta.language as 'pt-br' | 'en') ?? 'pt-br';
+
   return (
     <EditorShell
       initialMeta={draft.meta}
       initialBody={draft.body}
       draftId={id}
-      defaultLanguage={(draft.meta.language as 'pt-br' | 'en') ?? 'pt-br'}
+      defaultLanguage={primaryLanguage}
       sibling={
         sibling
           ? {

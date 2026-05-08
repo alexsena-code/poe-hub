@@ -59,6 +59,15 @@ function toMainImage(assetId: string | undefined): SanityImageRef | undefined {
  * opening them in the editor. With the fallback, opening a published-only
  * post loads its content; the next autosave PUT writes to `drafts.<id>` so
  * the published doc stays untouched until republish.
+ *
+ * The response also includes `languageFromI18n` — the `_key` of the
+ * `translation.metadata` entry that points at this post — when one exists.
+ * That's the authoritative language because the i18n plugin sets it when the
+ * pair is created and never changes it. The `meta.language` field on the
+ * doc itself can drift (e.g. autosave bugs once persisted both PT/EN drafts
+ * with `language: "en"`); callers should prefer `languageFromI18n` over
+ * `meta.language` when present so the editor heals the wrong value on the
+ * next autosave.
  */
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const session = await getServerSession(authOptions);
@@ -72,12 +81,27 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const draftId = `drafts.${baseId}`;
 
   let doc: Record<string, unknown> | null = null;
+  let languageFromI18n: "pt-br" | "en" | null = null;
   try {
     const draftDoc = await client.getDocument(draftId);
     doc = (draftDoc as Record<string, unknown> | null | undefined) ?? null;
     if (!doc) {
       const publishedDoc = await client.getDocument(baseId);
       doc = (publishedDoc as Record<string, unknown> | null | undefined) ?? null;
+    }
+
+    // Look up the translation.metadata entry pointing at this post and return
+    // its _key as the authoritative language.
+    const i18nQuery = `*[
+      _type == "translation.metadata" &&
+      (references($publishedId) || references($draftId))
+    ][0].translations[value._ref in [$publishedId, $draftId]][0]._key`;
+    const key = (await client.fetch<string | null>(i18nQuery, {
+      publishedId: baseId,
+      draftId,
+    })) ?? null;
+    if (key === "pt-br" || key === "en") {
+      languageFromI18n = key;
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -95,7 +119,35 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
   const meta = sanityPostToEditorMeta(doc);
   const body = (doc.body as unknown[] | undefined) ?? [];
 
-  return NextResponse.json({ meta, body, draftId: id }, { status: 200 });
+  // Self-heal: when the doc's language drifted from the i18n key (a known
+  // historical autosave bug saved both PT/EN drafts as "en"), patch the doc
+  // back to the authoritative value. Side-effect on a GET is a deliberate
+  // tradeoff — without it, posts with empty bodies (autosave gated by
+  // isBodyEmpty) never get a chance to fix their language and the publish
+  // form would persist the wrong value forever.
+  if (
+    languageFromI18n &&
+    meta.language !== languageFromI18n &&
+    typeof doc._id === "string"
+  ) {
+    try {
+      await client
+        .patch(doc._id)
+        .set({ language: languageFromI18n })
+        .commit();
+      meta.language = languageFromI18n;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      console.warn(
+        `[sanity.draft] heal-language patch failed for "${doc._id}": ${message}`,
+      );
+    }
+  }
+
+  return NextResponse.json(
+    { meta, body, draftId: id, languageFromI18n },
+    { status: 200 },
+  );
 }
 
 /**

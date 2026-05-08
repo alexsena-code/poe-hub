@@ -2,20 +2,22 @@
 /**
  * Publish blog post page — client wrapper.
  *
- * Loads draft via GET /api/sanity/draft/[id] (returns { meta, body, draftId }).
- * Shows spinner while loading; error message on failure.
+ * Loads draft via GET /api/sanity/draft/[id] and the sibling-language draft
+ * (when one exists) so the header can render a PT/EN toggle. Each language
+ * keeps an independent PublishForm — clicking the toggle navigates to the
+ * other draft's publish route, preserving everything the operator already
+ * entered for the current language.
  *
- * Renders PublishForm with the fetched meta + body.
- * Header includes "← Voltar ao editor" link (Link to /workspace/blog/[id]/edit).
+ * Without this toggle, the operator who clicked "Prosseguir →" from the
+ * editor's bilingual mode lost track of which language they were publishing
+ * (form fields appeared "lost" because they were looking at the other
+ * language's empty form).
  *
- * This must be a Client Component because the draft response drives state
- * and PublishForm needs hooks for the form and router.
- *
- * Session 10.b.
+ * Sessions 10.b → 21 (bilingual toggle in header).
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,11 +37,16 @@ interface DraftResponse {
   // producing an empty array → publish 400 "body must contain at least one block".
   body: PortableTextContent[];
   draftId: string;
+  languageFromI18n?: 'pt-br' | 'en' | null;
+}
+
+interface SiblingResponse extends DraftResponse {
+  language: 'pt-br' | 'en';
 }
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'found'; draft: DraftResponse }
+  | { status: 'found'; draft: DraftResponse; sibling: SiblingResponse | null }
   | { status: 'error'; message: string };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -66,20 +73,32 @@ export default function PublishBlogPostPage() {
 
     async function fetchDraft() {
       try {
-        const res = await fetch(`/api/sanity/draft/${id}`, { cache: 'no-store' });
+        const [primaryRes, siblingRes] = await Promise.all([
+          fetch(`/api/sanity/draft/${id}`, { cache: 'no-store' }),
+          fetch(`/api/sanity/draft/${id}/sibling`, { cache: 'no-store' }),
+        ]);
 
         if (cancelled) return;
 
-        if (!res.ok) {
+        if (!primaryRes.ok) {
           setState({
             status: 'error',
-            message: `Falha ao carregar rascunho: HTTP ${res.status}`,
+            message: `Falha ao carregar rascunho: HTTP ${primaryRes.status}`,
           });
           return;
         }
 
-        const data = await res.json() as DraftResponse;
-        setState({ status: 'found', draft: data });
+        const draft = (await primaryRes.json()) as DraftResponse;
+
+        let sibling: SiblingResponse | null = null;
+        if (siblingRes.ok) {
+          const siblingData = (await siblingRes.json()) as
+            | SiblingResponse
+            | { sibling: null };
+          if ('draftId' in siblingData) sibling = siblingData;
+        }
+
+        setState({ status: 'found', draft, sibling });
       } catch (err: unknown) {
         if (!cancelled) {
           setState({
@@ -135,8 +154,11 @@ export default function PublishBlogPostPage() {
 
   // ── Loaded ──────────────────────────────────────────────────────────────────
 
-  const { draft } = state;
+  const { draft, sibling } = state;
   const postTitle = (draft.meta?.title ?? '').trim() || 'Sem título';
+  // Prefer i18n key over meta.language — see edit page for the same rationale.
+  const currentLanguage =
+    draft.languageFromI18n ?? (draft.meta?.language as 'pt-br' | 'en' | undefined) ?? 'pt-br';
 
   return (
     <div className="flex flex-col min-h-screen bg-zinc-950">
@@ -156,6 +178,14 @@ export default function PublishBlogPostPage() {
         </div>
       </header>
 
+      {sibling && (
+        <PublishLanguageToggle
+          currentLanguage={currentLanguage}
+          siblingLanguage={sibling.language}
+          siblingDraftId={sibling.draftId}
+        />
+      )}
+
       {/* Form body */}
       <main className="flex-1 px-6 py-6 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
@@ -166,6 +196,63 @@ export default function PublishBlogPostPage() {
           />
         </div>
       </main>
+    </div>
+  );
+}
+
+// ─── Language toggle ──────────────────────────────────────────────────────────
+
+interface PublishLanguageToggleProps {
+  currentLanguage: 'pt-br' | 'en';
+  siblingLanguage: 'pt-br' | 'en';
+  siblingDraftId: string;
+}
+
+/**
+ * Toggle that navigates between the PT and EN publish forms. Each language
+ * has its own draft with independent metadata — switching navigates rather
+ * than toggling local state, so unsaved form values in the current language
+ * trigger the autosave debounce on the next blur (1s) before navigation.
+ */
+function PublishLanguageToggle({
+  currentLanguage,
+  siblingLanguage,
+  siblingDraftId,
+}: PublishLanguageToggleProps) {
+  const router = useRouter();
+  const labelOf = (lang: 'pt-br' | 'en') => (lang === 'pt-br' ? 'PT-BR' : 'EN');
+
+  const handleToggle = (target: 'current' | 'sibling') => {
+    if (target === 'sibling') {
+      router.push(`/workspace/blog/${siblingDraftId}/publish`);
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-6 py-2">
+      <span className="text-xs uppercase tracking-wide text-zinc-500">Idioma:</span>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="h-7 text-xs"
+        onClick={() => handleToggle('current')}
+      >
+        {labelOf(currentLanguage)}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 text-xs"
+        onClick={() => handleToggle('sibling')}
+      >
+        {labelOf(siblingLanguage)}
+      </Button>
+      <span className="ml-2 text-xs text-zinc-500">
+        Cada idioma tem seus próprios metadados — alternar navega entre as duas
+        páginas de publicação.
+      </span>
     </div>
   );
 }

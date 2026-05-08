@@ -135,3 +135,38 @@ Confirmação per-idioma: cada `useEditorPane` mantém `meta` próprio
 (title, metadata SEO, slug, tags, mainImage), `useAutosave` recebe o
 `meta` daquele pane, e `EditorTitleBar` lê via context que aponta
 sempre pro pane ativo. Metadata nunca cruza entre idiomas.
+
+**5. Bug crítico: toggle "EN + EN" e language drift.** Operador
+reportou que ambos os botões do toggle apareciam como "EN" e o
+campo language no Sanity ficava errado em alguns drafts. Causa
+raiz: `meta.language` no doc Sanity podia estar desincronizado
+(autosave histórico salvou drafts PT como `language: "en"`).
+EditorShell lia `meta.language` → ambos panes reportavam "en" →
+toggle "EN + EN".
+
+Solução em camadas:
+- `GET /api/sanity/draft/[id]` agora retorna `languageFromI18n`
+  derivado do `_key` no `translation.metadata` (fonte de verdade
+  do plugin i18n, nunca drifta).
+- Páginas `/edit` e `/publish` preferem `languageFromI18n` sobre
+  `meta.language` ao definir o language do pane.
+- `useEditorPane` força `language: defaultLanguage` no useState
+  inicial, sobrescrevendo qualquer `initialMeta.language` divergente.
+- `GET draft` faz **self-heal**: quando detecta `meta.language ≠
+  languageFromI18n`, dispara um `client.patch().set({language})`
+  no doc para sincronizar. Side-effect num GET é deliberado —
+  posts com body vazio (autosave gated por `isBodyEmpty`) jamais
+  conseguiriam corrigir o language sozinhos.
+- `/publish` também ganhou um toggle PT/EN navegacional no header
+  (clica e o `router.push` leva ao draft do outro idioma) para
+  evitar a confusão de "perdi o que tinha digitado" quando o
+  operador alternava idiomas no editor e ia pra publish do par
+  errado sem perceber.
+
+Validado via Playwright em produção: doc `ebJsD6uVuolZMs6YRDTzw`
+(PT) tinha `meta.language: "en"` no Sanity. Após abrir
+`/workspace/blog/ebJsD6uVuolZMs6YRDTzw/edit`: GET retornou
+`languageFromI18n: "pt-br"`, disparou `patch.set({language})`,
+re-fetch confirmou `meta.language: "pt-br"` (`healed: true`).
+Mesma checagem no irmão EN também passou. Toggle agora mostra
+"PT-BR" + "EN" corretamente.

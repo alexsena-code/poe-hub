@@ -26,7 +26,20 @@ const mockGetServerSession = vi.mocked(getServerSession);
 const mockCreateOrReplace = vi.fn();
 const mockGetDocument = vi.fn();
 const mockDelete = vi.fn();
+const mockFetch = vi.fn();
 const mockTransactionCommit = vi.fn();
+const mockPatchCommit = vi.fn();
+
+// GET self-heal: client.patch(id).set({...}).commit(). Same chain pattern as
+// transaction — set returns the same patch builder so chaining works.
+function makePatchStub() {
+  const patch: { set: ReturnType<typeof vi.fn>; commit: ReturnType<typeof vi.fn> } = {
+    set: vi.fn(),
+    commit: mockPatchCommit,
+  };
+  patch.set.mockReturnValue(patch);
+  return patch;
+}
 
 // deletePost (used by DELETE handler) uses a transaction:
 // `client.transaction().delete(draftId).delete(baseId).commit()`. The chained
@@ -46,6 +59,8 @@ vi.mock("@/lib/sanity/client", () => ({
     createOrReplace: mockCreateOrReplace,
     getDocument: mockGetDocument,
     delete: mockDelete,
+    fetch: mockFetch,
+    patch: () => makePatchStub(),
     transaction: () => makeTransactionStub(),
   }),
 }));
@@ -100,7 +115,9 @@ beforeEach(() => {
   mockCreateOrReplace.mockResolvedValue({ _id: "drafts.post-abc123" });
   mockGetDocument.mockResolvedValue(sanityDraftDoc);
   mockDelete.mockResolvedValue({});
+  mockFetch.mockResolvedValue(null);
   mockTransactionCommit.mockResolvedValue({});
+  mockPatchCommit.mockResolvedValue({});
 });
 
 // ─── PUT tests ────────────────────────────────────────────────────────────────
