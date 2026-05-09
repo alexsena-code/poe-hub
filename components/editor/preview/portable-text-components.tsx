@@ -174,23 +174,24 @@ const HEADING_CLASSES: Record<number, string> = {
 };
 
 /**
- * Threshold above which a paragraph is treated as "long" enough to also
- * justify its last line (text-align-last:justify). Short paragraphs (1-2
- * visual lines, ≤200 chars) skip that rule because forcing justification on
- * a final line with 2-3 words produces absurd word gaps. CSS has no native
- * "skip last-line if <X% wide" toggle so length is used as a proxy.
+ * Paragraph classes mirror poetrade-dev's body renderer:
+ *   - `leading-relaxed` (NOT the typo `leading-relax`, which silently no-ops
+ *     because Tailwind drops unknown utilities — line-height was missing
+ *     entirely until this fix).
+ *   - `text-justify` for the bulk of lines, but WITHOUT
+ *     `[text-align-last:justify]`: that property stretched both the final
+ *     line and any soft-break (`<br/>` is how Portable Text encodes `\n`),
+ *     producing huge word-gaps on short trailing fragments. CSS has no
+ *     "don't justify if line < X% wide" toggle, so we just let the last
+ *     line align naturally.
+ *   - `hyphens-auto` + `[text-wrap:pretty]` smooth out raggedness without
+ *     resorting to last-line justify.
  */
-const LONG_PARAGRAPH_CHARS = 200;
-
-function justifyClassFor(textLength: number): string {
-  const base = "leading-relax mb-4 text-justify hyphens-auto [text-wrap:pretty]";
-  return textLength > LONG_PARAGRAPH_CHARS
-    ? `${base} [text-align-last:justify]`
-    : base;
-}
+const PARAGRAPH_CLASS =
+  "leading-relaxed mb-4 text-justify hyphens-auto [text-wrap:pretty]";
 
 function processNormalBlock(children: React.ReactNode): React.ReactNode {
-  const { first: firstText, full: fullText } = getTextContent(children);
+  const { first: firstText } = getTextContent(children);
 
   if (firstText) {
     if (/^(-{3,}|\*{3,}|_{3,})$/.test(firstText)) {
@@ -202,12 +203,8 @@ function processNormalBlock(children: React.ReactNode): React.ReactNode {
     }
   }
 
-  // Justification mirrors poetrade-dev. Without text-justify, the preview
-  // shows left-aligned paragraphs while the published article is justified —
-  // a constant "looks different" surprise for the operator.
-  const length = fullText?.length ?? 0;
   return (
-    <p className={`${justifyClassFor(length)} whitespace-pre-wrap`}>
+    <p className={`${PARAGRAPH_CLASS} whitespace-pre-wrap`}>
       {processChildren(children)}
     </p>
   );
