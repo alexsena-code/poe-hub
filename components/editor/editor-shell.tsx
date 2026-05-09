@@ -161,7 +161,7 @@ export function EditorShell({
         )}
 
         <div className="flex flex-1 overflow-hidden">
-          <main className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
+          <main className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 py-4">
             {phase === 'preview' ? (
               <PreviewPane
                 title={active.meta.title}

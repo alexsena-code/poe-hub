@@ -256,20 +256,20 @@ function ImageComponent({ value, isInline }: { value: Record<string, unknown>; i
   //    don't dominate the viewport; the image is letterboxed inside a centered
   //    box that keeps the aspect ratio.
   //  - aspectRatio CSS reserves space pre-load (no CLS).
-  //  - Breakout: article container is max-w-6xl (1152px). Negative margins
-  //    push images wider than the prose column. Effective image widths:
-  //      xl  (1280-1535) → 1344px (1152 +  96·2)
-  //      2xl (1536-1919) → 1536px (1152 + 192·2)
-  //      ≥1920 ultrawide → 1728px (1152 + 288·2)
+  //  - No negative margins / breakout: in the hub the editor lives next to a
+  //    sidebar + right rail, so <main> is narrower than the viewport. Pushing
+  //    images past the prose column triggers a horizontal scrollbar on the
+  //    main scroll container. The published site can break out because it
+  //    has the full viewport — the hub preview doesn't.
   return (
-    <div className="my-10 flex justify-center overflow-hidden rounded-[15px] xl:-mx-24 2xl:-mx-48 min-[1920px]:-mx-72">
+    <div className="my-10 flex justify-center overflow-hidden rounded-[15px]">
       <Image
         src={src}
         width={width}
         height={height}
         alt={(value.alt as string) || "blog image"}
         loading="lazy"
-        sizes="(max-width: 1024px) 100vw, (max-width: 1280px) 1152px, (max-width: 1536px) 1344px, (max-width: 1920px) 1536px, 1728px"
+        sizes="(max-width: 1024px) 100vw, 1152px"
         style={{
           display: isInline ? "inline-block" : "block",
           width: "100%",
