@@ -112,11 +112,23 @@ export default function PricesPage() {
       const form = new FormData();
       form.append("file", file);
       const res = await fetch("/api/prices/import", { method: "POST", body: form });
-      const json = await res.json().catch(() => ({}));
+
+      // Read the body as text first so a non-JSON error response (404 page,
+      // 413 from a proxy, HTML stack trace) still surfaces a useful message
+      // with the HTTP status instead of a generic "Falha no upload".
+      const raw = await res.text();
+      let json: { error?: string; messages?: number; channelName?: string } = {};
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        // body wasn't JSON — keep raw text for the diagnostic message below
+      }
 
       if (!res.ok) {
-        toast.error(json.error || "Falha no upload do JSON.");
-        setLogs((prev) => [...prev, { type: "error", text: json.error || "Falha no upload." }]);
+        const detail = json.error || raw.slice(0, 200).trim() || "sem detalhe";
+        const msg = `Falha no upload (HTTP ${res.status}): ${detail}`;
+        toast.error(msg);
+        setLogs((prev) => [...prev, { type: "error", text: msg }]);
         return;
       }
 
