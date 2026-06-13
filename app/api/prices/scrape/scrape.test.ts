@@ -117,4 +117,28 @@ describe("POST /api/prices/scrape", () => {
     expect(res.body).not.toBeNull();
     expect(res.body).toBeInstanceOf(ReadableStream);
   });
+
+  it("should pass --from-cache flag when fromCache=true", async () => {
+    const { spawn } = await import("child_process");
+    vi.mocked(spawn).mockClear();
+
+    await POST(postReq({ fromCache: true }));
+
+    expect(spawn).toHaveBeenCalledWith(
+      "npx",
+      expect.arrayContaining(["--from-cache"]),
+      expect.any(Object)
+    );
+  });
+
+  it("should NOT clear exports when fromCache=true (preserve uploaded JSON)", async () => {
+    const fs = await import("fs");
+    vi.mocked(fs.unlinkSync).mockClear();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockReturnValue(["uploaded.json"] as never);
+
+    await POST(postReq({ fromCache: true }));
+
+    expect(fs.unlinkSync).not.toHaveBeenCalled();
+  });
 });

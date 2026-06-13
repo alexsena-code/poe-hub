@@ -42,15 +42,18 @@ const BATCH_SIZE = 500;
 interface Args {
   full: boolean;
   dcePath: string;
+  fromCache: boolean;
 }
 
 function parseArgs(): Args {
   const args = process.argv.slice(2);
   let full = false;
+  let fromCache = false;
   let dcePath = process.env.DCE_PATH || DEFAULT_DCE_PATH;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--full") full = true;
+    else if (args[i] === "--from-cache") fromCache = true;
     else if (args[i] === "--dce-path" && args[i + 1]) { dcePath = args[i + 1]; i++; }
     else if (args[i] === "--help" || args[i] === "-h") {
       console.log(`
@@ -61,6 +64,8 @@ Usage:
 
 Options:
   --full              Force full history export (ignore last message date)
+  --from-cache        Skip Discord export; process JSON files already in exports/
+                      (no DISCORD_TOKEN / DiscordChatExporter required)
   --dce-path <path>   Path to DiscordChatExporter.Cli.exe
   --help, -h          Show help
 
@@ -73,7 +78,7 @@ Environment:
     }
   }
 
-  return { full, dcePath };
+  return { full, dcePath, fromCache };
 }
 
 // ---------------------------------------------------------------------------
@@ -230,23 +235,100 @@ async function aggregateDailyPrices(prisma: PrismaClient, entries: ParsedPrice[]
 }
 
 // ---------------------------------------------------------------------------
+// Single export processing (shared by Discord export and --from-cache modes)
+// ---------------------------------------------------------------------------
+
+interface ProcessResult {
+  inserted: number;
+  duplicates: number;
+  skipped: number;
+  entries: ParsedPrice[];
+}
+
+/**
+ * Parse a single DiscordChatExporter JSON file, auto-resolve leagues and insert
+ * PriceEntry rows in batches. Used both after a live Discord export and when
+ * importing an uploaded JSON via --from-cache (see /api/prices/import).
+ */
+async function processSingleExport(
+  prisma: PrismaClient,
+  outputFile: string,
+  channelName: string,
+  cnlAuthorIds: Set<string>,
+  leagues: LeagueInfo[],
+): Promise<ProcessResult> {
+  const poeVersion: "poe1" | "poe2" = channelName.includes("2") ? "poe2" : "poe1";
+  console.log(`  PoE version: ${poeVersion}`);
+
+  const data: DiscordExport = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
+  const result = await parseExport(data, cnlAuthorIds);
+
+  // Auto-resolve leagues for entries the parser left unresolved
+  for (const entry of result.entries) {
+    if (!entry.league) {
+      entry.league = resolveLeague(new Date(entry.messageTimestamp), leagues, poeVersion);
+    }
+  }
+
+  console.log(`  Parsed: ${result.entries.length} prices, ${result.skipped} skipped`);
+
+  let inserted = 0;
+  for (let i = 0; i < result.entries.length; i += BATCH_SIZE) {
+    const batch = result.entries.slice(i, i + BATCH_SIZE);
+    const dbRecords = batch
+      .filter((e) => !isNaN(e.price) && e.price > 0)
+      .map((e) => ({
+        discordMessageId: e.discordMessageId,
+        discordChannelId: e.discordChannelId,
+        discordServerId: e.discordServerId,
+        authorDiscordId: e.authorDiscordId,
+        authorName: e.authorName,
+        isCnl: e.isCnl,
+        price: parseFloat(Number(e.price).toFixed(8)).toString(),
+        currency: e.currency as "divine" | "chaos" | "usd" | "brl" | "other",
+        item: e.item,
+        rawMessage: e.rawMessage,
+        messageTimestamp: e.messageTimestamp,
+        league: e.league,
+      }));
+
+    try {
+      const res = await prisma.priceEntry.createMany({ data: dbRecords, skipDuplicates: true });
+      inserted += res.count;
+    } catch (dbErr) {
+      console.error(`    DB batch error (skipping batch): ${dbErr instanceof Error ? dbErr.message.substring(0, 100) : String(dbErr)}`);
+    }
+  }
+
+  const duplicates = result.entries.length - inserted;
+  console.log(`  Inserted: ${inserted} new, ${duplicates} duplicates`);
+
+  return { inserted, duplicates, skipped: result.skipped, entries: result.entries };
+}
+
+// ---------------------------------------------------------------------------
 // Main pipeline
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const { full, dcePath } = parseArgs();
+  const { full, dcePath, fromCache } = parseArgs();
 
-  const token = process.env.DISCORD_TOKEN;
-  if (!token) { console.error("ERROR: DISCORD_TOKEN not set."); process.exit(1); }
+  // --from-cache reads uploaded JSON straight from exports/ — no Discord access,
+  // so DISCORD_TOKEN and DiscordChatExporter are not required.
+  let token = "";
+  if (!fromCache) {
+    token = process.env.DISCORD_TOKEN || "";
+    if (!token) { console.error("ERROR: DISCORD_TOKEN not set."); process.exit(1); }
 
-  if (!fs.existsSync(dcePath)) {
-    console.error(`ERROR: DiscordChatExporter not found at: ${dcePath}`);
-    console.error("Set DCE_PATH env var or use --dce-path");
-    process.exit(1);
+    if (!fs.existsSync(dcePath)) {
+      console.error(`ERROR: DiscordChatExporter not found at: ${dcePath}`);
+      console.error("Set DCE_PATH env var or use --dce-path");
+      process.exit(1);
+    }
   }
 
   console.log("=== Discord Price Scraper — Automated Pipeline ===");
-  console.log(`Mode: ${full ? "FULL HISTORY" : "INCREMENTAL"}`);
+  console.log(`Mode: ${fromCache ? "FROM CACHE (uploaded JSON)" : full ? "FULL HISTORY" : "INCREMENTAL"}`);
   console.log();
 
   // Ensure temp dir
@@ -255,9 +337,9 @@ async function main() {
   const prisma = createPrisma();
 
   try {
-    // Load Discord sources
+    // Load Discord sources (channel metadata + cnlAuthorIds)
     const sources = await prisma.discordSource.findMany({ where: { isActive: true } });
-    if (sources.length === 0) {
+    if (!fromCache && sources.length === 0) {
       console.error("ERROR: No active Discord sources configured.");
       console.error("Add sources via the UI at /prices/sources or seed them.");
       process.exit(1);
@@ -276,117 +358,106 @@ async function main() {
     let totalSkipped = 0;
     const allParsedEntries: ParsedPrice[] = [];
 
-    for (let si = 0; si < sources.length; si++) {
-      const source = sources[si];
-
-      // Delay between channels to reduce detection risk (skip first)
-      if (si > 0) {
-        const delaySec = 30 + Math.floor(Math.random() * 30); // 30-60s
-        console.log(`\n  Waiting ${delaySec}s before next channel...`);
-        await new Promise((r) => setTimeout(r, delaySec * 1000));
+    if (fromCache) {
+      // Process every JSON already in exports/ (uploaded via /api/prices/import).
+      // Channel id/name come from each file's own metadata, so no Discord source
+      // is required — a matching source only supplies cnlAuthorIds when present.
+      const files = fs.existsSync(EXPORTS_DIR)
+        ? fs.readdirSync(EXPORTS_DIR).filter((f) => f.endsWith(".json"))
+        : [];
+      if (files.length === 0) {
+        console.error(`ERROR: No JSON files found in ${EXPORTS_DIR} to import.`);
+        process.exit(1);
       }
+      console.log(`Cache files to process: ${files.length}`);
 
-      console.log(`\n--- ${source.serverName} / ${source.channelName} (${source.channelId}) ---`);
-
-      // Determine poeVersion from channel name
-      const poeVersion: "poe1" | "poe2" = source.channelName.includes("2") ? "poe2" : "poe1";
-      console.log(`  PoE version: ${poeVersion}`);
-
-      // Find last known message timestamp for this channel (incremental)
-      let afterDate: string | undefined;
-      if (!full) {
-        const lastEntry = await prisma.priceEntry.findFirst({
-          where: { discordChannelId: source.channelId },
-          orderBy: { messageTimestamp: "desc" },
-          select: { messageTimestamp: true },
-        });
-
-        if (lastEntry) {
-          // Go 1 hour back to catch any missed messages
-          const since = new Date(lastEntry.messageTimestamp.getTime() - 3600000);
-          afterDate = since.toISOString().split("T")[0];
-          console.log(`  Incremental: since ${afterDate} (last entry: ${lastEntry.messageTimestamp.toISOString()})`);
-        } else {
-          console.log("  First run: exporting full history");
-        }
-      } else {
-        console.log("  Full history export (--full flag)");
-      }
-
-      // Export (skip if file already exists and is > 1MB — reuse cached export)
-      const outputFile = path.join(EXPORTS_DIR, `${source.channelId}.json`);
-      if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 1024 * 1024) {
-        const sizeMB = (fs.statSync(outputFile).size / 1024 / 1024).toFixed(1);
-        console.log(`  Using cached export: ${outputFile} (${sizeMB}MB)`);
-      } else {
+      for (const file of files) {
+        const outputFile = path.join(EXPORTS_DIR, file);
+        let channelId = file.replace(/\.json$/, "");
+        let channelName = channelId;
         try {
-          exportChannel(dcePath, token, source.channelId, outputFile, afterDate);
+          const peek: DiscordExport = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
+          channelId = peek.channel?.id || channelId;
+          channelName = peek.channel?.name || channelName;
+          console.log(`\n--- ${peek.guild?.name ?? "?"} / ${channelName} (${channelId}) ---`);
         } catch (err) {
-          console.error(`  Export failed: ${err instanceof Error ? err.message : String(err)}`);
+          console.error(`  Skipping ${file}: invalid JSON (${err instanceof Error ? err.message.substring(0, 80) : String(err)})`);
           continue;
         }
 
-        if (!fs.existsSync(outputFile)) {
-          console.log("  No export file generated (no new messages)");
-          continue;
-        }
+        const source = sources.find((s) => s.channelId === channelId);
+        const res = await processSingleExport(
+          prisma, outputFile, channelName, new Set(source?.cnlAuthorIds ?? []), leagues,
+        );
+        totalNew += res.inserted;
+        totalDuplicates += res.duplicates;
+        totalSkipped += res.skipped;
+        allParsedEntries.push(...res.entries);
       }
+    } else {
+      for (let si = 0; si < sources.length; si++) {
+        const source = sources[si];
 
-      // Parse
-      const data: DiscordExport = JSON.parse(fs.readFileSync(outputFile, "utf-8"));
-      const cnlAuthorIds = new Set(source.cnlAuthorIds);
-      const result = await parseExport(data, cnlAuthorIds);
-
-      // Auto-resolve leagues
-      for (const entry of result.entries) {
-        if (!entry.league) {
-          entry.league = resolveLeague(new Date(entry.messageTimestamp), leagues, poeVersion);
+        // Delay between channels to reduce detection risk (skip first)
+        if (si > 0) {
+          const delaySec = 30 + Math.floor(Math.random() * 30); // 30-60s
+          console.log(`\n  Waiting ${delaySec}s before next channel...`);
+          await new Promise((r) => setTimeout(r, delaySec * 1000));
         }
-      }
 
-      console.log(`  Parsed: ${result.entries.length} prices, ${result.skipped} skipped`);
-      allParsedEntries.push(...result.entries);
+        console.log(`\n--- ${source.serverName} / ${source.channelName} (${source.channelId}) ---`);
 
-      // Insert
-      if (result.entries.length > 0) {
-        let inserted = 0;
-        for (let i = 0; i < result.entries.length; i += BATCH_SIZE) {
-          const batch = result.entries.slice(i, i + BATCH_SIZE);
-          const dbRecords = batch
-            .filter((e) => !isNaN(e.price) && e.price > 0)
-            .map((e) => ({
-            discordMessageId: e.discordMessageId,
-            discordChannelId: e.discordChannelId,
-            discordServerId: e.discordServerId,
-            authorDiscordId: e.authorDiscordId,
-            authorName: e.authorName,
-            isCnl: e.isCnl,
-            price: parseFloat(Number(e.price).toFixed(8)).toString(),
-            currency: e.currency as "divine" | "chaos" | "usd" | "brl" | "other",
-            item: e.item,
-            rawMessage: e.rawMessage,
-            messageTimestamp: e.messageTimestamp,
-            league: e.league,
-          }));
+        // Find last known message timestamp for this channel (incremental)
+        let afterDate: string | undefined;
+        if (!full) {
+          const lastEntry = await prisma.priceEntry.findFirst({
+            where: { discordChannelId: source.channelId },
+            orderBy: { messageTimestamp: "desc" },
+            select: { messageTimestamp: true },
+          });
 
+          if (lastEntry) {
+            // Go 1 hour back to catch any missed messages
+            const since = new Date(lastEntry.messageTimestamp.getTime() - 3600000);
+            afterDate = since.toISOString().split("T")[0];
+            console.log(`  Incremental: since ${afterDate} (last entry: ${lastEntry.messageTimestamp.toISOString()})`);
+          } else {
+            console.log("  First run: exporting full history");
+          }
+        } else {
+          console.log("  Full history export (--full flag)");
+        }
+
+        // Export (skip if file already exists and is > 1MB — reuse cached export)
+        const outputFile = path.join(EXPORTS_DIR, `${source.channelId}.json`);
+        if (fs.existsSync(outputFile) && fs.statSync(outputFile).size > 1024 * 1024) {
+          const sizeMB = (fs.statSync(outputFile).size / 1024 / 1024).toFixed(1);
+          console.log(`  Using cached export: ${outputFile} (${sizeMB}MB)`);
+        } else {
           try {
-            const res = await prisma.priceEntry.createMany({ data: dbRecords, skipDuplicates: true });
-            inserted += res.count;
-          } catch (dbErr) {
-            console.error(`    DB batch error (skipping batch): ${dbErr instanceof Error ? dbErr.message.substring(0, 100) : String(dbErr)}`);
+            exportChannel(dcePath, token, source.channelId, outputFile, afterDate);
+          } catch (err) {
+            console.error(`  Export failed: ${err instanceof Error ? err.message : String(err)}`);
+            continue;
+          }
+
+          if (!fs.existsSync(outputFile)) {
+            console.log("  No export file generated (no new messages)");
+            continue;
           }
         }
 
-        const dupes = result.entries.length - inserted;
-        console.log(`  Inserted: ${inserted} new, ${dupes} duplicates`);
-        totalNew += inserted;
-        totalDuplicates += dupes;
+        const res = await processSingleExport(
+          prisma, outputFile, source.channelName, new Set(source.cnlAuthorIds), leagues,
+        );
+        totalNew += res.inserted;
+        totalDuplicates += res.duplicates;
+        totalSkipped += res.skipped;
+        allParsedEntries.push(...res.entries);
+
+        // Keep exported file for future re-processing
+        console.log(`  Export saved: ${outputFile}`);
       }
-
-      totalSkipped += result.skipped;
-
-      // Keep exported file for future re-processing
-      console.log(`  Export saved: ${outputFile}`);
     }
 
     // Aggregate daily prices

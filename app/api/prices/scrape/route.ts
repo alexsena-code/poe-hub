@@ -13,10 +13,13 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const full = body.full === true;
+  // fromCache processes JSON already uploaded into exports/ (via /api/prices/import)
+  // instead of exporting fresh from Discord — must NOT clear the cache.
+  const fromCache = body.fromCache === true;
 
   // Clear cached exports so the scraper does a fresh Discord export
   const exportsDir = path.resolve(process.cwd(), "exports");
-  if (fs.existsSync(exportsDir)) {
+  if (!fromCache && fs.existsSync(exportsDir)) {
     for (const file of fs.readdirSync(exportsDir)) {
       if (file.endsWith(".json")) {
         fs.unlinkSync(path.join(exportsDir, file));
@@ -25,7 +28,8 @@ export async function POST(request: NextRequest) {
   }
 
   const scriptPath = path.resolve(process.cwd(), "scripts/discord-price-scraper/index.ts");
-  const args = ["tsx", scriptPath, ...(full ? ["--full"] : [])];
+  const flags = [...(full ? ["--full"] : []), ...(fromCache ? ["--from-cache"] : [])];
+  const args = ["tsx", scriptPath, ...flags];
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -34,7 +38,12 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       }
 
-      send("log", "Limpando cache de exports antigos...");
+      send(
+        "log",
+        fromCache
+          ? "Processando JSON enviado (modo from-cache)..."
+          : "Limpando cache de exports antigos...",
+      );
 
       const child = spawn("npx", args, {
         env: { ...process.env },
