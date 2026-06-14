@@ -49,13 +49,30 @@ o JSON exportado manualmente e deixar o resto do pipeline rodar.
 - `npx tsx scripts/discord-price-scraper/index.ts --help` — flag novo
   aparece.
 
+## Parser migrado para OpenRouter (14/06/2026)
+
+O parser LLM (`scripts/discord-price-scraper/llm-parser.ts`) usava o SDK
+direto do Gemini (`@google/genai` + `GEMINI_API_KEY`), cujo **free tier
+(10 req/min, 20 req/dia)** estourava no meio de um export (CONCURRENCY=10).
+Trocado para **OpenRouter** (API OpenAI-compatible via `fetch`):
+
+- `OPENROUTER_API_KEY` (mesma chave do engine), modelo
+  `google/gemini-2.5-flash-lite` por padrão, override via `OPENROUTER_MODEL`.
+- Custo ~$0.03 por export inteiro (~105 batches).
+- Validação real: export poe2 de 28/05–14/06 (3202 msgs) processado
+  **completo** em produção (`poth` na VPS) — 2823 preços parseados, 2483
+  inseridos, 26 daily_prices; divine R$70 → R$0,50 ao longo da liga.
+
+Contexto de infra (onde o hub roda, DB de produção) na memória do projeto
+`project-hub-deploy-architecture`.
+
 ## Observações / known issues
 
-- O modo `from-cache` ainda parseia via **Gemini** (precisa de
-  `GEMINI_API_KEY`); o upload só substitui a etapa de coleta no Discord,
-  não o parsing.
-- Limite de upload 100MB; exports de canais muito ativos em histórico
-  longo podem estourar — retorna 413 com mensagem clara.
+- O hub roda local (ngrok), não na Vercel, para o scraping funcionar
+  (filesystem + spawn + DiscordChatExporter.exe). O `.env` local aponta o
+  `DATABASE_URL` para o Docker local; para gravar em produção, injetar a
+  URL do `poth` da VPS no comando (feito assim no processamento acima).
+- Limite de upload 100MB; exports muito longos podem estourar — 413 claro.
 
 ## O que falta
 

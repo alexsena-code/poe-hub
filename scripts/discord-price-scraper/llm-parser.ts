@@ -5,8 +5,6 @@
  * Much more accurate than regex for varied message formats.
  */
 
-import { GoogleGenAI } from "@google/genai";
-
 export interface DiscordExport {
   guild: { id: string; name: string };
   channel: { id: string; name: string };
@@ -96,15 +94,17 @@ const BATCH_SIZE = 30;
 const MAX_RETRIES = 3;
 const CONCURRENCY = 10;
 
-let aiClient: GoogleGenAI | null = null;
+// OpenRouter (OpenAI-compatible) — single key for all models. Default to Gemini
+// Flash Lite (cheap) but allow override via OPENROUTER_MODEL. Switched off the
+// direct Gemini API because its free tier (10 req/min, 20 req/day) made full
+// exports impossible — see project memory hub-deploy-architecture.
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash-lite";
 
-function getClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-    aiClient = new GoogleGenAI({ apiKey });
-  }
-  return aiClient;
+function getApiKey(): string {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
+  return apiKey;
 }
 
 function isCnl(authorId: string, content: string, cnlAuthorIds: Set<string>): boolean {
@@ -122,7 +122,7 @@ function preFilter(msg: DiscordMessage): boolean {
 }
 
 async function parseBatch(messages: { index: number; content: string }[]): Promise<LlmExtracted[]> {
-  const client = getClient();
+  const apiKey = getApiKey();
 
   const batchText = messages
     .map((m) => `[${m.index}] "${m.content.replace(/[\n\r]+/g, " ").substring(0, 300)}"`)
@@ -130,18 +130,33 @@ async function parseBatch(messages: { index: number; content: string }[]): Promi
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const response = await client.models.generateContent({
-        model: "gemini-2.5-flash-lite",
-        contents: [{ role: "user", parts: [{ text: batchText }] }],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          temperature: 0,
-          maxOutputTokens: 2048,
+      const response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          model: OPENROUTER_MODEL,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: batchText },
+          ],
+          temperature: 0,
+          max_tokens: 2048,
+        }),
       });
 
-      const text = response.text?.trim() || "[]";
-      // Clean markdown if present
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`OpenRouter ${response.status}: ${detail.slice(0, 300)}`);
+      }
+
+      const data = (await response.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const text = data.choices?.[0]?.message?.content?.trim() || "[]";
+      // Clean markdown fences if the model wrapped the JSON
       const cleaned = text.replace(/^```json?\n?/i, "").replace(/\n?```$/i, "").trim();
       const parsed: LlmExtracted[] = JSON.parse(cleaned);
       return parsed;

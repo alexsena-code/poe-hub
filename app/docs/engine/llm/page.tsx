@@ -161,9 +161,10 @@ GET /jobs/abc-123
 
       <H2>poe-hub LLM</H2>
       <P>
-        O poe-hub usa Gemini apenas para o price parser — parsing de mensagens de preco do Discord
-        em dados estruturados (preco, moeda, quantidade). Configurado via GEMINI_API_KEY no .env.
-        Este e o unico caso que ainda usa SDK direto (nao passa pelo OpenRouter).
+        O poe-hub usa o LLM apenas para o price parser — parsing de mensagens de preco do Discord
+        em dados estruturados (preco, moeda, quantidade). Roda via OpenRouter
+        (OPENROUTER_API_KEY no .env), modelo google/gemini-2.5-flash-lite por padrao
+        (sobrescrevivel com OPENROUTER_MODEL).
       </P>
     </>
   );
