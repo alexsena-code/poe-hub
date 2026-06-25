@@ -1,7 +1,33 @@
 import { headers } from "next/headers";
 import { PageHeader } from "@/components/ui/page-header";
-import { formatDistanceToNow } from "date-fns";
 import { CompetitorFilters } from "./competitor-filters";
+import { RawTextDialog } from "./raw-text-dialog";
+
+// Raw-first contract (engine rewrite): pages no longer carry longevity or
+// isPoeRelated — only structural fields + rawText from the crawl.
+interface CompetitorPageRow {
+  id: string;
+  domain: string;
+  url: string;
+  title: string | null;
+  slug: string | null;
+  category: string | null;
+  fetchedAt: string | null;
+  lastCrawledAt: string | null;
+  rawText: string | null;
+}
+
+interface PageMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+interface FetchPagesResult {
+  data: CompetitorPageRow[];
+  meta: PageMeta;
+}
 
 interface PageProps {
   searchParams: Promise<{
@@ -9,11 +35,21 @@ interface PageProps {
     limit?: string;
     domain?: string;
     category?: string;
-    longevity?: string;
-    isPoeRelated?: string;
     search?: string;
     sortBy?: string;
   }>;
+}
+
+// Formats a date string as dd/mm/yyyy in pt-BR locale.
+function formatDateBR(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 async function fetchPages(
@@ -21,24 +57,20 @@ async function fetchPages(
   limit: number,
   domain: string,
   category: string,
-  longevity: string,
-  isPoeRelated: string,
   search: string,
   sortBy: string
-) {
+): Promise<FetchPagesResult> {
   const h = await headers();
   const proto = h.get("x-forwarded-proto") ?? "http";
   const host = h.get("host") ?? "localhost:3001";
-  
+
   const params = new URLSearchParams();
-  params.set('page', String(page));
-  params.set('limit', String(limit));
-  if (domain) params.set('domain', domain);
-  if (category) params.set('category', category);
-  if (longevity) params.set('longevity', longevity);
-  if (isPoeRelated) params.set('isPoeRelated', isPoeRelated);
-  if (search) params.set('search', search);
-  if (sortBy) params.set('sortBy', sortBy);
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  if (domain) params.set("domain", domain);
+  if (category) params.set("category", category);
+  if (search) params.set("search", search);
+  if (sortBy) params.set("sortBy", sortBy);
 
   const url = `${proto}://${host}/api/engine/seo/competitors/pages?${params.toString()}`;
 
@@ -48,9 +80,13 @@ async function fetchPages(
   });
 
   if (!res.ok) {
-    throw new Error(`fetch failed: ${res.status}`);
+    throw new Error(`fetch failed: ${res.status} (${url})`);
   }
-  return res.json();
+  return res.json() as Promise<FetchPagesResult>;
+}
+
+function pageLabel(row: CompetitorPageRow): string {
+  return row.title ?? row.slug ?? row.url.split("/").pop() ?? "Unknown";
 }
 
 export default async function CompetitorPagesPage({ searchParams }: PageProps) {
@@ -59,27 +95,39 @@ export default async function CompetitorPagesPage({ searchParams }: PageProps) {
   const limit = parseInt(raw.limit || "50", 10);
   const domain = raw.domain || "";
   const category = raw.category || "";
-  const longevity = raw.longevity || "";
-  const isPoeRelated = raw.isPoeRelated || "";
   const search = raw.search || "";
   const sortBy = raw.sortBy || "";
 
-  let result = null;
-  let error = null;
+  let result: FetchPagesResult | null = null;
+  let error: string | null = null;
   try {
-    result = await fetchPages(page, limit, domain, category, longevity, isPoeRelated, search, sortBy);
+    result = await fetchPages(page, limit, domain, category, search, sortBy);
   } catch (e) {
     error = (e as Error).message;
   }
 
-  const rows = result?.data || [];
-  const meta = result?.meta || { total: 0, page: 1, limit: 50, totalPages: 1 };
+  const rows = result?.data ?? [];
+  const meta: PageMeta = result?.meta ?? { total: 0, page: 1, limit: 50, totalPages: 1 };
+
+  // Build pagination query preserving current filters.
+  const paginationBase = new URLSearchParams();
+  if (domain) paginationBase.set("domain", domain);
+  if (category) paginationBase.set("category", category);
+  if (search) paginationBase.set("search", search);
+  if (sortBy) paginationBase.set("sortBy", sortBy);
+  paginationBase.set("limit", String(limit));
+
+  function pageHref(p: number) {
+    const q = new URLSearchParams(paginationBase);
+    q.set("page", String(p));
+    return `?${q.toString()}`;
+  }
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
       <PageHeader
         title="Competitor Pages"
-        description="Todas as páginas indexadas via rastreamento de sitemaps dos concorrentes."
+        description="Páginas rastreadas dos concorrentes — conteúdo bruto (rawText) coletado pelo crawler."
         className="mb-2"
       />
 
@@ -96,60 +144,57 @@ export default async function CompetitorPagesPage({ searchParams }: PageProps) {
               <thead className="bg-background/50 border-b border-border/50 text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Domain</th>
-                  <th className="px-4 py-3 font-medium">Title</th>
-                  <th className="px-4 py-3 font-medium">Keywords</th>
-                  <th className="px-4 py-3 font-medium">Relevance</th>
-                  <th className="px-4 py-3 font-medium">Longevity</th>
-                  <th className="px-4 py-3 font-medium text-right">Updated</th>
-                  <th className="px-4 py-3 font-medium text-right">Crawled</th>
+                  <th className="px-4 py-3 font-medium">Título / URL</th>
+                  <th className="px-4 py-3 font-medium">Categoria</th>
+                  <th className="px-4 py-3 font-medium">Raw Text (preview)</th>
+                  <th className="px-4 py-3 font-medium text-right">Coletado em</th>
+                  <th className="px-4 py-3 font-medium text-right">Rastreado em</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/30">
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                       Nenhuma página encontrada.
                     </td>
                   </tr>
                 ) : (
-                  rows.map((row: any) => (
-                    <tr key={row.id} className="hover:bg-foreground/5 transition-colors group">
+                  rows.map((row) => (
+                    <tr key={row.id} className="hover:bg-foreground/5 transition-colors">
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs">{row.domain}</span>
                       </td>
-                      <td className="px-4 py-3 max-w-[300px] truncate">
-                        <a href={row.url} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">
-                          {row.title || row.slug || row.url.split('/').pop() || 'Unknown'}
+                      <td className="px-4 py-3 max-w-[260px] truncate">
+                        <a
+                          href={row.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 hover:underline"
+                        >
+                          {pageLabel(row)}
                         </a>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-1 flex-wrap">
-                          {row.keywords?.slice(0, 3).map((kw: string) => (
-                            <span key={kw} className="bg-foreground/10 text-[10px] px-1.5 py-0.5 rounded">
-                              {kw}
-                            </span>
-                          ))}
-                          {row.keywords?.length > 3 && (
-                            <span className="text-[10px] text-muted-foreground">+{row.keywords.length - 3}</span>
-                          )}
-                        </div>
+                        {row.category ? (
+                          <span className="bg-foreground/10 text-[10px] px-1.5 py-0.5 rounded font-mono">
+                            {row.category}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
                       </td>
-                      <td className="px-4 py-3">
-                        {row.isPoeRelated === true && <span className="text-emerald-400 text-xs">PoE</span>}
-                        {row.isPoeRelated === false && <span className="text-red-400 text-xs">Off-topic</span>}
-                        {row.isPoeRelated === null && <span className="text-muted-foreground text-xs">Pending</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        {row.longevity === 'evergreen' && <span className="text-emerald-400 text-xs">Evergreen</span>}
-                        {row.longevity === 'patch-specific' && <span className="text-blue-400 text-xs">Patch</span>}
-                        {row.longevity === 'outdated' && <span className="text-red-400 text-xs">Outdated</span>}
-                        {!row.longevity && <span className="text-muted-foreground text-xs">-</span>}
+                      <td className="px-4 py-3 max-w-[320px]">
+                        {row.rawText ? (
+                          <RawTextDialog rawText={row.rawText} title={pageLabel(row)} />
+                        ) : (
+                          <span className="text-muted-foreground text-xs italic">sem conteúdo</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-muted-foreground text-xs">
-                        {row.pageUpdatedAt ? formatDistanceToNow(new Date(row.pageUpdatedAt), { addSuffix: true }) : '-'}
+                        {formatDateBR(row.fetchedAt)}
                       </td>
                       <td className="px-4 py-3 text-right text-muted-foreground text-xs">
-                        {row.lastCrawledAt ? formatDistanceToNow(new Date(row.lastCrawledAt), { addSuffix: true }) : '-'}
+                        {formatDateBR(row.lastCrawledAt)}
                       </td>
                     </tr>
                   ))
@@ -163,16 +208,16 @@ export default async function CompetitorPagesPage({ searchParams }: PageProps) {
             </span>
             <div className="flex items-center gap-2">
               {meta.page > 1 && (
-                <a 
-                  href={`?${new URLSearchParams({ ...raw, page: String(meta.page - 1), limit: String(meta.limit) } as any).toString()}`} 
+                <a
+                  href={pageHref(meta.page - 1)}
                   className="px-3 py-1 bg-background border border-border rounded hover:bg-foreground/10"
                 >
                   Anterior
                 </a>
               )}
               {meta.page < meta.totalPages && (
-                <a 
-                  href={`?${new URLSearchParams({ ...raw, page: String(meta.page + 1), limit: String(meta.limit) } as any).toString()}`} 
+                <a
+                  href={pageHref(meta.page + 1)}
                   className="px-3 py-1 bg-background border border-border rounded hover:bg-foreground/10"
                 >
                   Próxima

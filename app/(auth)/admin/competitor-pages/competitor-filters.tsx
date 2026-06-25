@@ -71,31 +71,18 @@ export function CompetitorFilters() {
         </Select>
 
         <Select
-          value={searchParams.get("longevity") || "all"}
-          onValueChange={(val) => handleFilterChange("longevity", val === "all" ? "" : val)}
+          value={searchParams.get("category") || "all"}
+          onValueChange={(val) => handleFilterChange("category", val === "all" ? "" : val)}
         >
-          <SelectTrigger className="w-[150px] bg-background/50 border-border/50">
-            <SelectValue placeholder="Longevity" />
+          <SelectTrigger className="w-[160px] bg-background/50 border-border/50">
+            <SelectValue placeholder="Categoria" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todo o Tempo</SelectItem>
-            <SelectItem value="evergreen">Evergreen</SelectItem>
-            <SelectItem value="patch-specific">Patch-Specific</SelectItem>
-            <SelectItem value="outdated">Outdated</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={searchParams.get("isPoeRelated") || "all"}
-          onValueChange={(val) => handleFilterChange("isPoeRelated", val === "all" ? "" : val)}
-        >
-          <SelectTrigger className="w-[140px] bg-background/50 border-border/50">
-            <SelectValue placeholder="Relevância" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="true">Relevante (PoE)</SelectItem>
-            <SelectItem value="false">Off-topic</SelectItem>
+            <SelectItem value="all">Todas as Categorias</SelectItem>
+            <SelectItem value="build_guide">Build Guide</SelectItem>
+            <SelectItem value="mechanic_guide">Mechanic Guide</SelectItem>
+            <SelectItem value="currency_guide">Currency Guide</SelectItem>
+            <SelectItem value="news">News</SelectItem>
           </SelectContent>
         </Select>
 
@@ -104,11 +91,11 @@ export function CompetitorFilters() {
           onValueChange={(val) => handleFilterChange("sortBy", val)}
         >
           <SelectTrigger className="w-[160px] bg-background/50 border-border/50">
-            <SelectValue placeholder="Ordernar por" />
+            <SelectValue placeholder="Ordenar por" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="lastCrawledAt">Visto Recentemente</SelectItem>
-            <SelectItem value="pageUpdatedAt">Atualizado na Fonte</SelectItem>
+            <SelectItem value="lastCrawledAt">Rastreado Recentemente</SelectItem>
+            <SelectItem value="fetchedAt">Coletado em</SelectItem>
             <SelectItem value="createdAt">Descoberto</SelectItem>
           </SelectContent>
         </Select>

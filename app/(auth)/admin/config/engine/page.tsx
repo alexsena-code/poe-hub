@@ -13,7 +13,6 @@ const LlmPanel = dynamic(() => import('./tabs/llm-tab'), { loading: tabLoading }
 const BudgetPanel = dynamic(() => import('./tabs/budget-tab'), { loading: tabLoading });
 const StylePanel = dynamic(() => import('./tabs/style-tab'), { loading: tabLoading });
 const IdeationPanel = dynamic(() => import('./tabs/ideation-tab'), { loading: tabLoading });
-const CompetitorsPanel = dynamic(() => import('./tabs/competitors-tab'), { loading: tabLoading });
 const PlaygroundPanel = dynamic(() => import('./tabs/playground-tab'), { loading: tabLoading });
 const PipelinesPanel = dynamic(() => import('./tabs/pipelines-tab'), { loading: tabLoading });
 const KeybertPanel = dynamic(() => import('./keybert-tab'), { loading: tabLoading });
@@ -47,7 +46,7 @@ interface QueryRoute {
   example: string;
 }
 
-type Tab = 'weights' | 'routing' | 'llm' | 'budget' | 'style' | 'ideation' | 'competitors' | 'playground' | 'pipelines' | 'keybert';
+type Tab = 'weights' | 'routing' | 'llm' | 'budget' | 'style' | 'ideation' | 'playground' | 'pipelines' | 'keybert';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'weights', label: 'Collection Weights' },
@@ -56,7 +55,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'budget', label: 'Token Budget' },
   { key: 'style', label: 'Style Guide' },
   { key: 'ideation', label: 'Ideation Prompt' },
-  { key: 'competitors', label: 'Competitors' },
   { key: 'playground', label: 'RAG Playground' },
   { key: 'pipelines', label: 'Pipelines' },
   { key: 'keybert', label: 'KeyBERT' },
@@ -166,7 +164,6 @@ export default function ConfigPage() {
         />
       )}
       {tab === 'ideation' && <IdeationPanel />}
-      {tab === 'competitors' && <CompetitorsPanel />}
       {tab === 'playground' && <PlaygroundPanel />}
       {tab === 'pipelines' && <PipelinesPanel />}
       {tab === 'keybert' && <KeybertPanel />}

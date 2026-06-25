@@ -1,6 +1,13 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-05-07 (session 21 — Sanity image preview fix +
+Last updated: 2026-06-25 (session 23 — Concorrentes raw-first no hub: tela
+`/admin/competitors` DB-backed (CRUD) + observabilidade de crawl (botão
+"Crawlar" por concorrente + painel de histórico de runs + dialog de erros,
+polling) + `/competitor-pages` raw-first (preview de rawText); removeu
+`/admin/competitor-gaps` + `competitors-tab` YAML; docs de coleta
+(refinement/audit/restructure). Contraparte do engine session 40 (crawler
+raw-first + observabilidade + 3º OOM ninja). Hub commitado, **deploy pendente**.
+Ver `progress/session-23.md`. — Histórico anterior: session 21 — Sanity image preview fix +
 DB connection lessons. Bug do preview era envs `NEXT_PUBLIC_SANITY_*`
 marcadas como "Sensitive" no Vercel (não expostas em build) → fix:
 desmarcar Sensitive + `getSanityPublicConfig()` lazy validador. Bug
@@ -138,6 +145,7 @@ Most recent first.
 
 | Session | Date | Theme |
 |---------|------|-------|
+| [23](progress/session-23.md) | 2026-06-25 | Concorrentes raw-first no hub — tela `/admin/competitors` DB-backed (CRUD substitui a YAML morta) + observabilidade de crawl (botão "Crawlar" por domínio, painel de histórico de `crawl-runs`, dialog de erros, polling 4s) + `/competitor-pages` migrado pro raw-first (preview de `rawText`, tira longevity/isPoeRelated). Cleanup: removeu `/admin/competitor-gaps` (gap analysis saiu do engine) + `competitors-tab` do engine-config. Docs de coleta (refinement §1-7 + audit + restructure-plan) + survey de frontend/observabilidade pra próxima fase. Contraparte do engine session 40 (crawler raw-first, camada de análise demolida, `CrawlRun`, 3º OOM ninja). Validado ao vivo: maxroll 187 URLs, rawText cheio, sem bloqueio → proxy descartado. **Deploy do hub pendente** |
 | [22](progress/session-22.md) | 2026-06-13 | Upload de JSON pro histórico de preços — botão "Subir JSON" na página de preços que sobe um export do DiscordChatExporter e roda o pipeline (parse Gemini → insert → agregação) sem precisar de `DISCORD_TOKEN`/DCE. Novo modo `--from-cache` no scraper (processa JSONs já em `exports/`, derivando channel do próprio arquivo; parse+insert extraídos pra `processSingleExport()` compartilhado), endpoint `POST /api/prices/import` (valida shape DiscordChatExporter + salva em `exports/<channelId>.json`), scrape route aceita `fromCache` (não limpa cache + `--from-cache`). +5 testes |
 | [21](progress/session-21.md) | 2026-05-07 | Sanity image preview fix + DB connection lessons — preview de imagem 404 em prod por envs `NEXT_PUBLIC_SANITY_*` marcadas como "Sensitive" no Vercel (não ficam disponíveis em build → string vazia no bundle do client → URLs `cdn.sanity.io/images///hash.webp`). Fix: desmarcar Sensitive + `getSanityPublicConfig()` lazy validador que lança erro claro quando vazio + try/catch no `imageUrlFor` do preview com placeholder visual em vez de derrubar a árvore React. Engine `poe-api` em crash loop por `.env` apontando pro DB errado primeiro (`poth` em vez de `poe_content`) e depois pelo IP público `77.42.47.106` em vez de `localhost` (Postgres no container vê tráfego pela WAN como vindo do IP público, não do gateway docker, e `pg_hba.conf` rejeita). `docs/security/db-hardening.md` ganhou Passo 4.5 documentando localhost-vs-IP-público + tabela de qual user/host cada app usa + smoke test em node + nota sobre PM2 `--update-env` não relê `env_file` |
 | [20](progress/session-20.md) | 2026-05-06 | DB hardening — Postgres exposto na VPS após report do BSI/Hetzner: senha forte do superuser `poe`, user novo `poth_app` CRUD only no DB `poth` pra Vercel (não mais conexão como superuser), `pg_hba.conf` restringe `poe` à Docker network 172.18.0.0/16, cross-DB isolation (REVOKE/GRANT em poth/poe_content/hardware_deals), Postgres logging em arquivo com `client=%h`, fail2ban com `chain = DOCKER-USER` + `banaction = iptables-multiport` + `backend = polling` + `ignoreip` do gateway Docker. Validado com 6 falhas → ban → `Connection refused`. Decisão: manter VPS em vez de migrar pra Neon. Runbook em `docs/security/db-hardening.md` |
