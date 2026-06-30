@@ -1,13 +1,19 @@
 # PoE Hub — Progress Tracker
 
-Last updated: 2026-06-25 (session 23 — Concorrentes raw-first no hub: tela
-`/admin/competitors` DB-backed (CRUD) + observabilidade de crawl (botão
-"Crawlar" por concorrente + painel de histórico de runs + dialog de erros,
-polling) + `/competitor-pages` raw-first (preview de rawText); removeu
-`/admin/competitor-gaps` + `competitors-tab` YAML; docs de coleta
-(refinement/audit/restructure). Contraparte do engine session 40 (crawler
-raw-first + observabilidade + 3º OOM ninja). Hub commitado, **deploy pendente**.
-Ver `progress/session-23.md`. — Histórico anterior: session 21 — Sanity image preview fix +
+Last updated: 2026-06-30 (session 23 continuação — limpeza de frontend +
+observability unificada: removidas 4 features mortas (People, Q&A, Feature
+Flags, **Benchmark inteiro** — 58 arquivos + migration `drop_benchmark`);
+`/admin/operations` + `/admin/observability` fundidas em `/admin/runtime` (6
+tabs lazy: **Saúde** nova com frescor por fonte via engine `GET
+/seo/health/sources` + Operações + Logs/LLM/Analytics/Monitor); 1 entrada
+"Runtime" na sidebar. No engine (session 40): coleta Reddit raw-first via
+**old.reddit** no worker residencial (score+comentários) + RSS fallback +
+endpoint de saúde. Pendente: split god files (follow-up). Início da session 23 —
+Concorrentes raw-first no hub: `/admin/competitors` DB-backed (CRUD) +
+observabilidade de crawl + `/competitor-pages` raw-first; removeu
+`/admin/competitor-gaps` + `competitors-tab` YAML; docs de coleta. Contraparte
+do engine session 40 (crawler raw-first + 3º OOM ninja). Ver
+`progress/session-23.md`. — Histórico anterior: session 21 — Sanity image preview fix +
 DB connection lessons. Bug do preview era envs `NEXT_PUBLIC_SANITY_*`
 marcadas como "Sensitive" no Vercel (não expostas em build) → fix:
 desmarcar Sensitive + `getSanityPublicConfig()` lazy validador. Bug
