@@ -7,16 +7,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
-import { DollarSign, Flag, Globe, Trophy, Users } from "lucide-react";
+import { DollarSign, Globe, Trophy, Users } from "lucide-react";
 
 const settingsCards = [
-  {
-    title: "Feature Flags (Engine)",
-    description:
-      "Liga/desliga o outline proposer, plan node, gap check e outros flags do content engine em runtime",
-    href: "/admin/config/feature-flags",
-    icon: Flag,
-  },
   {
     title: "Configuracoes de Custo",
     description: "Gerencie perfis de custo operacional para simulacoes",

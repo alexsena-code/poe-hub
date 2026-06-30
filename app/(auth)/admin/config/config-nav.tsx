@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   Wrench,
   DollarSign,
-  Flag,
   Trophy,
   Globe,
   Users,
@@ -34,7 +33,6 @@ const ENTRIES: NavEntry[] = [
   { href: "/admin/config/leagues", label: "Ligas", icon: Trophy },
   { href: "/admin/config/proxy", label: "Proxy", icon: Globe },
   { href: "/admin/config/users", label: "Usuarios", icon: Users },
-  { href: "/admin/config/feature-flags", label: "Feature Flags", icon: Flag },
 ];
 
 function isActive(pathname: string, entry: NavEntry): boolean {

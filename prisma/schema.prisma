@@ -93,11 +93,6 @@ enum BotAlertSeverity {
   critical
 }
 
-enum BenchmarkType {
-  qa
-  ideation
-  content_generation
-}
 
 // ============================================================
 // Models
@@ -507,88 +502,4 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
-// ============================================================
-// Benchmark — session 13
-// ============================================================
-//
-// Presets: persisted "form setups" the operator can load with one click.
-// Runs:    one per benchmark execution — stores full request + response
-//          so history and compare pages have the raw data.
-// Evaluations: LLM-as-judge verdicts pairing two runs, keyed by judge.
-//
-// All three live in the hub DB (not engine) because they're UI artifacts
-// for the operator workflow. Engine stays stateless for benchmarking.
-
-model BenchmarkPreset {
-  id        String        @id @default(uuid())
-  name      String
-  type      BenchmarkType
-  /// Form payload for this type — briefing + optional modelOverrides + template + notes.
-  /// Validated at API layer per type-specific zod schema.
-  payload   Json
-  notes     String?
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
-
-  runs BenchmarkRun[]
-
-  @@unique([name, type])
-  @@index([type])
-  @@map("benchmark_presets")
-}
-
-model BenchmarkRun {
-  id               String        @id @default(uuid())
-  type             BenchmarkType
-  /// Preset this run was started from (null for ad-hoc runs).
-  presetId         String?       @map("preset_id")
-  preset           BenchmarkPreset? @relation(fields: [presetId], references: [id], onDelete: SetNull)
-  /// Per-node overrides applied, e.g. { write: "moonshotai/kimi-k2" }.
-  /// Empty object when no override was used.
-  modelOverrides   Json          @map("model_overrides")
-  /// Full request body sent to engine — for reproducibility.
-  requestBody      Json          @map("request_body")
-  /// Full engine response (result + telemetry snapshot).
-  response         Json
-  /// Denormalized from response.telemetry for fast list queries.
-  totalCostUsd     Float         @map("total_cost_usd")
-  totalDurationMs  Int           @map("total_duration_ms")
-  llmCallCount     Int           @map("llm_call_count")
-  qdrantQueryCount Int           @map("qdrant_query_count")
-  /// Engine HTTP status (200 success, others = error path).
-  httpStatus       Int           @map("http_status")
-  error            String?
-  createdAt        DateTime      @default(now()) @map("created_at")
-
-  evaluationsAsA BenchmarkEvaluation[] @relation("EvalRunA")
-  evaluationsAsB BenchmarkEvaluation[] @relation("EvalRunB")
-
-  @@index([type])
-  @@index([createdAt])
-  @@index([presetId])
-  @@map("benchmark_runs")
-}
-
-model BenchmarkEvaluation {
-  id         String       @id @default(uuid())
-  /// Pair of runs compared. UNIQUE on (a, b, judge) — re-runs same judge overwrite.
-  runAId     String       @map("run_a_id")
-  runA       BenchmarkRun @relation("EvalRunA", fields: [runAId], references: [id], onDelete: Cascade)
-  runBId     String       @map("run_b_id")
-  runB       BenchmarkRun @relation("EvalRunB", fields: [runBId], references: [id], onDelete: Cascade)
-  /// Judge model ID (e.g. "anthropic/claude-sonnet-4.6").
-  judgeModel String       @map("judge_model")
-  /// Full judge verdict: per-dimension winners, scores, rationale.
-  verdict    Json
-  /// Overall winner (A | B | tie | null). Null = inconclusive.
-  winner     String?
-  /// Cost of the judge call itself, in USD.
-  costUsd    Float        @map("cost_usd")
-  createdAt  DateTime     @default(now()) @map("created_at")
-
-  @@unique([runAId, runBId, judgeModel])
-  @@index([runAId])
-  @@index([runBId])
-  @@map("benchmark_evaluations")
-}
 

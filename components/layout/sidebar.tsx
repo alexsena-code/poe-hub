@@ -18,7 +18,6 @@ import {
   Menu,
   BookOpen,
   PenTool,
-  MessageSquare,
   Search,
   BarChart3,
   FileText,
@@ -91,11 +90,9 @@ const navSections: { label: string; items: NavEntry[] }[] = [
             ],
           },
           { title: "Guides", href: "/workspace/guides", icon: BookOpen },
-          { title: "Q&A", href: "/workspace/qa", icon: MessageSquare },
           { title: "Ideas", href: "/workspace/ideas", icon: Lightbulb },
           { title: "Templates", href: "/workspace/templates", icon: FileText },
           { title: "Slang", href: "/workspace/slang", icon: BookOpenCheck },
-          { title: "People", href: "/workspace/people", icon: Users },
         ],
       },
       {
@@ -138,7 +135,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
       },
       {
         // Admin sub-grouped into 3 semantic clusters (S07.h):
-        //   Operacoes — runtime observability + task tracking + benchmarks
+        //   Operacoes — runtime observability + task tracking
         //   SEO Tools — GSC (admin-level, distinct from /seo workspace)
         //   Config    — all YAML / system configuration pages
         title: "Admin",
@@ -152,10 +149,6 @@ const navSections: { label: string; items: NavEntry[] }[] = [
               { title: "Operations", href: "/admin/operations", icon: Activity },
               { title: "Observability", href: "/admin/observability", icon: Activity },
               { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
-              // Session 06 S06.d — benchmark page for QA/Ideation/ContentGen runs
-              { title: "Benchmark", href: "/admin/benchmark", icon: Activity },
-              // Session 01 S01.benchmark-history — run history + compare
-              { title: "Bench History", href: "/admin/benchmark/history", icon: Activity },
               // Session 21 Fase 3 — curated ingest for 5 Qdrant collections
               { title: "Curated Ingest", href: "/admin/curated-ingest", icon: Database },
             ],
@@ -180,7 +173,6 @@ const navSections: { label: string; items: NavEntry[] }[] = [
               { title: "Proxy", href: "/admin/config/proxy", icon: Wrench },
               { title: "Ligas", href: "/admin/config/leagues", icon: ListTodo },
               { title: "Usuarios", href: "/admin/config/users", icon: Users },
-              { title: "Feature Flags", href: "/admin/config/feature-flags", icon: Settings },
             ],
           },
         ],

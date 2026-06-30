@@ -46,13 +46,40 @@ benchmark, engine-config gen-tabs, feature-flags, trace, e a validar qa/people).
 Recomendações: `/admin/runtime` unificado, painel saúde-por-fonte, `<LogDataTable>`
 genérica. Base pra Fase 3/4 do restructure-plan.
 
+### Cleanup — 4 features mortas removidas (decisão do operador)
+Operador confirmou cortar e **deletar de vez** (não arquivar): **People**,
+**Feature Flags**, **Q&A**, **Benchmark inteiro**. Mantidos: **Ideas** e
+**Trace** (este último o survey marcou errado como morto — é funcional, linkado
+do `guides-client`, backed pelo engine `/content/traces`).
+- **58 arquivos deletados.** Benchmark era o maior footprint: 3 rotas + 18
+  componentes (`compare-client` 773L etc.) + `app/api/benchmark/` (9 arquivos) +
+  6 libs (`benchmark-*.ts`) + scripts/seed + factory + 3 models Prisma
+  (`BenchmarkPreset/Run/Evaluation` + enum `BenchmarkType`). People/Q&A:
+  páginas + `components/modules/workspace/{people,qa}/`. Feature Flags: página +
+  `FeatureFlagsPanel` + funções órfãs em `content-api.ts`.
+- **Editados:** `sidebar.tsx` (-5 entradas + import órfão), `config-nav.tsx`,
+  `config/page.tsx` (card Feature Flags), `content-api.ts` (funções
+  feature-flags; `askQuestion` MANTIDA — usada pelo editor), `schema.prisma`,
+  `package.json` (script seed:benchmarks), 2 comentários em openrouter routes.
+- **Validação:** `tsc --noEmit` sem nenhum erro das features removidas (os
+  restantes são pré-existentes alheios: auth `trustHost`, simulations/annual,
+  reddit `use-reddit-state`, editor tests). `prisma generate` OK.
+- **Pendente:** `npx prisma migrate dev --name drop_benchmark` (DB offline no
+  momento — Docker Desktop parado). Schema já limpo + client regenerado; o drop
+  das tabelas `benchmark_*` resolve no próximo `migrate dev` com a DB de pé.
+
 ## What's left
-- **Deploy do hub** (Vercel/local) — esta sessão está commitada mas não
-  deployada.
-- **Limpeza grande + observabilidade unificada** (`/admin/runtime`, cortar
-  rotas mortas, split god files) — precisa das decisões de corte do operador
-  (qa/people; arquivar-atrás-de-flag vs deletar). Survey pronto.
-- Aplicar raw-first às outras fontes (Reddit/Wiki) — concorrentes foi o piloto.
+- **Observabilidade unificada** (`/admin/runtime`) — PRÓXIMO: fundir
+  `/admin/operations` + `/admin/observability` numa página só com tab **Saúde**
+  nova (frescor por fonte: Reddit/YouTube/Ninja/Concorrentes/GSC/Trends, via
+  novo endpoint engine `GET /seo/health/sources`) + Operações + Logs/LLM/
+  Analytics/Monitor. Uma entrada "Runtime" na sidebar no lugar das duas.
+- **Migration `drop_benchmark`** quando a DB subir.
+- **Split god files** (hardware/analytics 621, guide-content 577,
+  hardware/builder 529, config/users 522, deals-tab 555, items-tab 508,
+  price-history-table 504) — refactor mecânico, follow-up.
+- **Deploy do hub** (Vercel/local).
+- Aplicar raw-first às outras fontes (Reddit já feito no engine; Wiki pendente).
 
 ## Notas
 - Validação engine ao vivo (session 40): crawl maxroll 187 URLs, rawText cheio

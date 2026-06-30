@@ -5,9 +5,8 @@ import { NextResponse } from "next/server";
 /**
  * GET /api/openrouter/models
  *
- * Returns the full OpenRouter model catalog (simplified shape) for the
- * benchmark combobox. Cached 1h server-side — the catalog rarely changes
- * within a single editing session.
+ * Returns the full OpenRouter model catalog (simplified shape).
+ * Cached 1h server-side — the catalog rarely changes within a single editing session.
  *
  * For a single-model lookup (pricing card), use /api/openrouter/models/:id
  * (the catch-all sibling route).

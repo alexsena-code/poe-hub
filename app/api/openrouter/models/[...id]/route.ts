@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // OpenRouter's public /api/v1/models returns all available models with pricing.
-// We cache for 5 minutes to avoid hammering their endpoint on repeated benchmark previews.
+// We cache for 5 minutes to avoid hammering their endpoint on repeated requests.
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 const CACHE_REVALIDATE_SECONDS = 300;
 

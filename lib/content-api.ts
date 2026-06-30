@@ -232,50 +232,6 @@ export async function fetchSkimCollections(): Promise<SkimCollectionsCatalog> {
 }
 
 // ---------------------------------------------------------------------------
-// Feature flags (runtime toggles backed by output/feature-flags.json)
-// ---------------------------------------------------------------------------
-
-export interface FeatureFlagEntry {
-  key: string;
-  envVar: string;
-  default: boolean;
-  label: string;
-  description: string;
-  value: boolean;
-  source: 'file' | 'env' | 'default';
-}
-
-export async function fetchFeatureFlags(): Promise<{ flags: FeatureFlagEntry[] }> {
-  const res = await fetch(`${CONTENT_API_URL}/content/feature-flags`, {
-    headers: authHeaders(),
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error('Falha ao carregar feature flags');
-  return res.json();
-}
-
-export async function updateFeatureFlags(
-  updates: Record<string, boolean>,
-): Promise<{ flags: FeatureFlagEntry[] }> {
-  const res = await fetch(`${CONTENT_API_URL}/content/feature-flags`, {
-    method: 'PUT',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(updates),
-  });
-  if (!res.ok) throw new Error('Falha ao atualizar feature flags');
-  return res.json();
-}
-
-export async function resetFeatureFlag(key: string): Promise<{ flags: FeatureFlagEntry[] }> {
-  const res = await fetch(`${CONTENT_API_URL}/content/feature-flags/${encodeURIComponent(key)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  });
-  if (!res.ok) throw new Error('Falha ao resetar feature flag');
-  return res.json();
-}
-
-// ---------------------------------------------------------------------------
 // Outline proposer metrics
 // ---------------------------------------------------------------------------
 
