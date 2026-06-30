@@ -68,12 +68,21 @@ do `guides-client`, backed pelo engine `/content/traces`).
   momento — Docker Desktop parado). Schema já limpo + client regenerado; o drop
   das tabelas `benchmark_*` resolve no próximo `migrate dev` com a DB de pé.
 
+### Observabilidade unificada — `/admin/runtime`
+Fundidas `/admin/operations` + `/admin/observability` numa página só com 6 tabs
+lazy-loaded: **Saúde** (nova) · Operações · Logs · LLM · Analytics · Monitor.
+- **Tab Saúde** (`components/admin/runtime/health-tab.tsx`): cards de frescor por
+  fonte via SWR (refresh 60s) consumindo o novo `GET /seo/health/sources` do
+  engine (deployado, retorna as 7 fontes ao vivo). Badge verde<24h / âmbar<72h /
+  vermelho / sem-dados; datas dd/mm/yyyy pt-BR; idade, rowCount, status do run.
+- **Tab Operações** (`operations-tab.tsx`): action cards + Recent Runs extraídos
+  da antiga operations (reusa `use-operations`/`action-card`/`recent-runs`).
+- Páginas antigas `/admin/operations` + `/admin/observability` → `redirect()`
+  pra `/admin/runtime` (bookmarks preservados). Sidebar: **uma** entrada
+  "Runtime" no lugar das duas.
+- tsc limpo nos arquivos novos (22 erros restantes são baseline pré-existente).
+
 ## What's left
-- **Observabilidade unificada** (`/admin/runtime`) — PRÓXIMO: fundir
-  `/admin/operations` + `/admin/observability` numa página só com tab **Saúde**
-  nova (frescor por fonte: Reddit/YouTube/Ninja/Concorrentes/GSC/Trends, via
-  novo endpoint engine `GET /seo/health/sources`) + Operações + Logs/LLM/
-  Analytics/Monitor. Uma entrada "Runtime" na sidebar no lugar das duas.
 - **Migration `drop_benchmark`** quando a DB subir.
 - **Split god files** (hardware/analytics 621, guide-content 577,
   hardware/builder 529, config/users 522, deals-tab 555, items-tab 508,

@@ -145,9 +145,9 @@ const navSections: { label: string; items: NavEntry[] }[] = [
             title: "Operacoes",
             icon: Activity,
             children: [
-              // Session 36 — unified control center for crawls/pipelines/maintenance
-              { title: "Operations", href: "/admin/operations", icon: Activity },
-              { title: "Observability", href: "/admin/observability", icon: Activity },
+              // Session 23 — Operations + Observability fundidas em /admin/runtime
+              // (tabs Saúde/Operações/Logs/LLM/Analytics/Monitor).
+              { title: "Runtime", href: "/admin/runtime", icon: Activity },
               { title: "Tarefas", href: "/admin/tasks", icon: ListTodo },
               // Session 21 Fase 3 — curated ingest for 5 Qdrant collections
               { title: "Curated Ingest", href: "/admin/curated-ingest", icon: Database },
