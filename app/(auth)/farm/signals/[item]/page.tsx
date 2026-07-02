@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { getItemDetail } from "@/lib/cx-mock";
+import { getItemDetail } from "@/lib/cx-signals";
 import { PriceVolumeChart, FillCurveChart } from "@/components/modules/signals/item-charts";
 
 interface Props {
@@ -21,7 +21,7 @@ export default async function ItemDetailPage({ params }: Props) {
   if (!session) redirect("/login");
 
   const { item } = await params;
-  const detail = getItemDetail(decodeURIComponent(item));
+  const detail = await getItemDetail(decodeURIComponent(item));
   if (!detail) notFound();
   const s = detail.signal;
 

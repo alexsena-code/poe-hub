@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Download, ArrowUpDown, SlidersHorizontal } from "lucide-react";
-import type { CxSignal } from "@/lib/cx-mock";
+import type { CxSignal } from "@/lib/cx-signals";
 
 type NumKey = {
   [K in keyof CxSignal]: CxSignal[K] extends number | null ? K : never;

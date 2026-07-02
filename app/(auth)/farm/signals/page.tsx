@@ -6,14 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SignalsTable } from "@/components/modules/signals/signals-table";
 import { ArbTable } from "@/components/modules/signals/arb-table";
-import { getSignals, getArb } from "@/lib/cx-mock";
+import { getSignals, getArb } from "@/lib/cx-signals";
 
 export default async function SignalsPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const signals = getSignals();
-  const arb = getArb();
+  const [signals, arb] = await Promise.all([getSignals(), getArb()]);
 
   return (
     <div className="space-y-6">

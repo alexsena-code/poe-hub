@@ -569,3 +569,99 @@ model ChatMessage {
   @@index([conversationId])
   @@map("chat_messages")
 }
+
+// ============================================================
+// Currency Exchange — dados de mercado + sinais (alimentados pelo worker cxw).
+// Float (não Decimal) porque são analytics/triagem, não contabilidade.
+// Cada linha tem capturedAt (versionado por rodada). Espelha os tipos de
+// lib/cx-mock.ts — o provider troca o mock por queries nestas tabelas.
+// ============================================================
+
+model CxSignal {
+  id          String   @id @default(uuid())
+  league      String
+  item        String
+  base        String   @default("Chaos Orb")
+  // book
+  bid         Float?
+  ask         Float?
+  spreadPct   Float?   @map("spread_pct")
+  mmBuy       Float?   @map("mm_buy")
+  mmSell      Float?   @map("mm_sell")
+  mmSpreadPct Float?   @map("mm_spread_pct")
+  capDiv      Float?   @map("cap_div")
+  // Tier 1
+  fairVamp    Float?   @map("fair_vamp")
+  obi         Float?
+  slipPct     Float?   @map("slip_pct")
+  halfLifeH   Float?   @map("half_life_h")
+  driftDay    Float?   @map("drift_day")
+  volPct      Float?   @map("vol_pct")
+  kelly       Float?
+  markoutPct  Float?   @map("markout_pct")
+  liqPerH     Float?   @map("liq_per_h")
+  // fill-prob
+  pFillBuy    Float?   @map("p_fill_buy")
+  pFillSell   Float?   @map("p_fill_sell")
+  pRoundtrip  Float?   @map("p_roundtrip")
+  eTFillH     Float?   @map("e_t_fill_h")
+  qAheadBuy   Float?   @map("q_ahead_buy")
+  qAheadSell  Float?   @map("q_ahead_sell")
+  // validação cxapi + confiança
+  cxapiLo     Float?   @map("cxapi_lo")
+  cxapiHi     Float?   @map("cxapi_hi")
+  cxapiOk     Boolean? @map("cxapi_ok")
+  conf        String   // ok | fina | baixa
+  capturedAt  DateTime @map("captured_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([league, capturedAt])
+  @@index([item])
+  @@map("cx_signal")
+}
+
+model CxArb {
+  id             String   @id @default(uuid())
+  league         String
+  item           String
+  priceChaos     Float    @map("price_chaos")
+  priceViaDivine Float    @map("price_via_divine")
+  discPct        Float    @map("disc_pct")
+  grainPct       Float    @map("grain_pct")
+  edgePct        Float    @map("edge_pct")
+  volDivine      Float    @map("vol_divine")
+  conf           String   // ALTA | media | baixa
+  capturedAt     DateTime @map("captured_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([league, capturedAt])
+  @@map("cx_arb")
+}
+
+// Série horária p/ gráficos de preço/volume (do digest da cxapi)
+model CxMarketHourly {
+  id     String   @id @default(uuid())
+  league String
+  item   String
+  ts     DateTime // hora
+  price  Float // chaos/item (mid)
+  volume Float
+
+  @@unique([league, item, ts])
+  @@index([league, item, ts])
+  @@map("cx_market_hourly")
+}
+
+// Escada do book capturado in-game (último snapshot por item)
+model CxBookLevel {
+  id         String   @id @default(uuid())
+  league     String
+  item       String
+  side       String // ask | bid
+  price      Float
+  qty        Float
+  capturedAt DateTime @map("captured_at")
+
+  @@index([league, item, capturedAt])
+  @@map("cx_book_level")
+}

@@ -2,7 +2,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import type { ArbRow } from "@/lib/cx-mock";
+import type { ArbRow } from "@/lib/cx-signals";
 
 const fmt = (v: number, dp = 2) => v.toLocaleString("pt-BR", { maximumFractionDigits: dp });
 
