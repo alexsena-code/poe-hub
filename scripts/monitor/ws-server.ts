@@ -23,6 +23,7 @@ import {
   isHideoutArea,
 } from "./alert-engine.js";
 import { notifyDiscord } from "./discord-notifier.js";
+import { handleExecutorConnection } from "./cx-executor-handler.js";
 import type {
   InstanceInfo,
   LogEntry,
@@ -83,6 +84,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
 
   if (url.startsWith("/ws/agent")) {
     handleAgentConnection(ws);
+  } else if (url.startsWith("/ws/executor")) {
+    handleExecutorConnection(ws);
   } else if (url.startsWith("/ws/dashboard")) {
     handleDashboardConnection(ws);
   } else {

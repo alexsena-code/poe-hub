@@ -50,6 +50,17 @@ export interface FillInitialData {
   notes: string | null;
 }
 
+// Pré-preenchimento vindo do sinal ("Fazer Order" em /farm/signals). Só afeta
+// o modo criação (sem id) — os campos ficam editáveis antes de registrar.
+export interface FillPrefill {
+  item?: string;
+  base?: string;
+  league?: string;
+  buyRatio?: string;
+  fairAtEntry?: string;
+  buyQAhead?: string;
+}
+
 // datetime-local exige "YYYY-MM-DDTHH:mm" na hora local
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
@@ -58,7 +69,7 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-export function FillForm({ initialData }: { initialData?: FillInitialData }) {
+export function FillForm({ initialData, prefill }: { initialData?: FillInitialData; prefill?: FillPrefill }) {
   const router = useRouter();
   const isEditing = !!initialData;
   const { leagues } = useLeagues();
@@ -66,14 +77,14 @@ export function FillForm({ initialData }: { initialData?: FillInitialData }) {
 
   const form = useForm<FillFormValues>({
     defaultValues: {
-      item: initialData?.item ?? "",
-      base: initialData?.base ?? "Chaos Orb",
-      league: initialData?.league ?? "",
+      item: initialData?.item ?? prefill?.item ?? "",
+      base: initialData?.base ?? prefill?.base ?? "Chaos Orb",
+      league: initialData?.league ?? prefill?.league ?? "",
       mode: initialData?.mode ?? "manual",
-      buyRatio: initialData?.buyRatio?.toString() ?? "",
+      buyRatio: initialData?.buyRatio?.toString() ?? prefill?.buyRatio ?? "",
       buyQty: initialData?.buyQty?.toString() ?? "",
-      fairAtEntry: initialData?.fairAtEntry?.toString() ?? "",
-      buyQAhead: initialData?.buyQAhead?.toString() ?? "",
+      fairAtEntry: initialData?.fairAtEntry?.toString() ?? prefill?.fairAtEntry ?? "",
+      buyQAhead: initialData?.buyQAhead?.toString() ?? prefill?.buyQAhead ?? "",
       sellRatio: initialData?.sellRatio?.toString() ?? "",
       sellQty: initialData?.sellQty?.toString() ?? "",
       sellFilledAt: toLocalInput(initialData?.sellFilledAt ?? null),

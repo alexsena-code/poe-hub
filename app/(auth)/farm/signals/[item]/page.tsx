@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Play } from "lucide-react";
 import { getItemDetail } from "@/lib/cx-signals";
 import { PriceVolumeChart, FillCurveChart } from "@/components/modules/signals/item-charts";
 
@@ -47,14 +47,30 @@ export default async function ItemDetailPage({ params }: Props) {
   const maxAsk = Math.max(...detail.book.asks.map((l) => l.qty), 1);
   const maxBid = Math.max(...detail.book.bids.map((l) => l.qty), 1);
 
+  // "Fazer Order" pré-preenche a Nova Order com o preço de compra sugerido (MM buy,
+  // fallback ASK) e o fair/fila do sinal. Tudo editável antes de registrar.
+  const buyHint = s.mmBuy ?? s.ask;
+  const orderQs = new URLSearchParams();
+  orderQs.set("item", s.item);
+  orderQs.set("base", s.base);
+  orderQs.set("league", s.league);
+  if (buyHint != null) orderQs.set("buyRatio", String(buyHint));
+  if (s.fairVamp != null) orderQs.set("fairAtEntry", String(s.fairVamp));
+  if (s.qAheadBuy != null) orderQs.set("buyQAhead", String(s.qAheadBuy));
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={s.item}
         actions={
-          <Link href="/farm/signals">
-            <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Voltar</Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/farm/signals">
+              <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" /> Voltar</Button>
+            </Link>
+            <Link href={`/farm/fills/new?${orderQs.toString()}`}>
+              <Button><Play className="mr-2 h-4 w-4" /> Fazer Order</Button>
+            </Link>
+          </div>
         }
       />
 
