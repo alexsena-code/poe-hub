@@ -11,6 +11,7 @@ import {
   ListTodo,
   DollarSign,
   TrendingUp,
+  Repeat,
   Calculator,
   Settings,
   LogOut,
@@ -117,6 +118,8 @@ const navSections: { label: string; items: NavEntry[] }[] = [
         children: [
           { title: "Bots", href: "/farm/bots", icon: Bot },
           { title: "Vendas", href: "/farm/sales", icon: DollarSign },
+          { title: "Sinais (Cambio)", href: "/farm/signals", icon: TrendingUp },
+          { title: "Exchange", href: "/farm/fills", icon: Repeat },
           { title: "Precos", href: "/farm/prices", icon: TrendingUp },
           { title: "Simulacoes", href: "/farm/simulations", icon: Calculator },
           { title: "Faturamento Anual", href: "/farm/simulations/annual", icon: Calculator },

@@ -93,6 +93,25 @@ enum BotAlertSeverity {
   critical
 }
 
+// Câmbio de moedas (Currency Exchange) — modos e ciclo de vida de um flip
+enum FillMode {
+  manual
+  semi
+  full
+}
+
+enum FillSource {
+  ui
+  plugin
+  auto
+}
+
+enum FillStatus {
+  open // ordem de compra postada, ainda enchendo
+  holding // comprou, segurando inventário (venda ainda não fechou)
+  closed // round-trip completo (comprou e vendeu)
+  cancelled
+}
 
 // ============================================================
 // Models
@@ -106,24 +125,24 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  assignedTasks Task[] @relation("AssignedTasks")
-  createdTasks  Task[] @relation("CreatedTasks")
+  assignedTasks Task[]             @relation("AssignedTasks")
+  createdTasks  Task[]             @relation("CreatedTasks")
   conversations ChatConversation[]
 
   @@map("users")
 }
 
 model Bot {
-  id            String    @id @default(uuid())
-  nick          String
-  email         String
-  password      String    // encrypted
-  proxyIp       String    @map("proxy_ip")
-  proxyEol      DateTime? @map("proxy_eol")
-  status        BotStatus @default(active)
-  notes         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id        String    @id @default(uuid())
+  nick      String
+  email     String
+  password  String // encrypted
+  proxyIp   String    @map("proxy_ip")
+  proxyEol  DateTime? @map("proxy_eol")
+  status    BotStatus @default(active)
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   instances BotInstance[]
 
@@ -132,13 +151,13 @@ model Bot {
 }
 
 model ProxyConfig {
-  id            String   @id @default(uuid())
-  port          Int      @default(8080)
-  username      String   // encrypted
-  password      String   // encrypted
-  notes         String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  port      Int      @default(8080)
+  username  String // encrypted
+  password  String // encrypted
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("proxy_config")
 }
@@ -155,7 +174,7 @@ model PriceEntry {
   currency         Currency
   item             String?
   rawMessage       String   @map("raw_message")
-  messageTimestamp  DateTime @map("message_timestamp")
+  messageTimestamp DateTime @map("message_timestamp")
   league           String?
   createdAt        DateTime @default(now()) @map("created_at")
 
@@ -168,21 +187,21 @@ model PriceEntry {
 }
 
 model DailyPrice {
-  id             String   @id @default(uuid())
-  date           DateTime @db.Date
-  item           String   // divine, mirror, chaos
-  league         String   @default("")
-  currency       String   @default("brl") // brl, usd
-  median         Decimal  @db.Decimal(18, 8)
-  mean           Decimal  @db.Decimal(18, 8)
-  min            Decimal  @db.Decimal(18, 8)
-  max            Decimal  @db.Decimal(18, 8)
-  cnlPrice       Decimal? @map("cnl_price") @db.Decimal(18, 8)
-  sellCount      Int      @map("sell_count")
-  buyCount       Int      @map("buy_count")
-  totalOffers    Int      @map("total_offers")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  date        DateTime @db.Date
+  item        String // divine, mirror, chaos
+  league      String   @default("")
+  currency    String   @default("brl") // brl, usd
+  median      Decimal  @db.Decimal(18, 8)
+  mean        Decimal  @db.Decimal(18, 8)
+  min         Decimal  @db.Decimal(18, 8)
+  max         Decimal  @db.Decimal(18, 8)
+  cnlPrice    Decimal? @map("cnl_price") @db.Decimal(18, 8)
+  sellCount   Int      @map("sell_count")
+  buyCount    Int      @map("buy_count")
+  totalOffers Int      @map("total_offers")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@unique([date, item, league, currency])
   @@index([date])
@@ -207,19 +226,19 @@ model DiscordSource {
 }
 
 model Sale {
-  id              String   @id @default(uuid())
-  date            DateTime @db.Date
-  buyerId         String   @map("buyer_id")
-  quantity        Decimal  @db.Decimal(18, 8)
-  unit            SaleUnit
-  divinePriceUsd  Decimal? @map("divine_price_usd") @db.Decimal(18, 8)
-  divinePriceBrl  Decimal? @map("divine_price_brl") @db.Decimal(18, 8)
-  totalUsd        Decimal? @map("total_usd") @db.Decimal(18, 2)
-  totalBrl        Decimal? @map("total_brl") @db.Decimal(18, 2)
-  league          String
-  notes           String?
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  date           DateTime @db.Date
+  buyerId        String   @map("buyer_id")
+  quantity       Decimal  @db.Decimal(18, 8)
+  unit           SaleUnit
+  divinePriceUsd Decimal? @map("divine_price_usd") @db.Decimal(18, 8)
+  divinePriceBrl Decimal? @map("divine_price_brl") @db.Decimal(18, 8)
+  totalUsd       Decimal? @map("total_usd") @db.Decimal(18, 2)
+  totalBrl       Decimal? @map("total_brl") @db.Decimal(18, 2)
+  league         String
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   buyer Buyer @relation(fields: [buyerId], references: [id])
 
@@ -230,11 +249,11 @@ model Sale {
 }
 
 model Buyer {
-  id      String  @id @default(uuid())
-  name    String
-  isCnl   Boolean @default(false) @map("is_cnl")
-  contact String?
-  notes   String?
+  id        String   @id @default(uuid())
+  name      String
+  isCnl     Boolean  @default(false) @map("is_cnl")
+  contact   String?
+  notes     String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -243,24 +262,72 @@ model Buyer {
   @@map("buyers")
 }
 
+// ============================================================
+// Currency Exchange — Log de fills (flips chaos<->item<->divine in-game)
+// Distinto de `sales` (vendas RMT em USD/BRL). Aqui é câmbio in-game, e os
+// campos extras (qAhead, fairAtEntry, posted vs filled) calibram o fill-prob.
+// ============================================================
+
+model Fill {
+  id     String     @id @default(uuid())
+  league String
+  item   String // ex.: "Orb of Annulment"
+  base   String     @default("Chaos Orb") // moeda base do flip
+  mode   FillMode   @default(manual)
+  source FillSource @default(ui)
+  status FillStatus @default(open)
+
+  // perna COMPRA
+  buyRatio    Decimal?  @map("buy_ratio") @db.Decimal(18, 6) // preço/un pago (base/item)
+  buyQty      Decimal?  @map("buy_qty") @db.Decimal(18, 4)
+  buyPostedAt DateTime? @map("buy_posted_at") // ENTRADA (default now no clique)
+  buyFilledAt DateTime? @map("buy_filled_at")
+  buyQAhead   Decimal?  @map("buy_q_ahead") @db.Decimal(18, 2) // fila à frente no post (calibração)
+
+  // perna VENDA
+  sellRatio    Decimal?  @map("sell_ratio") @db.Decimal(18, 6)
+  sellQty      Decimal?  @map("sell_qty") @db.Decimal(18, 4)
+  sellPostedAt DateTime? @map("sell_posted_at")
+  sellFilledAt DateTime? @map("sell_filled_at") // SAÍDA (auto via plugin/Faustus)
+  sellQAhead   Decimal?  @map("sell_q_ahead") @db.Decimal(18, 2)
+
+  fairAtEntry Decimal? @map("fair_at_entry") @db.Decimal(18, 6) // fair(VAMP) no post (markout)
+  pnlChaos    Decimal? @map("pnl_chaos") @db.Decimal(18, 4)
+  pnlDiv      Decimal? @map("pnl_div") @db.Decimal(18, 6)
+
+  botInstanceId String?  @map("bot_instance_id") // qual executor (null = manual)
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  botInstance BotInstance? @relation(fields: [botInstanceId], references: [id], onDelete: SetNull)
+
+  @@index([league])
+  @@index([item])
+  @@index([status])
+  @@index([buyPostedAt])
+  @@index([botInstanceId])
+  @@map("cx_fills")
+}
+
 model Simulation {
-  id              String           @id @default(uuid())
-  name            String
-  league          String
-  status          SimulationStatus @default(draft)
-  kind            SimulationKind   @default(operational)
-  durationWeeks   Int              @map("duration_weeks")
-  startDayOffset  Int              @default(0) @map("start_day_offset")
-  notes           String?
+  id             String           @id @default(uuid())
+  name           String
+  league         String
+  status         SimulationStatus @default(draft)
+  kind           SimulationKind   @default(operational)
+  durationWeeks  Int              @map("duration_weeks")
+  startDayOffset Int              @default(0) @map("start_day_offset")
+  notes          String?
 
   // Cost snapshot (copied from GlobalCostConfig when selected)
-  costConfigName          String?  @map("cost_config_name")
-  proxyCostPerBotMonthly  Decimal? @map("sim_proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
-  levelingCostPerBot      Decimal? @map("sim_leveling_cost_per_bot") @db.Decimal(10, 2)
-  stashPackCostPerBot     Decimal? @map("sim_stash_pack_cost_per_bot") @db.Decimal(10, 2)
-  expluginsKeyCostDaily   Decimal? @map("sim_explugins_key_cost_daily") @db.Decimal(10, 4)
-  dpbKeyCostDaily         Decimal? @map("sim_dpb_key_cost_daily") @db.Decimal(10, 4)
-  customCosts             Json?    @map("sim_custom_costs")
+  costConfigName         String?  @map("cost_config_name")
+  proxyCostPerBotMonthly Decimal? @map("sim_proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
+  levelingCostPerBot     Decimal? @map("sim_leveling_cost_per_bot") @db.Decimal(10, 2)
+  stashPackCostPerBot    Decimal? @map("sim_stash_pack_cost_per_bot") @db.Decimal(10, 2)
+  expluginsKeyCostDaily  Decimal? @map("sim_explugins_key_cost_daily") @db.Decimal(10, 4)
+  dpbKeyCostDaily        Decimal? @map("sim_dpb_key_cost_daily") @db.Decimal(10, 4)
+  customCosts            Json?    @map("sim_custom_costs")
 
   // Explugins discount: from this 1-based global day onwards, the daily
   // explugins cost is multiplied by (1 - percent/100). null = no discount.
@@ -268,8 +335,8 @@ model Simulation {
   expluginsDiscountStartDay Int?     @map("explugins_discount_start_day")
   expluginsDiscountPercent  Decimal? @default(50) @map("explugins_discount_percent") @db.Decimal(5, 2)
 
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   weeks       SimulationWeek[]
   costLinks   SimulationCostLink[]
@@ -282,13 +349,13 @@ model Simulation {
 }
 
 model AnnualPlan {
-  id                 String   @id @default(uuid())
-  name               String
-  year               Int
-  annualCustomCosts  Json?    @map("annual_custom_costs")
-  notes              String?
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id                String   @id @default(uuid())
+  name              String
+  year              Int
+  annualCustomCosts Json?    @map("annual_custom_costs")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   simulationLinks AnnualPlanSimulation[]
 
@@ -313,16 +380,16 @@ model AnnualPlanSimulation {
 }
 
 model SimulationWeek {
-  id                     String  @id @default(uuid())
-  simulationId           String  @map("simulation_id")
-  weekNumber             Int     @map("week_number")
-  label                  String?
-  defaultActiveBots      Int     @map("default_active_bots")
-  defaultDivinePerHour   Decimal @map("default_divine_per_hour") @db.Decimal(18, 8)
-  defaultHoursPerDay     Decimal @map("default_hours_per_day") @db.Decimal(5, 2) @default(24)
-  defaultDivinePriceUsd  Decimal? @map("default_divine_price_usd") @db.Decimal(18, 8)
-  defaultDivinePriceBrl  Decimal? @map("default_divine_price_brl") @db.Decimal(18, 8)
-  buildCostDivines       Decimal? @map("build_cost_divines") @db.Decimal(18, 4)
+  id                    String   @id @default(uuid())
+  simulationId          String   @map("simulation_id")
+  weekNumber            Int      @map("week_number")
+  label                 String?
+  defaultActiveBots     Int      @map("default_active_bots")
+  defaultDivinePerHour  Decimal  @map("default_divine_per_hour") @db.Decimal(18, 8)
+  defaultHoursPerDay    Decimal  @default(24) @map("default_hours_per_day") @db.Decimal(5, 2)
+  defaultDivinePriceUsd Decimal? @map("default_divine_price_usd") @db.Decimal(18, 8)
+  defaultDivinePriceBrl Decimal? @map("default_divine_price_brl") @db.Decimal(18, 8)
+  buildCostDivines      Decimal? @map("build_cost_divines") @db.Decimal(18, 4)
 
   simulation Simulation      @relation(fields: [simulationId], references: [id], onDelete: Cascade)
   days       SimulationDay[]
@@ -332,16 +399,16 @@ model SimulationWeek {
 }
 
 model SimulationDay {
-  id               String   @id @default(uuid())
-  simulationWeekId String   @map("simulation_week_id")
-  dayNumber        Int      @map("day_number")
+  id               String    @id @default(uuid())
+  simulationWeekId String    @map("simulation_week_id")
+  dayNumber        Int       @map("day_number")
   date             DateTime? @db.Date
-  activeBots       Int?     @map("active_bots")
-  divinePerHour    Decimal? @map("divine_per_hour") @db.Decimal(18, 8)
-  hoursPerDay      Decimal? @map("hours_per_day") @db.Decimal(5, 2)
-  divinePriceUsd   Decimal? @map("divine_price_usd") @db.Decimal(18, 8)
-  divinePriceBrl   Decimal? @map("divine_price_brl") @db.Decimal(18, 8)
-  overrideNotes    String?  @map("override_notes")
+  activeBots       Int?      @map("active_bots")
+  divinePerHour    Decimal?  @map("divine_per_hour") @db.Decimal(18, 8)
+  hoursPerDay      Decimal?  @map("hours_per_day") @db.Decimal(5, 2)
+  divinePriceUsd   Decimal?  @map("divine_price_usd") @db.Decimal(18, 8)
+  divinePriceBrl   Decimal?  @map("divine_price_brl") @db.Decimal(18, 8)
+  overrideNotes    String?   @map("override_notes")
 
   week SimulationWeek @relation(fields: [simulationWeekId], references: [id], onDelete: Cascade)
 
@@ -350,18 +417,18 @@ model SimulationDay {
 }
 
 model GlobalCostConfig {
-  id                        String  @id @default(uuid())
-  name                      String
-  isDefault                 Boolean @default(false) @map("is_default")
-  proxyCostPerBotMonthly    Decimal @map("proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
-  levelingCostPerBot        Decimal @map("leveling_cost_per_bot") @db.Decimal(10, 2)
-  stashPackCostPerBot       Decimal @default(0) @map("stash_pack_cost_per_bot") @db.Decimal(10, 2)
-  expluginsKeyCostDaily     Decimal @map("explugins_key_cost_daily") @db.Decimal(10, 4)
-  dpbKeyCostDaily           Decimal @map("dpb_key_cost_daily") @db.Decimal(10, 4)
-  customCosts               Json?   @map("custom_costs")
-  notes                     String?
-  createdAt                 DateTime @default(now()) @map("created_at")
-  updatedAt                 DateTime @updatedAt @map("updated_at")
+  id                     String   @id @default(uuid())
+  name                   String
+  isDefault              Boolean  @default(false) @map("is_default")
+  proxyCostPerBotMonthly Decimal  @map("proxy_cost_per_bot_monthly") @db.Decimal(10, 2)
+  levelingCostPerBot     Decimal  @map("leveling_cost_per_bot") @db.Decimal(10, 2)
+  stashPackCostPerBot    Decimal  @default(0) @map("stash_pack_cost_per_bot") @db.Decimal(10, 2)
+  expluginsKeyCostDaily  Decimal  @map("explugins_key_cost_daily") @db.Decimal(10, 4)
+  dpbKeyCostDaily        Decimal  @map("dpb_key_cost_daily") @db.Decimal(10, 4)
+  customCosts            Json?    @map("custom_costs")
+  notes                  String?
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
   simulationLinks SimulationCostLink[]
 
@@ -387,7 +454,7 @@ model Task {
   priority    TaskPriority @default(medium)
   assignedTo  String?      @map("assigned_to")
   createdBy   String       @map("created_by")
-  dueDate     DateTime?    @db.Date @map("due_date")
+  dueDate     DateTime?    @map("due_date") @db.Date
   league      String?
   module      TaskModule?
   position    Int          @default(0)
@@ -408,8 +475,8 @@ model League {
   id         String     @id @default(uuid())
   name       String     @unique
   poeVersion PoeVersion @map("poe_version")
-  startDate  DateTime?  @db.Date @map("start_date")
-  endDate    DateTime?  @db.Date @map("end_date")
+  startDate  DateTime?  @map("start_date") @db.Date
+  endDate    DateTime?  @map("end_date") @db.Date
   isCurrent  Boolean    @default(false) @map("is_current")
   createdAt  DateTime   @default(now()) @map("created_at")
   updatedAt  DateTime   @updatedAt @map("updated_at")
@@ -435,8 +502,9 @@ model BotInstance {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  bot    Bot?        @relation(fields: [botId], references: [id], onDelete: SetNull)
+  bot    Bot?       @relation(fields: [botId], references: [id], onDelete: SetNull)
   alerts BotAlert[]
+  fills  Fill[]
 
   @@unique([pcName, configName])
   @@index([botId])
@@ -446,16 +514,16 @@ model BotInstance {
 }
 
 model BotAlert {
-  id             String          @id @default(uuid())
-  instanceId     String          @map("instance_id")
-  type           BotAlertType    @map("type")
+  id             String           @id @default(uuid())
+  instanceId     String           @map("instance_id")
+  type           BotAlertType     @map("type")
   severity       BotAlertSeverity @map("severity")
   title          String
   message        String
   details        String?
-  acknowledged   Boolean         @default(false)
-  acknowledgedAt DateTime?       @map("acknowledged_at")
-  createdAt      DateTime        @default(now()) @map("created_at")
+  acknowledged   Boolean          @default(false)
+  acknowledgedAt DateTime?        @map("acknowledged_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
 
   instance BotInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
 
@@ -477,7 +545,7 @@ model ChatConversation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   messages ChatMessage[]
-  user     User @relation(fields: [userId], references: [id])
+  user     User          @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([updatedAt])
@@ -501,5 +569,3 @@ model ChatMessage {
   @@index([conversationId])
   @@map("chat_messages")
 }
-
-
