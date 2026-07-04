@@ -80,6 +80,7 @@ type ExecutorMessage =
   | { type: "param_state"; executorId: string; params?: unknown }
   | ({ type: "metrics"; executorId: string; ts?: string } & RemoteMetricsPayload)
   | ({ type: "decision"; executorId: string } & DecisionData)
+  | { type: "validate_request"; executorId?: string; id: string; league?: string; items?: string[] }
   | { type: "disconnect"; executorId: string };
 
 /** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
@@ -92,6 +93,7 @@ const KNOWN_MESSAGE_TYPES = new Set([
   "param_state",
   "metrics",
   "decision",
+  "validate_request",
   "disconnect",
 ]);
 
@@ -150,7 +152,7 @@ export function handleExecutorConnection(ws: WebSocket): void {
       return;
     }
 
-    executorId = msg.executorId;
+    executorId = msg.executorId ?? null;
 
     cxWsMessagesTotal.inc({
       type: KNOWN_MESSAGE_TYPES.has(msg.type) ? msg.type : "unknown",
@@ -192,6 +194,9 @@ export function handleExecutorConnection(ws: WebSocket): void {
         case "decision":
           await handleDecision(msg);
           break;
+        case "validate_request":
+          await handleValidateRequest(ws, msg);
+          break;
         case "disconnect":
           await markOffline(msg.executorId);
           break;
@@ -208,6 +213,7 @@ export function handleExecutorConnection(ws: WebSocket): void {
       if (executorSockets.get(executorId) === ws) {
         executorSockets.delete(executorId);
       }
+      lastPlanKey.delete(executorId);
       markOffline(executorId).catch(() => {});
     }
   });
@@ -260,6 +266,9 @@ async function handleRegister(
   } catch (err) {
     console.error(`[CX-Exec] upsert cx_executor falhou (${msg.executorId}):`, err);
   }
+
+  // snapshot do plano na conexão (o resto vem pelo push do drain)
+  void pushPlanTo(msg.executorId, true);
 }
 
 /** Sincroniza o gauge cx_executors_online com a presença em memória. */
@@ -459,6 +468,7 @@ export function startCxJobDrain(): void {
   if (drainTimer) return;
   drainTimer = setInterval(() => {
     void drainJobs();
+    void pushPlans();   // entrega o cx_order_plan pelo MESMO WS (sem DB na ponta)
   }, JOB_DRAIN_INTERVAL_MS);
   console.log(`[CX-Exec] drain da fila cx_job ativo (${JOB_DRAIN_INTERVAL_MS}ms)`);
 }
@@ -497,6 +507,102 @@ async function drainJobs(): Promise<void> {
   } finally {
     draining = false;
   }
+}
+
+// ============================================================
+// Plano (push) — entrega o cx_order_plan pelo MESMO WS (sem DB na ponta do executor)
+// ============================================================
+
+interface PlanRow {
+  item: string;
+  base: string;
+  buy_ratio: unknown;
+  sell_ratio: unknown;
+  qty: unknown;
+  exp_profit_c: unknown;
+  exp_profit_div: unknown;
+  p_fill: unknown;
+  priority: unknown;
+  slot_class: string | null;
+  created_at: Date;
+}
+
+// executorId -> generatedAt já empurrado (evita re-enviar o mesmo plano a cada 2s)
+const lastPlanKey = new Map<string, string>();
+
+async function readPlan(league: string) {
+  // cx_order_plan é tabela do worker (não é model Prisma) -> query cru parametrizado
+  const rows = await prisma.$queryRaw<PlanRow[]>(Prisma.sql`
+    select item, base, buy_ratio, sell_ratio, qty, exp_profit_c, exp_profit_div,
+           p_fill, priority, slot_class, created_at
+    from cx_order_plan where league = ${league} order by priority`);
+  if (!rows || rows.length === 0) return null;
+  let gen = rows[0].created_at;
+  for (const r of rows) if (r.created_at > gen) gen = r.created_at;
+  return {
+    league,
+    generatedAt: new Date(gen).toISOString(),
+    orders: rows.map((r) => ({
+      priority: Number(r.priority),
+      item: r.item,
+      base: r.base,
+      buyRatio: Number(r.buy_ratio),
+      sellRatio: Number(r.sell_ratio),
+      qty: Number(r.qty),
+      expProfitC: r.exp_profit_c == null ? null : Number(r.exp_profit_c),
+      expProfitDiv: r.exp_profit_div == null ? null : Number(r.exp_profit_div),
+      pFill: r.p_fill == null ? null : Number(r.p_fill),
+      class: r.slot_class,
+    })),
+  };
+}
+
+/** Empurra o plano pro executor se mudou (ou force). Silencioso se a tabela não existe ainda. */
+async function pushPlanTo(executorId: string, force = false): Promise<void> {
+  const league = executors.get(executorId)?.league;
+  if (!league) return;
+  try {
+    const plan = await readPlan(league);
+    if (!plan) return;
+    if (!force && lastPlanKey.get(executorId) === plan.generatedAt) return;
+    if (sendToExecutor(executorId, { type: "plan", ...plan })) {
+      lastPlanKey.set(executorId, plan.generatedAt);
+    }
+  } catch {
+    // cx_order_plan pode não existir (tabela do worker) — ignora silenciosamente
+  }
+}
+
+async function pushPlans(): Promise<void> {
+  for (const [id, ws] of executorSockets.entries()) {
+    if (ws.readyState === WebSocket.OPEN) await pushPlanTo(id);
+  }
+}
+
+// ============================================================
+// Value-check v2 (RPC) — bid/ask fresco do cx_signal pelo MESMO WS
+// ============================================================
+
+async function handleValidateRequest(
+  ws: WebSocket,
+  msg: Extract<ExecutorMessage, { type: "validate_request" }>
+): Promise<void> {
+  const books: Record<string, [number, number]> = {};
+  try {
+    const items = (msg.items ?? []).filter((x): x is string => typeof x === "string");
+    if (msg.league && items.length) {
+      const rows = await prisma.cxSignal.findMany({
+        where: { league: msg.league, item: { in: items } },
+        select: { item: true, bid: true, ask: true },
+      });
+      for (const r of rows) {
+        if (r.bid != null && r.ask != null) books[r.item] = [Number(r.bid), Number(r.ask)];
+      }
+    }
+  } catch (err) {
+    console.error("[CX-Exec] validate_request falhou:", err);
+  }
+  safeSend(ws, { type: "validate_response", id: msg.id, books });
 }
 
 // ============================================================
