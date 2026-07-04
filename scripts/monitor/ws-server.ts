@@ -10,7 +10,7 @@
 
 import "dotenv/config";
 import { WebSocketServer, WebSocket } from "ws";
-import { IncomingMessage } from "http";
+import http, { IncomingMessage, ServerResponse } from "http";
 import { randomUUID } from "crypto";
 import { prisma } from "../../lib/prisma.js";
 import {
@@ -24,6 +24,11 @@ import {
 } from "./alert-engine.js";
 import { notifyDiscord } from "./discord-notifier.js";
 import { handleExecutorConnection, startCxJobDrain } from "./cx-executor-handler.js";
+import {
+  cxWsConnections,
+  renderMetrics,
+  startJobQueueDepthPoller,
+} from "./cx-metrics.js";
 import type {
   InstanceInfo,
   LogEntry,
@@ -82,9 +87,17 @@ const state: MonitorState = {
 // WebSocket Server bootstrap
 // ============================================================
 
-const wss = new WebSocketServer({ port: PORT });
+/**
+ * HTTP server explícito: serve GET /metrics (Prometheus) e faz o upgrade
+ * das conexões WS (mesma porta de sempre).
+ */
+const httpServer = http.createServer(handleHttpRequest);
+const wss = new WebSocketServer({ server: httpServer });
 
-console.log(`[Monitor] WebSocket server listening on ws://0.0.0.0:${PORT}`);
+httpServer.listen(PORT, () => {
+  console.log(`[Monitor] WebSocket server listening on ws://0.0.0.0:${PORT}`);
+  console.log(`[Monitor] Prometheus metrics em http://0.0.0.0:${PORT}/metrics`);
+});
 
 /**
  * Valida o token do canal do executor: query `?token=` OU header
@@ -105,10 +118,48 @@ function isExecutorAuthorized(req: IncomingMessage): boolean {
   return false;
 }
 
+/**
+ * GET /metrics — exposição Prometheus, protegida pelo MESMO CX_WS_TOKEN
+ * do canal do executor (?token= ou Authorization: Bearer). O Prometheus
+ * manda o token via config (params/authorization no prometheus.yml).
+ */
+function handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
+  const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+
+  if (pathname === "/metrics") {
+    if (req.method !== "GET") {
+      res.writeHead(405, { "content-type": "text/plain" }).end("method not allowed\n");
+      return;
+    }
+    if (!isExecutorAuthorized(req)) {
+      res.writeHead(401, { "content-type": "text/plain" }).end("unauthorized\n");
+      return;
+    }
+    renderMetrics()
+      .then(({ contentType, body }) => {
+        res.writeHead(200, { "content-type": contentType }).end(body);
+      })
+      .catch((err) => {
+        console.error("[Monitor] /metrics falhou:", err);
+        res.writeHead(500, { "content-type": "text/plain" }).end("metrics error\n");
+      });
+    return;
+  }
+
+  res.writeHead(404, { "content-type": "text/plain" }).end("not found\n");
+}
+
+/** Registra a conexão no gauge cx_ws_connections{path} e o decremento no close. */
+function trackWsConnection(ws: WebSocket, path: string): void {
+  cxWsConnections.inc({ path });
+  ws.once("close", () => cxWsConnections.dec({ path }));
+}
+
 wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
   const url = req.url ?? "";
 
   if (url.startsWith("/ws/agent")) {
+    trackWsConnection(ws, "/ws/agent");
     handleAgentConnection(ws);
   } else if (url.startsWith("/ws/executor")) {
     if (!isExecutorAuthorized(req)) {
@@ -116,8 +167,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       ws.close(4001, "unauthorized");
       return;
     }
+    trackWsConnection(ws, "/ws/executor");
     handleExecutorConnection(ws);
   } else if (url.startsWith("/ws/dashboard")) {
+    trackWsConnection(ws, "/ws/dashboard");
     handleDashboardConnection(ws);
   } else {
     console.warn(`[Monitor] Unknown path: ${url} — closing connection`);
@@ -747,6 +800,7 @@ async function saveAlertToDB(alert: BotAlert): Promise<void> {
 startInactivityChecker();
 startStatsBroadcaster();
 startCxJobDrain();
+startJobQueueDepthPoller();
 
 if (!CX_WS_TOKEN) {
   console.warn(

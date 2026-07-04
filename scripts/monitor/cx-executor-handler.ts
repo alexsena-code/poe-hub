@@ -20,6 +20,15 @@ import { WebSocket } from "ws";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { deriveStatus, derivePnl, type FillLegs } from "../../lib/fills.js";
+import {
+  applyRemoteMetrics,
+  cxDecisionsTotal,
+  cxExecutorsOnline,
+  cxFillReportsTotal,
+  cxJobLatencySeconds,
+  cxWsMessagesTotal,
+} from "./cx-metrics.js";
+import type { RemoteMetricsPayload } from "./cx-metrics-remote.js";
 
 // ============================================================
 // Protocolo
@@ -50,6 +59,18 @@ interface ExecutorLogEntry {
   meta?: unknown;
 }
 
+/** Decisão de trading reportada pelo executor (regra/LLM/manual). */
+interface DecisionData {
+  ts?: string;
+  source?: string; // rule|llm|manual
+  mode?: string; // manual|semi|full
+  item?: string;
+  league?: string;
+  action?: string;
+  reason?: string;
+  snapshot?: unknown;
+}
+
 type ExecutorMessage =
   | { type: "register"; executorId: string; pcName?: string; data?: { capabilities?: string[]; league?: string } }
   | { type: "heartbeat"; executorId: string }
@@ -57,11 +78,27 @@ type ExecutorMessage =
   | ({ type: "command_ack"; executorId: string } & CommandAckData)
   | { type: "logs"; executorId: string; entries?: ExecutorLogEntry[]; data?: { entries?: ExecutorLogEntry[] } }
   | { type: "param_state"; executorId: string; params?: unknown }
+  | ({ type: "metrics"; executorId: string; ts?: string } & RemoteMetricsPayload)
+  | ({ type: "decision"; executorId: string } & DecisionData)
   | { type: "disconnect"; executorId: string };
+
+/** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
+const KNOWN_MESSAGE_TYPES = new Set([
+  "register",
+  "heartbeat",
+  "fill_report",
+  "command_ack",
+  "logs",
+  "param_state",
+  "metrics",
+  "decision",
+  "disconnect",
+]);
 
 interface ExecutorInfo {
   executorId: string;
   pcName: string | null;
+  league: string | null;
   lastSeen: string;
   isOnline: boolean;
   fillsApplied: number;
@@ -115,6 +152,10 @@ export function handleExecutorConnection(ws: WebSocket): void {
 
     executorId = msg.executorId;
 
+    cxWsMessagesTotal.inc({
+      type: KNOWN_MESSAGE_TYPES.has(msg.type) ? msg.type : "unknown",
+    });
+
     try {
       switch (msg.type) {
         case "register":
@@ -128,6 +169,9 @@ export function handleExecutorConnection(ws: WebSocket): void {
           await touch(msg.executorId);
           const inst = executors.get(msg.executorId);
           if (inst && res.ok) inst.fillsApplied++;
+          if (res.ok && (msg.data.side === "buy" || msg.data.side === "sell")) {
+            cxFillReportsTotal.inc({ side: msg.data.side });
+          }
           // eco de confirmação pro executor (idempotência/log local)
           safeSend(ws, { type: "fill_ack", ok: res.ok, fillId: res.fillId, reason: res.reason });
           break;
@@ -141,6 +185,12 @@ export function handleExecutorConnection(ws: WebSocket): void {
         case "param_state":
           // opcional nesta fase — só registra no console do servidor
           console.log(`[CX-Exec] param_state de ${msg.executorId}:`, JSON.stringify(msg.params ?? {}));
+          break;
+        case "metrics":
+          handleMetrics(msg);
+          break;
+        case "decision":
+          await handleDecision(msg);
           break;
         case "disconnect":
           await markOffline(msg.executorId);
@@ -175,11 +225,13 @@ async function handleRegister(
   executors.set(msg.executorId, {
     executorId: msg.executorId,
     pcName: msg.pcName ?? null,
+    league: msg.data?.league ?? executors.get(msg.executorId)?.league ?? null,
     lastSeen: now.toISOString(),
     isOnline: true,
     fillsApplied: executors.get(msg.executorId)?.fillsApplied ?? 0,
   });
   executorSockets.set(msg.executorId, ws);
+  updateExecutorsOnlineGauge();
   console.log(`[CX-Exec] registrado: ${msg.executorId} (${msg.pcName ?? "?"}) caps=${msg.data?.capabilities ?? []}`);
 
   const capabilities = msg.data?.capabilities ?? [];
@@ -210,12 +262,20 @@ async function handleRegister(
   }
 }
 
+/** Sincroniza o gauge cx_executors_online com a presença em memória. */
+function updateExecutorsOnlineGauge(): void {
+  let online = 0;
+  for (const inst of executors.values()) if (inst.isOnline) online++;
+  cxExecutorsOnline.set(online);
+}
+
 async function touch(executorId: string): Promise<void> {
   const now = new Date();
   const inst = executors.get(executorId);
   if (inst) {
     inst.lastSeen = now.toISOString();
     inst.isOnline = true;
+    updateExecutorsOnlineGauge();
   }
   try {
     await prisma.cxExecutor.updateMany({
@@ -231,6 +291,7 @@ async function markOffline(executorId: string): Promise<void> {
   const inst = executors.get(executorId);
   if (inst) {
     inst.isOnline = false;
+    updateExecutorsOnlineGauge();
     console.log(`[CX-Exec] offline: ${executorId}`);
   }
   try {
@@ -280,9 +341,83 @@ async function handleCommandAck(
       console.warn(`[CX-Exec] command_ack pra job desconhecido/estado inválido: ${msg.id} (${msg.status})`);
     } else {
       console.log(`[CX-Exec] job ${msg.id} -> ${msg.status}${msg.error ? ` (${msg.error})` : ""}`);
+      // latência total do job (createdAt -> doneAt) no fechamento
+      if (msg.status === "done" || msg.status === "failed") {
+        const job = await prisma.cxJob.findUnique({
+          where: { id: msg.id },
+          select: { createdAt: true },
+        });
+        if (job) {
+          cxJobLatencySeconds.observe((now.getTime() - job.createdAt.getTime()) / 1000);
+        }
+      }
     }
   } catch (err) {
     console.error(`[CX-Exec] update cx_job falhou (${msg.id}):`, err);
+  }
+}
+
+// ============================================================
+// Telemetria — métricas remotas e trilha de decisões
+// ============================================================
+
+/**
+ * {"type":"metrics", counters:[{name,labels,value}], gauges:[...]}
+ * Re-expõe no /metrics com labels extras {executor_id, league}. Validação
+ * (nome ^[a-z_][a-z0-9_]*$, cap de 100 séries/executor) em cx-metrics-remote.
+ */
+function handleMetrics(
+  msg: Extract<ExecutorMessage, { type: "metrics" }>
+): void {
+  const league = executors.get(msg.executorId)?.league ?? null;
+  applyRemoteMetrics(msg.executorId, league, msg);
+}
+
+/**
+ * {"type":"decision", ts, source, mode, item, league, action, reason, snapshot}
+ * -> INSERT em cx_decision_log + counter cx_decisions_total{action,mode}.
+ * `mode` não tem coluna própria — vai junto no snapshot.
+ */
+async function handleDecision(
+  msg: Extract<ExecutorMessage, { type: "decision" }>
+): Promise<void> {
+  const action = typeof msg.action === "string" && msg.action ? msg.action : null;
+  const reason = typeof msg.reason === "string" ? msg.reason : "";
+  if (!action) {
+    console.warn(`[CX-Exec] decision sem action de ${msg.executorId} — ignorando`);
+    return;
+  }
+  const mode = typeof msg.mode === "string" && msg.mode ? msg.mode : "unknown";
+  const source = typeof msg.source === "string" && msg.source ? msg.source : "rule";
+
+  cxDecisionsTotal.inc({ action, mode });
+
+  // mode entra no snapshot (a tabela não tem coluna dedicada)
+  let snapshot: Prisma.InputJsonValue | undefined;
+  if (msg.snapshot && typeof msg.snapshot === "object" && !Array.isArray(msg.snapshot)) {
+    snapshot = { mode, ...(msg.snapshot as Record<string, unknown>) } as Prisma.InputJsonValue;
+  } else if (msg.snapshot !== undefined) {
+    snapshot = { mode, value: msg.snapshot } as Prisma.InputJsonValue;
+  } else {
+    snapshot = { mode } as Prisma.InputJsonValue;
+  }
+
+  const ts = msg.ts ? new Date(msg.ts) : null;
+  try {
+    await prisma.cxDecisionLog.create({
+      data: {
+        executorId: msg.executorId,
+        source,
+        item: typeof msg.item === "string" ? msg.item : null,
+        league: typeof msg.league === "string" ? msg.league : null,
+        action,
+        reason,
+        snapshot,
+        createdAt: ts && !Number.isNaN(ts.getTime()) ? ts : undefined,
+      },
+    });
+  } catch (err) {
+    console.error(`[CX-Exec] insert cx_decision_log falhou (${msg.executorId}):`, err);
   }
 }
 
