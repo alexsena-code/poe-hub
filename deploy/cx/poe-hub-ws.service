@@ -1,0 +1,48 @@
+# poe-hub-ws.service — ws-server do módulo CX (poe-hub) na mahou-vps.
+#
+# Instalado por deploy/cx/setup-vps.sh, que troca o caminho do node abaixo
+# pelo real (`command -v node`) antes de copiar pra /etc/systemd/system/.
+# Baseado no template deploy/poe-hub-bot.service do poe-hub-bot, adaptado
+# pra Node.
+#
+# Decisão tsx vs build (tsc):
+#   Rodamos direto com o tsx do próprio repo (node_modules/tsx, pinado pelo
+#   package-lock; instalado pelo `npm ci` com devDependencies). Não existe
+#   pipeline de build pros scripts (o tsconfig do Next não emite JS) e o
+#   próprio ws-server.ts se documenta como "run with: npx tsx". Custo: ~1s
+#   de boot e um pouco de RAM a mais; benefício: zero passo de build e o
+#   mesmo fluxo do dev. Se um dia doer, o caminho é um tsconfig dedicado
+#   pros scripts + `node dist/...` — trocar só o ExecStart.
+#
+# Env: /opt/poe-hub/.env.ws (criado pelo setup-vps.sh) precisa de
+#   CX_WS_TOKEN   — token do canal /ws/executor e do GET /metrics
+#   DATABASE_URL  — Postgres de prod (poth_app@127.0.0.1:5432/poth)
+# ATENÇÃO: o ws-server também carrega dotenv (/opt/poe-hub/.env, que está
+# STALE na VPS). O EnvironmentFile vence pras chaves definidas nele, mas
+# defina TODAS as chaves relevantes no .env.ws pra nada vazar do .env velho.
+
+[Unit]
+Description=PoE Hub CX WebSocket server (ws-server, porta 8766)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=poehub
+Group=poehub
+WorkingDirectory=/opt/poe-hub
+# setup-vps.sh substitui /usr/bin/node pelo caminho detectado na VPS.
+ExecStart=/usr/bin/node node_modules/tsx/dist/cli.mjs scripts/monitor/ws-server.ts
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/poe-hub/.env.ws
+
+# Endurecimento básico (o processo só precisa ler o repo e falar TCP)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
