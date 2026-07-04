@@ -16,6 +16,7 @@
  * (status=pending de executor online, priority desc, createdAt asc).
  */
 
+import { appendFile } from "node:fs/promises";
 import { WebSocket } from "ws";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
@@ -81,6 +82,7 @@ type ExecutorMessage =
   | ({ type: "metrics"; executorId: string; ts?: string } & RemoteMetricsPayload)
   | ({ type: "decision"; executorId: string } & DecisionData)
   | { type: "validate_request"; executorId?: string; id: string; league?: string; items?: string[] }
+  | { type: "book_report"; executorId?: string; lines?: unknown[] }
   | { type: "disconnect"; executorId: string };
 
 /** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
@@ -94,6 +96,7 @@ const KNOWN_MESSAGE_TYPES = new Set([
   "metrics",
   "decision",
   "validate_request",
+  "book_report",
   "disconnect",
 ]);
 
@@ -196,6 +199,10 @@ export function handleExecutorConnection(ws: WebSocket): void {
           break;
         case "validate_request":
           await handleValidateRequest(ws, msg);
+          break;
+        case "book_report":
+          await handleBookReport(msg);
+          await touch(msg.executorId ?? "");
           break;
         case "disconnect":
           await markOffline(msg.executorId);
@@ -603,6 +610,31 @@ async function handleValidateRequest(
     console.error("[CX-Exec] validate_request falhou:", err);
   }
   safeSend(ws, { type: "validate_response", id: msg.id, books });
+}
+
+// ============================================================
+// Book relay — recebe o book capturado (sweep) e append no NDJSON que o
+// ingest da VPS consome (-> snapshots -> publish -> plan). Fecha o loop.
+// ============================================================
+
+// Arquivo que o worker da VPS ingere (env CX_BOOK_NDJSON). Sem env = relay desligado.
+const BOOK_NDJSON = process.env.CX_BOOK_NDJSON;
+let bookLinesTotal = 0;
+
+async function handleBookReport(msg: Extract<ExecutorMessage, { type: "book_report" }>): Promise<void> {
+  if (!BOOK_NDJSON) return; // relay desligado (sem env configurado)
+  const lines = Array.isArray(msg.lines) ? msg.lines : [];
+  if (lines.length === 0) return;
+  const chunk = lines.map((l) => JSON.stringify(l)).join("\n") + "\n";
+  try {
+    await appendFile(BOOK_NDJSON, chunk, "utf8");
+    bookLinesTotal += lines.length;
+    if (bookLinesTotal % 500 < lines.length) {
+      console.log(`[CX-Exec] book_report: +${lines.length} linhas (total ${bookLinesTotal}) -> ${BOOK_NDJSON}`);
+    }
+  } catch (err) {
+    console.error("[CX-Exec] book_report append falhou:", err);
+  }
 }
 
 // ============================================================
