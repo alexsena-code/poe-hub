@@ -1,0 +1,36 @@
+# Prometheus — config de PRODUÇÃO (mahou-vps) pro scrape do ws-server do CX.
+#
+# Uso na VPS (o compose monta observability/prometheus/prometheus.yml):
+#   cp deploy/cx/prometheus-prod.yml observability/prometheus/prometheus.yml
+#   sed -i 's/TROQUE_PELO_CX_WS_TOKEN/<token real>/' observability/prometheus/prometheus.yml
+# O arquivo com o token real fica SÓ na VPS — nunca commitar (mesma regra
+# do dev: o prometheus.yml local com token fica fora dos commits).
+#
+# Onde vive o token: é o MESMO CX_WS_TOKEN do /opt/poe-hub/.env.ws (ver
+# docs/deploy/cx-vps-runbook.md, passo do token). O Prometheus NÃO expande
+# variáveis de ambiente em config — por isso o sed.
+#
+# Target: o ws-server roda no HOST da VPS (systemd), fora do compose.
+# Dentro do container, 127.0.0.1 seria o próprio container — por isso o
+# alvo é host.docker.internal, que o docker-compose.observability.yml já
+# resolve pro host via `extra_hosts: host.docker.internal:host-gateway`
+# (necessário no Linux; no Docker Desktop é inócuo). Não troque por
+# 127.0.0.1 a menos que mude o serviço pra network_mode: host.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: cx-ws-server
+    metrics_path: /metrics
+    scheme: http
+    # Mesmo CX_WS_TOKEN do canal /ws/executor (obrigatório em prod).
+    authorization:
+      type: Bearer
+      credentials: TROQUE_PELO_CX_WS_TOKEN
+    static_configs:
+      - targets: ["host.docker.internal:8766"]
+        labels:
+          service: cx-ws-server
+          env: prod
