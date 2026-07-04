@@ -103,7 +103,7 @@ alto volume + tarefa simples = modelo barato ganha):
   `youtube-scan-store.service.ts` grava na CRIAÇÃO da row (não no UPDATE que
   corre na frente). Migration `20260624180000_add_youtube_transcript_raw`
   aplicada em `poe_content`; coluna confirmada no banco; `poe-api` reiniciado.
-- **[IMPLEMENTADO ⏳deploy] Refino da classificação** (4 itens acima) — `llm_classify.py`
+- **[DEPLOYADO ✅] Refino da classificação** (4 itens acima) — `llm_classify.py`
   reescrito two-tier (session 39): gate barato `_cheap_classify` resolve o óbvio
   (vocabulário PoE forte OU jogo concorrente no título/tags) e só o meio ambíguo
   vai pro LLM (`_llm_classify_ambiguous`), tirando o `is_poe` da rota cara; o prompt
@@ -112,8 +112,9 @@ alto volume + tarefa simples = modelo barato ganha):
   em vez de só `[:1500]`; proveniência gravada em colunas novas `classification_method`
   ('regex'|'llm') + `classification_confidence` (0.9 gate / 0.7 LLM). Migration
   `20260625120000_add_youtube_classification_provenance`. +18 pytest, +2 jest.
-  **Deploy pendente:** `prisma migrate deploy` no `poe_content` + restart do `poe-api`.
-- **[IMPLEMENTADO ⏳deploy] Fix da race de metadata LLM** (ver bug abaixo).
+  **[DEPLOYADO ✅]** commit `b7e75e3`; migration aplicada em `poe_content` (verificado
+  no `_prisma_migrations` em 30/06); `poe-api` reiniciado.
+- **[DEPLOYADO ✅] Fix da race de metadata LLM** (ver bug abaixo).
 - **[nice-to-have] Snapshots de views por scan** → trending por velocity.
 - **[nice-to-have] `lastVideoAt` + soft-delete** de canal morto.
 
@@ -127,7 +128,7 @@ rows" no log) e a metadata é descartada. Por isso esses campos estão quase
 sempre nulos (verificado no DB: 1096 vídeos, metadata majoritariamente nula).
 **Correção:** mesma rota do transcript bruto — o ingestor anexa a metadata no
 dict do vídeo, `run_smart` inclui no JSON, `saveScanVideos` grava na criação.
-**[IMPLEMENTADO ⏳deploy] (session 39):** `transcript_metadata.metadata_to_video_fields`
+**[DEPLOYADO ✅] (session 39, commit `b7e75e3`):** `transcript_metadata.metadata_to_video_fields`
 expõe as 5 colunas que existem em `YouTubeVideo` (não `topics`/`entities`/`game`,
 que ficam no Qdrant); `transcript_ingestor._process_one_video` anexa em
 `video["llm_metadata"]` no dict compartilhado; `runners._video_for_output` achata
