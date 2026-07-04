@@ -665,3 +665,108 @@ model CxBookLevel {
   @@index([league, item, capturedAt])
   @@map("cx_book_level")
 }
+
+// ============================================================
+// CX Management — gerenciamento do bot de currency exchange
+// (executores, fila de comandos, parâmetros, logs, decisões, schedules)
+// ============================================================
+
+// Presença persistida do cx-executor (Python local que conecta em /ws/executor).
+model CxExecutor {
+  id           String    @id @default(uuid())
+  executorId   String    @unique @map("executor_id") // ex.: "DESKTOP-ABC-cx"
+  pcName       String?   @map("pc_name")
+  league       String?
+  capabilities Json? // ex.: ["report","command"]
+  isOnline     Boolean   @default(false) @map("is_online")
+  lastSeen     DateTime? @map("last_seen")
+  connectedAt  DateTime? @map("connected_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([isOnline])
+  @@map("cx_executor")
+}
+
+// Fila de comandos VPS -> executor. O drain do ws-server pega pending do
+// executor online e envia {type:"command", id, cmd:type, args:payload}.
+model CxJob {
+  id          String    @id @default(cuid())
+  executorId  String    @map("executor_id")
+  type        String // run_job|place_order|cancel|collect|pause|resume|param_update|read_state
+  payload     Json
+  status      String    @default("pending") // pending|sent|acked|done|failed|expired
+  priority    Int       @default(0) // maior = primeiro
+  requestedBy String?   @map("requested_by") // userId da sessão que criou
+  result      Json?
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  sentAt      DateTime? @map("sent_at")
+  ackedAt     DateTime? @map("acked_at")
+  doneAt      DateTime? @map("done_at")
+
+  @@index([status, executorId])
+  @@index([createdAt])
+  @@map("cx_job")
+}
+
+// Parâmetros de operação (chave-valor com escopo).
+model CxParams {
+  id        String   @id @default(uuid())
+  scope     String // global|executor|item
+  scopeKey  String   @default("*") @map("scope_key") // executorId/item ou "*"
+  key       String
+  value     Json
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([scope, scopeKey, key])
+  @@map("cx_params")
+}
+
+// Logs enviados pelos executores (batch via mensagem "logs").
+model CxLog {
+  id         String   @id @default(uuid())
+  executorId String   @map("executor_id")
+  level      String // debug|info|warn|error
+  message    String
+  meta       Json?
+  ts         DateTime @default(now())
+
+  @@index([executorId, ts])
+  @@map("cx_log")
+}
+
+// Trilha de decisões (regra/LLM/manual) — por que cada ação foi tomada.
+model CxDecisionLog {
+  id         String   @id @default(uuid())
+  executorId String?  @map("executor_id")
+  source     String // rule|llm|manual
+  item       String?
+  league     String?
+  action     String
+  reason     String
+  snapshot   Json?
+  jobId      String?  @map("job_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([executorId])
+  @@map("cx_decision_log")
+}
+
+// Agendamentos de jobs (só CRUD nesta fase — execução fica pra próxima).
+model CxSchedule {
+  id         String    @id @default(uuid())
+  name       String
+  cron       String
+  jobType    String    @map("job_type")
+  payload    Json
+  executorId String?   @map("executor_id") // null = qualquer/definido na execução
+  enabled    Boolean   @default(true)
+  lastRunAt  DateTime? @map("last_run_at")
+  nextRunAt  DateTime? @map("next_run_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([enabled])
+  @@map("cx_schedule")
+}
