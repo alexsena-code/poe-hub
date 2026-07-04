@@ -111,19 +111,38 @@ const remoteSeriesByExecutor = new Map<string, Set<string>>();
 // executores que já geraram o warning de cap (1 warning, não spam)
 const capWarned = new Set<string>();
 
-function getRemoteMetric(name: string, labelNames: string[]): RemoteMetric {
+// nomes de métrica remota que COLIDEM com uma métrica já registrada pelo hub
+// (ex.: cx_fill_reports_total, que o hub conta pelos fill_report). O hub é
+// autoritativo — ignoramos a versão remota (1 warning, sem re-tentar por sample).
+const collidedNames = new Set<string>();
+
+function getRemoteMetric(name: string, labelNames: string[]): RemoteMetric | null {
+  if (collidedNames.has(name)) return null;
   let entry = remoteMetrics.get(name);
   if (!entry) {
-    entry = {
-      gauge: new Gauge({
-        name,
-        help: `Métrica remota de executor CX (${name}); counters remotos são cumulative-gauge`,
+    // já existe no registry (métrica do próprio hub)? não re-registra — evitava
+    // que a exceção de colisão derrubasse o LOTE INTEIRO de métricas do executor.
+    if (registry.getSingleMetric(name)) {
+      collidedNames.add(name);
+      console.warn(`[CX-Metrics] métrica remota "${name}" colide com métrica do hub — ignorada (hub é autoritativo)`);
+      return null;
+    }
+    try {
+      entry = {
+        gauge: new Gauge({
+          name,
+          help: `Métrica remota de executor CX (${name}); counters remotos são cumulative-gauge`,
+          labelNames,
+          registers: [registry],
+        }),
         labelNames,
-        registers: [registry],
-      }),
-      labelNames,
-    };
-    remoteMetrics.set(name, entry);
+      };
+      remoteMetrics.set(name, entry);
+    } catch (e) {
+      collidedNames.add(name);
+      console.warn(`[CX-Metrics] falha ao registrar métrica remota "${name}": ${(e as Error).message} — ignorada`);
+      return null;
+    }
   }
   return entry;
 }
@@ -147,6 +166,7 @@ export function applyRemoteMetrics(
 
   for (const sample of res.accepted) {
     const entry = getRemoteMetric(sample.name, Object.keys(sample.labels).sort());
+    if (!entry) continue;   // nome colidiu com métrica do hub — pula só este, segue o lote
     // projeta as labels no conjunto fixado na criação do gauge
     const labels: Record<string, string> = {};
     for (const ln of entry.labelNames) labels[ln] = sample.labels[ln] ?? "";
