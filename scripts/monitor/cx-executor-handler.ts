@@ -3,16 +3,21 @@
  *
  * Endpoint: /ws/executor  (novo, ao lado de /ws/agent e /ws/dashboard)
  *
- * O cx-executor local (Python, espelha o agent.py) conecta aqui e reporta
- * fills detectados in-game pelo plugin. Modelo FINO da Fase 2:
- *   executor -> VPS:  register · heartbeat · fill_report · disconnect
- *   VPS -> executor:  (ainda não — caminho de comando fica pro semi/full-auto)
+ * O cx-executor local (Python, espelha o agent.py) conecta aqui, reporta
+ * fills detectados in-game pelo plugin e recebe COMANDOS da fila cx_job:
+ *   executor -> VPS:  register · heartbeat · fill_report · command_ack · logs ·
+ *                     param_state · disconnect
+ *   VPS -> executor:  fill_ack · command {id, cmd, args}
  *
  * Um fill_report casa com o fill "open"/"holding" criado pela UI ("Fazer Order")
  * e preenche a perna correspondente via prisma direto (server-side, sem auth REST).
+ *
+ * Presença é persistida em cx_executor; a fila cx_job é drenada a cada ~2s
+ * (status=pending de executor online, priority desc, createdAt asc).
  */
 
 import { WebSocket } from "ws";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { deriveStatus, derivePnl, type FillLegs } from "../../lib/fills.js";
 
@@ -31,10 +36,27 @@ export interface FillReportData {
   qAhead?: number | null; // fila à frente no post (calibração)
 }
 
+interface CommandAckData {
+  id: string;
+  status: "acked" | "done" | "failed";
+  result?: unknown;
+  error?: string;
+}
+
+interface ExecutorLogEntry {
+  level?: string;
+  message?: string;
+  ts?: string;
+  meta?: unknown;
+}
+
 type ExecutorMessage =
   | { type: "register"; executorId: string; pcName?: string; data?: { capabilities?: string[]; league?: string } }
   | { type: "heartbeat"; executorId: string }
   | { type: "fill_report"; executorId: string; pcName?: string; data: FillReportData }
+  | ({ type: "command_ack"; executorId: string } & CommandAckData)
+  | { type: "logs"; executorId: string; entries?: ExecutorLogEntry[]; data?: { entries?: ExecutorLogEntry[] } }
+  | { type: "param_state"; executorId: string; params?: unknown }
   | { type: "disconnect"; executorId: string };
 
 interface ExecutorInfo {
@@ -45,11 +67,28 @@ interface ExecutorInfo {
   fillsApplied: number;
 }
 
-// Presença em memória (leve — não persiste bot_instances nesta fase).
+/** Máximo de entradas de log aceitas por mensagem "logs" */
+const LOGS_BATCH_CAP = 100;
+
+/** Intervalo do drain da fila cx_job */
+const JOB_DRAIN_INTERVAL_MS = 2_000;
+
+// Presença em memória (espelho leve; a fonte persistida é cx_executor).
 const executors = new Map<string, ExecutorInfo>();
+
+// Conexões vivas — necessário pro caminho VPS -> executor (comandos).
+const executorSockets = new Map<string, WebSocket>();
 
 export function getExecutors(): ExecutorInfo[] {
   return Array.from(executors.values());
+}
+
+/** Envia uma mensagem pro executor, se conectado. Retorna false se offline. */
+export function sendToExecutor(executorId: string, msg: unknown): boolean {
+  const ws = executorSockets.get(executorId);
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  ws.send(JSON.stringify(msg));
+  return true;
 }
 
 // ============================================================
@@ -79,22 +118,32 @@ export function handleExecutorConnection(ws: WebSocket): void {
     try {
       switch (msg.type) {
         case "register":
-          handleRegister(msg);
+          await handleRegister(ws, msg);
           break;
         case "heartbeat":
-          touch(msg.executorId);
+          await touch(msg.executorId);
           break;
         case "fill_report": {
           const res = await applyFillReport(msg.data);
-          touch(msg.executorId);
+          await touch(msg.executorId);
           const inst = executors.get(msg.executorId);
           if (inst && res.ok) inst.fillsApplied++;
           // eco de confirmação pro executor (idempotência/log local)
           safeSend(ws, { type: "fill_ack", ok: res.ok, fillId: res.fillId, reason: res.reason });
           break;
         }
+        case "command_ack":
+          await handleCommandAck(msg);
+          break;
+        case "logs":
+          await handleLogs(msg);
+          break;
+        case "param_state":
+          // opcional nesta fase — só registra no console do servidor
+          console.log(`[CX-Exec] param_state de ${msg.executorId}:`, JSON.stringify(msg.params ?? {}));
+          break;
         case "disconnect":
-          markOffline(msg.executorId);
+          await markOffline(msg.executorId);
           break;
         default:
           console.warn(`[CX-Exec] tipo desconhecido: ${(msg as { type: string }).type}`);
@@ -105,7 +154,12 @@ export function handleExecutorConnection(ws: WebSocket): void {
   });
 
   ws.on("close", () => {
-    if (executorId) markOffline(executorId);
+    if (executorId) {
+      if (executorSockets.get(executorId) === ws) {
+        executorSockets.delete(executorId);
+      }
+      markOffline(executorId).catch(() => {});
+    }
   });
 
   ws.on("error", (err) => {
@@ -113,36 +167,201 @@ export function handleExecutorConnection(ws: WebSocket): void {
   });
 }
 
-function handleRegister(msg: Extract<ExecutorMessage, { type: "register" }>): void {
-  const now = new Date().toISOString();
+async function handleRegister(
+  ws: WebSocket,
+  msg: Extract<ExecutorMessage, { type: "register" }>
+): Promise<void> {
+  const now = new Date();
   executors.set(msg.executorId, {
     executorId: msg.executorId,
     pcName: msg.pcName ?? null,
-    lastSeen: now,
+    lastSeen: now.toISOString(),
     isOnline: true,
     fillsApplied: executors.get(msg.executorId)?.fillsApplied ?? 0,
   });
+  executorSockets.set(msg.executorId, ws);
   console.log(`[CX-Exec] registrado: ${msg.executorId} (${msg.pcName ?? "?"}) caps=${msg.data?.capabilities ?? []}`);
-}
 
-function touch(executorId: string): void {
-  const inst = executors.get(executorId);
-  if (inst) {
-    inst.lastSeen = new Date().toISOString();
-    inst.isOnline = true;
+  const capabilities = msg.data?.capabilities ?? [];
+  const league = msg.data?.league ?? null;
+  try {
+    await prisma.cxExecutor.upsert({
+      where: { executorId: msg.executorId },
+      update: {
+        pcName: msg.pcName ?? undefined,
+        league: league ?? undefined,
+        capabilities,
+        isOnline: true,
+        lastSeen: now,
+        connectedAt: now,
+      },
+      create: {
+        executorId: msg.executorId,
+        pcName: msg.pcName ?? null,
+        league,
+        capabilities,
+        isOnline: true,
+        lastSeen: now,
+        connectedAt: now,
+      },
+    });
+  } catch (err) {
+    console.error(`[CX-Exec] upsert cx_executor falhou (${msg.executorId}):`, err);
   }
 }
 
-function markOffline(executorId: string): void {
+async function touch(executorId: string): Promise<void> {
+  const now = new Date();
+  const inst = executors.get(executorId);
+  if (inst) {
+    inst.lastSeen = now.toISOString();
+    inst.isOnline = true;
+  }
+  try {
+    await prisma.cxExecutor.updateMany({
+      where: { executorId },
+      data: { isOnline: true, lastSeen: now },
+    });
+  } catch (err) {
+    console.error(`[CX-Exec] touch cx_executor falhou (${executorId}):`, err);
+  }
+}
+
+async function markOffline(executorId: string): Promise<void> {
   const inst = executors.get(executorId);
   if (inst) {
     inst.isOnline = false;
     console.log(`[CX-Exec] offline: ${executorId}`);
   }
+  try {
+    await prisma.cxExecutor.updateMany({
+      where: { executorId },
+      data: { isOnline: false, lastSeen: new Date() },
+    });
+  } catch (err) {
+    console.error(`[CX-Exec] markOffline cx_executor falhou (${executorId}):`, err);
+  }
 }
 
 function safeSend(ws: WebSocket, obj: unknown): void {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+}
+
+// ============================================================
+// Command channel — ack de comandos e logs remotos
+// ============================================================
+
+async function handleCommandAck(
+  msg: Extract<ExecutorMessage, { type: "command_ack" }>
+): Promise<void> {
+  if (!msg.id || !["acked", "done", "failed"].includes(msg.status)) {
+    console.warn(`[CX-Exec] command_ack inválido:`, JSON.stringify(msg));
+    return;
+  }
+  const now = new Date();
+  const data: Prisma.CxJobUpdateManyMutationInput = { status: msg.status };
+  if (msg.status === "acked") {
+    data.ackedAt = now;
+  } else {
+    // done|failed
+    data.doneAt = now;
+    if (msg.result !== undefined) data.result = msg.result as Prisma.InputJsonValue;
+    if (msg.error !== undefined) data.error = String(msg.error);
+  }
+  try {
+    const updated = await prisma.cxJob.updateMany({
+      where:
+        msg.status === "acked"
+          ? { id: msg.id, status: "sent" }
+          : { id: msg.id, status: { in: ["sent", "acked"] } },
+      data,
+    });
+    if (updated.count === 0) {
+      console.warn(`[CX-Exec] command_ack pra job desconhecido/estado inválido: ${msg.id} (${msg.status})`);
+    } else {
+      console.log(`[CX-Exec] job ${msg.id} -> ${msg.status}${msg.error ? ` (${msg.error})` : ""}`);
+    }
+  } catch (err) {
+    console.error(`[CX-Exec] update cx_job falhou (${msg.id}):`, err);
+  }
+}
+
+async function handleLogs(
+  msg: Extract<ExecutorMessage, { type: "logs" }>
+): Promise<void> {
+  const entries = (msg.entries ?? msg.data?.entries ?? []).slice(0, LOGS_BATCH_CAP);
+  if (entries.length === 0) return;
+  const rows = entries
+    .filter((e) => e && typeof e.message === "string")
+    .map((e) => ({
+      executorId: msg.executorId,
+      level: typeof e.level === "string" ? e.level : "info",
+      message: e.message as string,
+      meta: e.meta === undefined ? undefined : (e.meta as Prisma.InputJsonValue),
+      ts: e.ts ? new Date(e.ts) : new Date(),
+    }));
+  if (rows.length === 0) return;
+  try {
+    await prisma.cxLog.createMany({ data: rows });
+  } catch (err) {
+    console.error(`[CX-Exec] insert cx_log falhou (${msg.executorId}):`, err);
+  }
+}
+
+// ============================================================
+// Drain da fila cx_job — pending -> command no socket -> sent
+// ============================================================
+
+let drainTimer: ReturnType<typeof setInterval> | null = null;
+let draining = false;
+
+/**
+ * Inicia o loop que drena a fila cx_job: a cada ~2s, pros executores com
+ * socket aberto, pega jobs pending (priority desc, createdAt asc), envia
+ * {type:"command", id, cmd, args} e marca status=sent.
+ */
+export function startCxJobDrain(): void {
+  if (drainTimer) return;
+  drainTimer = setInterval(() => {
+    void drainJobs();
+  }, JOB_DRAIN_INTERVAL_MS);
+  console.log(`[CX-Exec] drain da fila cx_job ativo (${JOB_DRAIN_INTERVAL_MS}ms)`);
+}
+
+async function drainJobs(): Promise<void> {
+  if (draining) return; // evita sobreposição se o banco demorar
+  draining = true;
+  try {
+    const onlineIds = Array.from(executorSockets.entries())
+      .filter(([, ws]) => ws.readyState === WebSocket.OPEN)
+      .map(([id]) => id);
+    if (onlineIds.length === 0) return;
+
+    const jobs = await prisma.cxJob.findMany({
+      where: { status: "pending", executorId: { in: onlineIds } },
+      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+      take: 50,
+    });
+
+    for (const job of jobs) {
+      const sent = sendToExecutor(job.executorId, {
+        type: "command",
+        id: job.id,
+        cmd: job.type,
+        args: job.payload ?? {},
+      });
+      if (!sent) continue; // socket caiu entre o findMany e o send — fica pending
+      await prisma.cxJob.update({
+        where: { id: job.id },
+        data: { status: "sent", sentAt: new Date() },
+      });
+      console.log(`[CX-Exec] -> command ${job.type} (job ${job.id}) p/ ${job.executorId}`);
+    }
+  } catch (err) {
+    console.error("[CX-Exec] drainJobs falhou:", err);
+  } finally {
+    draining = false;
+  }
 }
 
 // ============================================================

@@ -23,7 +23,7 @@ import {
   isHideoutArea,
 } from "./alert-engine.js";
 import { notifyDiscord } from "./discord-notifier.js";
-import { handleExecutorConnection } from "./cx-executor-handler.js";
+import { handleExecutorConnection, startCxJobDrain } from "./cx-executor-handler.js";
 import type {
   InstanceInfo,
   LogEntry,
@@ -40,6 +40,13 @@ import type {
 // ============================================================
 
 const PORT = Number(process.env.MONITOR_WS_PORT ?? 8766);
+
+/**
+ * Token compartilhado do canal do cx-executor (/ws/executor).
+ * Sem a env setada, o canal fica ABERTO (comportamento antigo de dev) —
+ * logamos warning no boot pra ninguém esquecer em produção.
+ */
+const CX_WS_TOKEN = process.env.CX_WS_TOKEN ?? "";
 
 /** Maximum log entries kept per instance (circular buffer) */
 const LOG_BUFFER_SIZE = 300;
@@ -79,12 +86,36 @@ const wss = new WebSocketServer({ port: PORT });
 
 console.log(`[Monitor] WebSocket server listening on ws://0.0.0.0:${PORT}`);
 
+/**
+ * Valida o token do canal do executor: query `?token=` OU header
+ * `authorization: Bearer <token>`. Se CX_WS_TOKEN não estiver setada,
+ * mantém aberto (dev) — o warning é emitido no boot.
+ */
+function isExecutorAuthorized(req: IncomingMessage): boolean {
+  if (!CX_WS_TOKEN) return true;
+
+  const url = new URL(req.url ?? "/", "ws://localhost");
+  const queryToken = url.searchParams.get("token");
+  if (queryToken === CX_WS_TOKEN) return true;
+
+  const auth = req.headers.authorization ?? "";
+  if (auth.startsWith("Bearer ") && auth.slice("Bearer ".length) === CX_WS_TOKEN) {
+    return true;
+  }
+  return false;
+}
+
 wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
   const url = req.url ?? "";
 
   if (url.startsWith("/ws/agent")) {
     handleAgentConnection(ws);
   } else if (url.startsWith("/ws/executor")) {
+    if (!isExecutorAuthorized(req)) {
+      console.warn("[Monitor] /ws/executor: token inválido — fechando (4001)");
+      ws.close(4001, "unauthorized");
+      return;
+    }
     handleExecutorConnection(ws);
   } else if (url.startsWith("/ws/dashboard")) {
     handleDashboardConnection(ws);
@@ -715,6 +746,13 @@ async function saveAlertToDB(alert: BotAlert): Promise<void> {
 
 startInactivityChecker();
 startStatsBroadcaster();
+startCxJobDrain();
+
+if (!CX_WS_TOKEN) {
+  console.warn(
+    "[Monitor] AVISO: CX_WS_TOKEN não setada — /ws/executor está SEM AUTH (ok em dev, não em produção)"
+  );
+}
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
