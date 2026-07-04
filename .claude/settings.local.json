@@ -2,7 +2,21 @@
   "permissions": {
     "allow": [
       "Bash(npx vitest:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -sI http://localhost:3000/api/health)",
+      "Bash(curl -sI http://localhost:3000/)",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
