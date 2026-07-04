@@ -1,0 +1,233 @@
+{
+  "uid": "cx-trading",
+  "title": "CX Trading",
+  "description": "Currency Exchange — visão de trading: slots, undercut, estoque, decisões, fills e PnL",
+  "tags": ["cx", "trading"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Slots abertos vs max",
+      "description": "cx_slots_open / cx_slots_max reportados pelos executores",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "spanNulls": true },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "slots max" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "dash": [6, 4], "fill": "dash" } },
+              { "id": "custom.fillOpacity", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cx_slots_open)",
+          "legendFormat": "slots abertos"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(cx_slots_max)",
+          "legendFormat": "slots max"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Ordens undercut",
+      "description": "cx_orders_undercut — ordens nossas que foram passadas no book",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "expr": "sum(cx_orders_undercut)", "legendFormat": "undercut" }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Estoque sem SELL",
+      "description": "cx_stock_items_without_sell — itens comprados sem ordem de venda postada",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "expr": "sum(cx_stock_items_without_sell)", "legendFormat": "sem sell" }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Fila de revisão",
+      "description": "cx_review_queue_depth — itens em pending_review.ndjson aguardando decisão humana",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [{ "refId": "A", "expr": "sum(cx_review_queue_depth)", "legendFormat": "revisão" }]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Ordens undercut (histórico)",
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20, "spanNulls": true },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (executor_id) (cx_orders_undercut)",
+          "legendFormat": "{{executor_id}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Decisões por ação (última 1h, janela deslizante)",
+      "description": "increase(cx_decisions_total[1h]) por action — inclui rule/llm/manual (label mode disponível)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "spanNulls": true },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (action) (increase(cx_decisions_total[1h]))",
+          "legendFormat": "{{action}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (action) (increase(cx_policy_decisions_total[1h]))",
+          "legendFormat": "policy: {{action}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Fills por lado (última 1h, janela deslizante)",
+      "description": "increase(cx_fill_reports_total[1h]) por side (buy/sell)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "cx-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "spanNulls": true },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (side) (increase(cx_fill_reports_total[1h]))",
+          "legendFormat": "{{side}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "PnL por dia — fills fechados (14d)",
+      "description": "Soma de pnl_chaos/pnl_div dos cx_fills status=closed, por dia de fechamento (Postgres)",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "postgres", "uid": "cx-postgres" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "barAlignment": 0
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "PnL (div)" },
+            "properties": [{ "id": "custom.axisPlacement", "value": "right" }]
+          }
+        ]
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('day', sell_filled_at) AS \"time\", COALESCE(SUM(pnl_chaos), 0)::float AS \"PnL (chaos)\", COALESCE(SUM(pnl_div), 0)::float AS \"PnL (div)\" FROM cx_fills WHERE status = 'closed' AND sell_filled_at >= now() - interval '14 days' GROUP BY 1 ORDER BY 1"
+        }
+      ]
+    }
+  ]
+}

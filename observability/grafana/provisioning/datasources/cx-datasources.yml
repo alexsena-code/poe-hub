@@ -1,0 +1,36 @@
+# Datasources provisionados do CX:
+#  - Prometheus (default) — métricas do ws-server + executores
+#  - Postgres do hub — painéis SQL (PnL por dia em cx_fills etc.)
+#
+# As variáveis $CX_PG_* vêm do environment do container do Grafana
+# (defaults no docker-compose = .env de dev do hub). Em produção use um
+# usuário READ-ONLY — receita em docs/observability/cx-metrics.md.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: cx-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+
+  - name: PoeHub Postgres
+    uid: cx-postgres
+    type: postgres
+    access: proxy
+    url: $CX_PG_HOST:$CX_PG_PORT
+    user: $CX_PG_USER
+    editable: false
+    jsonData:
+      database: $CX_PG_DB
+      sslmode: disable
+      postgresVersion: 1500
+      maxOpenConns: 4
+      maxIdleConns: 2
+    secureJsonData:
+      password: $CX_PG_PASSWORD

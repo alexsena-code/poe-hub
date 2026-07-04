@@ -1,0 +1,31 @@
+# Prometheus — scrape do ws-server do poe-hub (módulo CX).
+#
+# O ws-server expõe GET /metrics na MESMA porta do WebSocket (8766),
+# protegido pelo CX_WS_TOKEN (Bearer ou ?token=). Troque o placeholder
+# abaixo pelo valor real antes de subir (o arquivo roda dentro do
+# container — Prometheus NÃO expande variáveis de ambiente).
+#
+# Na VPS o ws-server roda no host: host.docker.internal resolve pro host
+# via extra_hosts (host-gateway) definido no docker-compose.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: cx-ws-server
+    metrics_path: /metrics
+    scheme: http
+    # Token do ws-server (mesmo CX_WS_TOKEN do canal /ws/executor).
+    # Se CX_WS_TOKEN não estiver setado no ws-server (dev), o endpoint
+    # fica aberto e este header é ignorado.
+    authorization:
+      type: Bearer
+      credentials: TROQUE_PELO_CX_WS_TOKEN
+    # Alternativa por query string (mesmo efeito):
+    # params:
+    #   token: ["TROQUE_PELO_CX_WS_TOKEN"]
+    static_configs:
+      - targets: ["host.docker.internal:8766"]
+        labels:
+          service: cx-ws-server

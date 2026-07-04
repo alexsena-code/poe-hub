@@ -1,0 +1,14 @@
+# Provider de dashboards do CX — carrega os *.json desta pasta.
+apiVersion: 1
+
+providers:
+  - name: cx
+    orgId: 1
+    folder: CX
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
