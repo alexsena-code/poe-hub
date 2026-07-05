@@ -638,7 +638,10 @@ function applyExploration<T extends { orders: DecOrder[] }>(plan: T): T {
   for (let i = 0; i < n; i++) active[active.length - 1 - i].class = "queue";   // rebaixa os piores ativos
   const picks = queue.sort(() => Math.random() - 0.5).slice(0, n);
   for (const q of picks) q.class = "active";                                    // promove itens da fila (exploração)
-  return { ...plan, orders, explored: true };
+  const swaps = picks
+    .map((q) => (typeof q.item === "string" ? q.item : null))
+    .filter((x): x is string => !!x);                                           // itens testados (pra auditar depois)
+  return { ...plan, orders, explored: true, swaps };
 }
 
 async function handleDecisionRequest(
@@ -653,9 +656,38 @@ async function handleDecisionRequest(
     console.error("[CX-Exec] decision_request falhou:", err);
   }
   const act = plan ? plan.orders.filter((o) => o.class === "active").length : 0;
-  console.log(`[CX-Exec] decision_request de ${msg.executorId ?? "?"} (${msg.league ?? "?"}) -> `
-    + (plan ? `${plan.orders.length} ordens, ${act} ativas${(plan as { explored?: boolean }).explored ? " (explorado)" : ""}` : "sem plano"));
+  const explored = !!(plan as { explored?: boolean } | null)?.explored;
+  const swaps = (plan as { swaps?: string[] } | null)?.swaps ?? [];
+  const reason = plan
+    ? `${plan.orders.length} ordens, ${act} ativas${explored ? " (explorado)" : ""}`
+    : "sem plano";
+  console.log(`[CX-Exec] decision_request de ${msg.executorId ?? "?"} (${msg.league ?? "?"}) -> ${reason}`);
   safeSend(ws, { type: "decision_response", id: msg.id, plan });
+
+  // Persiste a decisão VIVA (RPC) pra análise posterior (monitor da VPS lê cx_decision_log).
+  // Best-effort: já respondemos o executor; a gravação não pode atrasar/derrubar o RPC.
+  cxDecisionsTotal.inc({ action: "decision_request", mode: "live" });
+  try {
+    await prisma.cxDecisionLog.create({
+      data: {
+        executorId: msg.executorId ?? null,
+        source: "rule",
+        item: null,
+        league: msg.league ?? null,
+        action: "decision_request",
+        reason,
+        snapshot: {
+          mode: "live",
+          explored,
+          swaps,
+          active: act,
+          total: plan?.orders.length ?? 0,
+        } as Prisma.InputJsonValue,
+      },
+    });
+  } catch (err) {
+    console.error(`[CX-Exec] insert decision_request falhou (${msg.executorId}):`, err);
+  }
 }
 
 // ============================================================
