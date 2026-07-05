@@ -99,7 +99,7 @@ interface SanitizeState {
   counter?: { cur?: number; max?: number };
   orders?: Array<{
     orderKey?: string; item?: string; side?: string;
-    ageMin?: number; fillPct?: number; undercut?: boolean; priceBaseItem?: number;
+    ageMin?: number; fillPct?: number; undercut?: boolean; priceBaseItem?: number; competing?: number;
   }>;
   positions?: Array<{
     item?: string; net?: number; avgBuyRatio?: number; base?: string;
@@ -764,12 +764,14 @@ async function handleSanitizeRequest(
   const strat = th.strategy ?? {};
   const actions: SanitizeAction[] = [];
 
-  // custo/base por item (do ledger no executor_state) — pro piso de margem da venda
+  // custo/base/net por item (do ledger no executor_state) — pro piso de margem e qty da venda
   const costByItem = new Map<string, number>();
   const baseByItem = new Map<string, string>();
+  const netByItem = new Map<string, number>();
   for (const p of state.positions ?? []) {
     if (!p.item) continue;
     costByItem.set(p.item, num(p.avgBuyRatio) ?? 0);
+    netByItem.set(p.item, Math.floor(num(p.net) ?? 0));
     if (p.base) baseByItem.set(p.item, p.base);
   }
 
@@ -781,7 +783,8 @@ async function handleSanitizeRequest(
     const age = num(o.ageMin) ?? 0;
     const fill = num(o.fillPct) ?? 0;
     if (o.side === "sell") {                             // VENDA -> sanitização própria (abaixo)
-      if (age > sellStale && fill < 0.1) staleSells.push(o);
+      // só age em venda UNDERCUT (competidor mais barato); venda no mercado só esperando enche sozinha
+      if (o.undercut && age > sellStale && fill < 0.1) staleSells.push(o);
       continue;
     }
     if (o.undercut && age > staleMin && fill < 0.1) {
@@ -829,23 +832,23 @@ async function handleSanitizeRequest(
   // --- SANITIZAÇÃO DE VENDA PARADA: repreça p/ vender (com margem) OU review+standby ---
   for (const o of staleSells) {
     const item = o.item as string;
-    const bid = bidByItem.get(item);
+    const comp = num(o.competing) ?? 0;                  // preço do competidor (mais barato, já que undercut)
     const age = Math.floor(num(o.ageMin) ?? 0);
-    if (bid == null || bid <= 0) continue;               // sem preço — segura
+    if (comp <= 0) continue;                             // sem competidor visível — não sabe pra onde repreçar
     const cost = costByItem.get(item) ?? 0;
-    if (cost <= 0) continue;                              // CUSTO DESCONHECIDO -> NÃO mexe (não dumpa às cegas;
-                                                          // estoque pré-cost-fix; usuário resolve / manual)
+    if (cost <= 0) continue;                             // CUSTO DESCONHECIDO -> NÃO mexe (estoque pré-cost-fix)
     const floor = cost * (1 + sellMargin / 100);
-    if (bid < floor) {
-      // não dá pra vender com margem -> REVIEW (executor cancela + standby; usuário decide)
+    const qty = netByItem.get(item) ?? 0;
+    if (comp < floor) {
+      // pra bater o competidor teria que vender ABAIXO do piso -> REVIEW (cancela + standby)
       actions.push({ action: "review", item, side: "sell", orderKey: o.orderKey,
-        base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
-        reason: `venda ${age}min sem fill; mercado ${bid} < piso ${floor.toFixed(2)} (custo ${cost}) — revisar` });
-    } else {
-      // repreça pra vender no mercado (>= custo+margem)
+        base: baseByItem.get(item) ?? "Chaos Orb", ratio: comp,
+        reason: `venda undercut ${age}min; competidor ${comp} < piso ${floor.toFixed(2)} (custo ${cost}) — revisar` });
+    } else if (qty >= 1) {
+      // repreça COMPETITIVO: lista no preço do competidor (executor undercut no snap), >= piso — NÃO dumpa no bid
       actions.push({ action: "reprice_sell", item, side: "sell", orderKey: o.orderKey,
-        base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
-        reason: `venda ${age}min sem fill; repreça p/ mercado ${bid} (custo ${cost}, +${sellMargin}%)` });
+        base: baseByItem.get(item) ?? "Chaos Orb", ratio: comp, qty,
+        reason: `venda undercut ${age}min; repreça p/ ${comp} (piso ${floor.toFixed(2)}, custo ${cost})` });
     }
   }
 
