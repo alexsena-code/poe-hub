@@ -833,17 +833,19 @@ async function handleSanitizeRequest(
     const age = Math.floor(num(o.ageMin) ?? 0);
     if (bid == null || bid <= 0) continue;               // sem preço — segura
     const cost = costByItem.get(item) ?? 0;
-    const floor = cost > 0 ? cost * (1 + sellMargin / 100) : 0;
-    if (cost > 0 && bid < floor) {
+    if (cost <= 0) continue;                              // CUSTO DESCONHECIDO -> NÃO mexe (não dumpa às cegas;
+                                                          // estoque pré-cost-fix; usuário resolve / manual)
+    const floor = cost * (1 + sellMargin / 100);
+    if (bid < floor) {
       // não dá pra vender com margem -> REVIEW (executor cancela + standby; usuário decide)
       actions.push({ action: "review", item, side: "sell", orderKey: o.orderKey,
         base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
         reason: `venda ${age}min sem fill; mercado ${bid} < piso ${floor.toFixed(2)} (custo ${cost}) — revisar` });
     } else {
-      // repreça pra vender no mercado (>= custo+margem quando o custo é conhecido)
+      // repreça pra vender no mercado (>= custo+margem)
       actions.push({ action: "reprice_sell", item, side: "sell", orderKey: o.orderKey,
         base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
-        reason: `venda ${age}min sem fill; repreça p/ mercado ${bid}${cost > 0 ? ` (custo ${cost}, +${sellMargin}%)` : " (custo desconhecido)"}` });
+        reason: `venda ${age}min sem fill; repreça p/ mercado ${bid} (custo ${cost}, +${sellMargin}%)` });
     }
   }
 
