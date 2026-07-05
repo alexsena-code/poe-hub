@@ -742,6 +742,13 @@ async function handleSanitizeRequest(
   ws: WebSocket,
   msg: Extract<ExecutorMessage, { type: "sanitize_request" }>
 ): Promise<void> {
+  // KILL SWITCH da VPS: CX_SANITIZE_KILL=1 -> devolve ZERO ações (para toda execução F1/F2/F3
+  // sem depender da fila de comando/param local). Emergência: setar no .env.ws + restart.
+  if (process.env.CX_SANITIZE_KILL === "1") {
+    console.log(`[CX-Exec] sanitize_request de ${msg.executorId ?? "?"} — KILL SWITCH ativo, 0 ações`);
+    safeSend(ws, { type: "sanitize_response", id: msg.id, actions: [] });
+    return;
+  }
   const league = msg.league;
   const state = msg.state ?? {};
   const th = msg.thresholds ?? {};
