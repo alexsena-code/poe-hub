@@ -83,8 +83,33 @@ type ExecutorMessage =
   | ({ type: "decision"; executorId: string } & DecisionData)
   | { type: "validate_request"; executorId?: string; id: string; league?: string; items?: string[] }
   | { type: "decision_request"; executorId?: string; id: string; league?: string }
+  | {
+      type: "sanitize_request";
+      executorId?: string;
+      id: string;
+      league?: string;
+      state?: SanitizeState;
+      thresholds?: SanitizeThresholds;
+    }
   | { type: "book_report"; executorId?: string; lines?: unknown[] }
   | { type: "disconnect"; executorId: string };
+
+/** Estado do board que o executor manda pra VPS decidir F1/F2/F3 (shape = cx_policy.build_executor_state). */
+interface SanitizeState {
+  counter?: { cur?: number; max?: number };
+  orders?: Array<{
+    orderKey?: string; item?: string; side?: string;
+    ageMin?: number; fillPct?: number; undercut?: boolean; priceBaseItem?: number;
+  }>;
+  positions?: Array<{
+    item?: string; net?: number; avgBuyRatio?: number; base?: string;
+    hasOpenSell?: boolean; idleMin?: number;
+  }>;
+}
+interface SanitizeThresholds {
+  stock_idle_min?: number; stale_min?: number; dead_min?: number;
+  min_margin_pct?: number; strategy?: Record<string, string>;
+}
 
 /** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
 const KNOWN_MESSAGE_TYPES = new Set([
@@ -98,6 +123,7 @@ const KNOWN_MESSAGE_TYPES = new Set([
   "decision",
   "validate_request",
   "decision_request",
+  "sanitize_request",
   "book_report",
   "disconnect",
 ]);
@@ -204,6 +230,9 @@ export function handleExecutorConnection(ws: WebSocket): void {
           break;
         case "decision_request":
           await handleDecisionRequest(ws, msg);
+          break;
+        case "sanitize_request":
+          await handleSanitizeRequest(ws, msg);
           break;
         case "book_report":
           await handleBookReport(msg);
@@ -664,7 +693,8 @@ async function handleDecisionRequest(
   console.log(`[CX-Exec] decision_request de ${msg.executorId ?? "?"} (${msg.league ?? "?"}) -> ${reason}`);
   safeSend(ws, { type: "decision_response", id: msg.id, plan });
 
-  // Persiste a decisão VIVA (RPC) pra análise posterior (monitor da VPS lê cx_decision_log).
+  // Persiste a decisão VIVA (RPC) pra análise posterior (monitor da VPS lê cx_decision_log). Nota (2):
+  // este bloco é do decision_request (plano+exploração); o sanitize_request F1/F2/F3 é o handler abaixo.
   // Best-effort: já respondemos o executor; a gravação não pode atrasar/derrubar o RPC.
   cxDecisionsTotal.inc({ action: "decision_request", mode: "live" });
   try {
@@ -688,6 +718,104 @@ async function handleDecisionRequest(
   } catch (err) {
     console.error(`[CX-Exec] insert decision_request falhou (${msg.executorId}):`, err);
   }
+}
+
+// ============================================================
+// Sanitização F1/F2/F3 (RPC) — a VPS é a AUTORIDADE da decisão; o executor só EXECUTA.
+// O executor manda o board (executor_state) + thresholds; a VPS aplica as regras usando
+// dados FRESCOS (cx_signal p/ preço do sell_now + piso de margem) e devolve as `actions`.
+// Persiste cada uma em cx_decision_log (mode=vps). Os guardrails/kill-switch são do executor.
+// ============================================================
+
+interface SanitizeAction {
+  action: "reprice" | "cancel_realloc" | "sell_now";
+  item: string;
+  side?: string;
+  orderKey?: string;   // cancel/reprice: identidade estável da ordem-alvo (executor re-resolve o índice)
+  base?: string;       // sell_now
+  ratio?: number;      // sell_now: preço (base/item) já com piso de margem aplicado
+  qty?: number;        // sell_now
+  reason: string;
+}
+
+async function handleSanitizeRequest(
+  ws: WebSocket,
+  msg: Extract<ExecutorMessage, { type: "sanitize_request" }>
+): Promise<void> {
+  const league = msg.league;
+  const state = msg.state ?? {};
+  const th = msg.thresholds ?? {};
+  const stockIdle = num(th.stock_idle_min) ?? 30;
+  const staleMin = num(th.stale_min) ?? 45;
+  const deadMin = num(th.dead_min) ?? 240;
+  const minMargin = num(th.min_margin_pct) ?? 8;
+  const strat = th.strategy ?? {};
+  const actions: SanitizeAction[] = [];
+
+  // --- F3: ordens stale/undercut (mm segura a quote; flip repreça/cancela) ---
+  for (const o of state.orders ?? []) {
+    if (!o.item || !o.orderKey) continue;
+    if ((strat[o.item] ?? "flip") === "mm") continue;   // mm: hold (sem ação)
+    const age = num(o.ageMin) ?? 0;
+    const fill = num(o.fillPct) ?? 0;
+    if (o.undercut && age > staleMin && fill < 0.1) {
+      actions.push({ action: "reprice", item: o.item, side: o.side, orderKey: o.orderKey,
+        reason: `undercut, ${Math.floor(age)}min sem fill (${Math.round(fill * 100)}%)` });
+    } else if (age > deadMin && fill <= 1e-9) {
+      actions.push({ action: "cancel_realloc", item: o.item, side: o.side, orderKey: o.orderKey,
+        reason: `sem fill há ${Math.floor(age)}min` });
+    }
+  }
+
+  // --- F1: estoque parado -> sell_now (preço = bid fresco do cx_signal; piso de margem vs custo real) ---
+  const stuck = (state.positions ?? []).filter(
+    (p) => p.item && (num(p.net) ?? 0) >= 1 && !p.hasOpenSell && (num(p.idleMin) ?? 0) > stockIdle
+  );
+  if (stuck.length && league) {
+    let bidByItem = new Map<string, number>();
+    try {
+      const rows = await prisma.cxSignal.findMany({
+        where: { league, item: { in: stuck.map((p) => p.item as string) } },
+        select: { item: true, bid: true },
+      });
+      bidByItem = new Map(rows.filter((r) => r.bid != null).map((r) => [r.item, Number(r.bid)]));
+    } catch (err) {
+      console.error("[CX-Exec] sanitize: cxSignal lookup falhou:", err);
+    }
+    for (const p of stuck) {
+      const bid = bidByItem.get(p.item as string);
+      if (bid == null || bid <= 0) continue;             // sem preço fresco — NÃO vende às cegas
+      const cost = num(p.avgBuyRatio) ?? 0;
+      const floor = cost * (1 + minMargin / 100);
+      if (cost > 0 && bid < floor) continue;             // abaixo do piso de margem — segura
+      const qty = Math.floor(num(p.net) ?? 0);
+      if (qty < 1) continue;
+      actions.push({ action: "sell_now", item: p.item as string, side: "sell",
+        base: p.base ?? "Chaos Orb", ratio: bid, qty,
+        reason: `estoque ${qty}x parado ${Math.floor(num(p.idleMin) ?? 0)}min; bid ${bid} >= piso ${floor.toFixed(2)}` });
+    }
+  }
+
+  // Persiste cada ação (auditoria + o monitor da VPS lê). mode=vps: DECIDIDA aqui.
+  for (const a of actions) {
+    cxDecisionsTotal.inc({ action: a.action, mode: "vps" });
+    try {
+      await prisma.cxDecisionLog.create({
+        data: {
+          executorId: msg.executorId ?? null, source: "rule", item: a.item, league: league ?? null,
+          action: a.action, reason: a.reason,
+          snapshot: { mode: "vps", side: a.side, ratio: a.ratio, qty: a.qty,
+            orderKey: a.orderKey } as Prisma.InputJsonValue,
+        },
+      });
+    } catch (err) {
+      console.error("[CX-Exec] insert sanitize decision falhou:", err);
+    }
+  }
+
+  console.log(`[CX-Exec] sanitize_request de ${msg.executorId ?? "?"} (${league ?? "?"}) -> `
+    + `${actions.length} ações (${actions.map((a) => a.action).join(",") || "nenhuma"})`);
+  safeSend(ws, { type: "sanitize_response", id: msg.id, actions });
 }
 
 // ============================================================
