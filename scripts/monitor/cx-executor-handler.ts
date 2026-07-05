@@ -110,6 +110,7 @@ interface SanitizeThresholds {
   stock_idle_min?: number; stale_min?: number; dead_min?: number;
   min_margin_pct?: number; strategy?: Record<string, string>;
   sell_stale_min?: number; sell_min_margin_pct?: number;
+  sell_walk_drops?: number; sell_walk_margin_pct?: number;   // walk-down da venda
 }
 
 /** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
@@ -741,6 +742,24 @@ interface SanitizeAction {
   reason: string;
 }
 
+// WALK-DOWN da venda (price discovery / MM): posta no ASK e desce rumo ao BID em `drops`
+// degraus (fração do spread vivo); no passo final LIQUIDA no bid. Piso no CUSTO — nunca realiza
+// loss (abaixo do piso: price=null => segura). Espelha cx_policy.sell_walk_price (testado em Python).
+function sellWalkPrice(
+  ask: number, bid: number, cost: number, step: number, drops: number, minMarginPct: number
+): { price: number | null; liquidate: boolean } {
+  if (ask <= 0 || bid <= 0 || ask < bid) return { price: null, liquidate: false };
+  const floor = cost > 0 ? cost * (1 + Math.max(0, minMarginPct) / 100) : 0;
+  if (step >= Math.max(1, drops)) {                    // liquidação: vende no bid
+    return bid >= floor ? { price: bid, liquidate: true } : { price: null, liquidate: true };
+  }
+  const spread = ask - bid;
+  const target = ask - (spread * (step + 1)) / (drops + 1);   // desce rumo ao bid
+  const price = Math.max(target, floor);
+  if (price >= ask) return { price: null, liquidate: false };  // piso >= ask: sem margem nem no topo
+  return { price, liquidate: false };
+}
+
 async function handleSanitizeRequest(
   ws: WebSocket,
   msg: Extract<ExecutorMessage, { type: "sanitize_request" }>
@@ -759,8 +778,9 @@ async function handleSanitizeRequest(
   const staleMin = num(th.stale_min) ?? 45;
   const deadMin = num(th.dead_min) ?? 240;
   const minMargin = num(th.min_margin_pct) ?? 8;
-  const sellStale = num(th.sell_stale_min) ?? 60;        // idade p/ sanitizar VENDA parada
-  const sellMargin = num(th.sell_min_margin_pct) ?? 10;  // margem mínima sobre o custo p/ repreçar venda
+  const sellStale = num(th.sell_stale_min) ?? 40;        // intervalo entre degraus do walk-down (min)
+  const walkDrops = Math.max(1, Math.floor(num(th.sell_walk_drops) ?? 2));   // degraus antes de liquidar no bid
+  const walkMargin = num(th.sell_walk_margin_pct) ?? 0;  // piso do walk-down (0 = qualquer lucro > custo)
   const strat = th.strategy ?? {};
   const actions: SanitizeAction[] = [];
 
@@ -782,9 +802,11 @@ async function handleSanitizeRequest(
     if ((strat[o.item] ?? "flip") === "mm") continue;   // mm: hold (sem ação)
     const age = num(o.ageMin) ?? 0;
     const fill = num(o.fillPct) ?? 0;
-    if (o.side === "sell") {                             // VENDA -> sanitização própria (abaixo)
-      // só age em venda UNDERCUT (competidor mais barato); venda no mercado só esperando enche sozinha
-      if (o.undercut && age > sellStale && fill < 0.1) staleSells.push(o);
+    if (o.side === "sell") {                             // VENDA -> walk-down (abaixo)
+      // WALK-DOWN: venda parada (idade > intervalo, fill baixo) desce rumo ao bid — undercut OU não.
+      // Sentar no ask NÃO enche em liga morna; precisa descer pra vender/ciclar. O fill<0.1 evita
+      // mexer no que já está enchendo.
+      if (age > sellStale && fill < 0.1) staleSells.push(o);
       continue;
     }
     if (o.undercut && age > staleMin && fill < 0.1) {
@@ -801,18 +823,37 @@ async function handleSanitizeRequest(
     (p) => p.item && (num(p.net) ?? 0) >= 1 && !p.hasOpenSell && (num(p.idleMin) ?? 0) > stockIdle
   );
 
-  // bids frescos p/ TODOS que precisam de preço (estoque parado + vendas paradas)
+  // bid/ask frescos p/ TODOS que precisam de preço (estoque parado + walk-down da venda)
   let bidByItem = new Map<string, number>();
+  let askByItem = new Map<string, number>();
   const needBid = [...new Set([...stuck.map((p) => p.item as string),
     ...staleSells.map((o) => o.item as string)])];
   if (needBid.length && league) {
     try {
       const rows = await prisma.cxSignal.findMany({
-        where: { league, item: { in: needBid } }, select: { item: true, bid: true },
+        where: { league, item: { in: needBid } }, select: { item: true, bid: true, ask: true },
       });
       bidByItem = new Map(rows.filter((r) => r.bid != null).map((r) => [r.item, Number(r.bid)]));
+      askByItem = new Map(rows.filter((r) => r.ask != null).map((r) => [r.item, Number(r.ask)]));
     } catch (err) {
       console.error("[CX-Exec] sanitize: cxSignal lookup falhou:", err);
+    }
+  }
+
+  // step do walk-down por item = quantos reprice_sell já saíram na janela do ciclo (drops+2 intervalos)
+  const walkStepByItem = new Map<string, number>();
+  if (staleSells.length && league) {
+    try {
+      const since = new Date(Date.now() - sellStale * (walkDrops + 2) * 60_000);
+      const grp = await prisma.cxDecisionLog.groupBy({
+        by: ["item"],
+        where: { league, action: "reprice_sell", createdAt: { gte: since },
+          item: { in: staleSells.map((o) => o.item as string) } },
+        _count: { item: true },
+      });
+      for (const r of grp) if (r.item) walkStepByItem.set(r.item, r._count.item);
+    } catch (err) {
+      console.error("[CX-Exec] sanitize: walk-step lookup falhou:", err);
     }
   }
 
@@ -831,26 +872,29 @@ async function handleSanitizeRequest(
       reason: `estoque ${qty}x parado ${Math.floor(num(p.idleMin) ?? 0)}min; bid ${bid} >= piso ${floor.toFixed(2)}` });
   }
 
-  // --- SANITIZAÇÃO DE VENDA PARADA: repreça p/ vender (com margem) OU review+standby ---
+  // --- WALK-DOWN DA VENDA: ask -> bid em degraus; liquida no bid; piso no custo (senão review) ---
   for (const o of staleSells) {
     const item = o.item as string;
-    const comp = num(o.competing) ?? 0;                  // preço do competidor (mais barato, já que undercut)
     const age = Math.floor(num(o.ageMin) ?? 0);
-    if (comp <= 0) continue;                             // sem competidor visível — não sabe pra onde repreçar
+    const ask = askByItem.get(item) ?? 0;
+    const bid = bidByItem.get(item) ?? 0;
     const cost = costByItem.get(item) ?? 0;
     if (cost <= 0) continue;                             // CUSTO DESCONHECIDO -> NÃO mexe (estoque pré-cost-fix)
-    const floor = cost * (1 + sellMargin / 100);
+    if (ask <= 0 || bid <= 0) continue;                  // sem book fresco (sweep) -> NÃO mexe às cegas
     const qty = netByItem.get(item) ?? 0;
-    if (comp < floor) {
-      // pra bater o competidor teria que vender ABAIXO do piso -> REVIEW (cancela + standby)
+    const step = walkStepByItem.get(item) ?? 0;
+    const { price, liquidate } = sellWalkPrice(ask, bid, cost, step, walkDrops, walkMargin);
+    if (price == null) {
+      // nem no bid dá pra vender >= custo (underwater) -> REVIEW (cancela + standby; não realiza loss)
       actions.push({ action: "review", item, side: "sell", orderKey: o.orderKey,
-        base: baseByItem.get(item) ?? "Chaos Orb", ratio: comp,
-        reason: `venda undercut ${age}min; competidor ${comp} < piso ${floor.toFixed(2)} (custo ${cost}) — revisar` });
+        base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
+        reason: `walk-down passo ${step}: bid ${bid} < custo ${cost} — segura (review)` });
     } else if (qty >= 1) {
-      // repreça COMPETITIVO: lista no preço do competidor (executor undercut no snap), >= piso — NÃO dumpa no bid
       actions.push({ action: "reprice_sell", item, side: "sell", orderKey: o.orderKey,
-        base: baseByItem.get(item) ?? "Chaos Orb", ratio: comp, qty,
-        reason: `venda undercut ${age}min; repreça p/ ${comp} (piso ${floor.toFixed(2)}, custo ${cost})` });
+        base: baseByItem.get(item) ?? "Chaos Orb", ratio: Number(price.toFixed(4)), qty,
+        reason: liquidate
+          ? `walk-down LIQUIDA no bid ${bid} (passo ${step}, custo ${cost})`
+          : `walk-down passo ${step}/${walkDrops}: ${price.toFixed(2)} (ask ${ask} -> bid ${bid}, ${age}min)` });
     }
   }
 
