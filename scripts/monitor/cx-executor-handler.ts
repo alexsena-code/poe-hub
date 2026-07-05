@@ -82,6 +82,7 @@ type ExecutorMessage =
   | ({ type: "metrics"; executorId: string; ts?: string } & RemoteMetricsPayload)
   | ({ type: "decision"; executorId: string } & DecisionData)
   | { type: "validate_request"; executorId?: string; id: string; league?: string; items?: string[] }
+  | { type: "decision_request"; executorId?: string; id: string; league?: string }
   | { type: "book_report"; executorId?: string; lines?: unknown[] }
   | { type: "disconnect"; executorId: string };
 
@@ -96,6 +97,7 @@ const KNOWN_MESSAGE_TYPES = new Set([
   "metrics",
   "decision",
   "validate_request",
+  "decision_request",
   "book_report",
   "disconnect",
 ]);
@@ -199,6 +201,9 @@ export function handleExecutorConnection(ws: WebSocket): void {
           break;
         case "validate_request":
           await handleValidateRequest(ws, msg);
+          break;
+        case "decision_request":
+          await handleDecisionRequest(ws, msg);
           break;
         case "book_report":
           await handleBookReport(msg);
@@ -610,6 +615,44 @@ async function handleValidateRequest(
     console.error("[CX-Exec] validate_request falhou:", err);
   }
   safeSend(ws, { type: "validate_response", id: msg.id, books });
+}
+
+// ============================================================
+// Decisão-sob-demanda (RPC) — plano VIVO por-fill + exploração (epsilon-greedy)
+// O executor pede a cada fill "o que faço agora?"; o servidor decide FRESCO (não re-posta
+// o plano estático). v1: plano do allocator + exploração. v2 (depois): state-aware + cancel.
+// ============================================================
+
+type DecOrder = { class?: string | null; [k: string]: unknown };
+
+/** epsilon-greedy: com prob EPS troca ~SWAPS slots ATIVOS por itens da FILA — testa itens
+ *  diferentes / margem-baixa em vez de re-postar sempre o mesmo top. Deixa o plano NÃO-estático. */
+function applyExploration<T extends { orders: DecOrder[] }>(plan: T): T {
+  const EPS = 0.3, SWAPS = 2;
+  if (Math.random() >= EPS) return plan;
+  const orders = plan.orders.map((o) => ({ ...o }));
+  const active = orders.filter((o) => o.class === "active");
+  const queue = orders.filter((o) => o.class === "queue");
+  const n = Math.min(SWAPS, active.length, queue.length);
+  if (n < 1) return plan;
+  for (let i = 0; i < n; i++) active[active.length - 1 - i].class = "queue";   // rebaixa os piores ativos
+  const picks = queue.sort(() => Math.random() - 0.5).slice(0, n);
+  for (const q of picks) q.class = "active";                                    // promove itens da fila (exploração)
+  return { ...plan, orders, explored: true };
+}
+
+async function handleDecisionRequest(
+  ws: WebSocket,
+  msg: Extract<ExecutorMessage, { type: "decision_request" }>
+): Promise<void> {
+  let plan: unknown = null;
+  try {
+    const p = msg.league ? await readPlan(msg.league) : null;
+    if (p) plan = applyExploration(p);
+  } catch (err) {
+    console.error("[CX-Exec] decision_request falhou:", err);
+  }
+  safeSend(ws, { type: "decision_response", id: msg.id, plan });
 }
 
 // ============================================================
