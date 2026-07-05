@@ -820,8 +820,10 @@ async function handleSanitizeRequest(
     const bid = bidByItem.get(p.item as string);
     if (bid == null || bid <= 0) continue;               // sem preço fresco — NÃO vende às cegas
     const cost = num(p.avgBuyRatio) ?? 0;
+    if (cost <= 0) continue;                              // CUSTO DESCONHECIDO -> NÃO auto-vende (estoque
+                                                          // pré-cost-fix; usuário desova manual). Idem reprice_sell.
     const floor = cost * (1 + minMargin / 100);
-    if (cost > 0 && bid < floor) continue;               // abaixo do piso de margem — segura (F1)
+    if (bid < floor) continue;                            // abaixo do piso de margem — segura (F1)
     const qty = Math.floor(num(p.net) ?? 0);
     if (qty < 1) continue;
     actions.push({ action: "sell_now", item: p.item as string, side: "sell",
