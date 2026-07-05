@@ -109,6 +109,7 @@ interface SanitizeState {
 interface SanitizeThresholds {
   stock_idle_min?: number; stale_min?: number; dead_min?: number;
   min_margin_pct?: number; strategy?: Record<string, string>;
+  sell_stale_min?: number; sell_min_margin_pct?: number;
 }
 
 /** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
@@ -728,13 +729,15 @@ async function handleDecisionRequest(
 // ============================================================
 
 interface SanitizeAction {
-  action: "reprice" | "cancel_realloc" | "sell_now";
+  // reprice_sell = venda parada -> repreça p/ mercado (>= custo+margem); review = não dá com margem
+  // -> executor cancela + standby + revisão pro usuário.
+  action: "reprice" | "cancel_realloc" | "sell_now" | "reprice_sell" | "review";
   item: string;
   side?: string;
-  orderKey?: string;   // cancel/reprice: identidade estável da ordem-alvo (executor re-resolve o índice)
-  base?: string;       // sell_now
-  ratio?: number;      // sell_now: preço (base/item) já com piso de margem aplicado
-  qty?: number;        // sell_now
+  orderKey?: string;   // cancel/reprice/reprice_sell/review: identidade estável da ordem-alvo
+  base?: string;       // sell_now / reprice_sell
+  ratio?: number;      // preço (base/item)
+  qty?: number;
   reason: string;
 }
 
@@ -756,15 +759,31 @@ async function handleSanitizeRequest(
   const staleMin = num(th.stale_min) ?? 45;
   const deadMin = num(th.dead_min) ?? 240;
   const minMargin = num(th.min_margin_pct) ?? 8;
+  const sellStale = num(th.sell_stale_min) ?? 60;        // idade p/ sanitizar VENDA parada
+  const sellMargin = num(th.sell_min_margin_pct) ?? 10;  // margem mínima sobre o custo p/ repreçar venda
   const strat = th.strategy ?? {};
   const actions: SanitizeAction[] = [];
 
-  // --- F3: ordens stale/undercut (mm segura a quote; flip repreça/cancela) ---
+  // custo/base por item (do ledger no executor_state) — pro piso de margem da venda
+  const costByItem = new Map<string, number>();
+  const baseByItem = new Map<string, string>();
+  for (const p of state.positions ?? []) {
+    if (!p.item) continue;
+    costByItem.set(p.item, num(p.avgBuyRatio) ?? 0);
+    if (p.base) baseByItem.set(p.item, p.base);
+  }
+
+  // --- F3: ordens stale (BUY: reprice/cancel; SELL parada: sanitização de venda separada) ---
+  const staleSells: NonNullable<SanitizeState["orders"]> = [];
   for (const o of state.orders ?? []) {
     if (!o.item || !o.orderKey) continue;
     if ((strat[o.item] ?? "flip") === "mm") continue;   // mm: hold (sem ação)
     const age = num(o.ageMin) ?? 0;
     const fill = num(o.fillPct) ?? 0;
+    if (o.side === "sell") {                             // VENDA -> sanitização própria (abaixo)
+      if (age > sellStale && fill < 0.1) staleSells.push(o);
+      continue;
+    }
     if (o.undercut && age > staleMin && fill < 0.1) {
       actions.push({ action: "reprice", item: o.item, side: o.side, orderKey: o.orderKey,
         reason: `undercut, ${Math.floor(age)}min sem fill (${Math.round(fill * 100)}%)` });
@@ -774,32 +793,57 @@ async function handleSanitizeRequest(
     }
   }
 
-  // --- F1: estoque parado -> sell_now (preço = bid fresco do cx_signal; piso de margem vs custo real) ---
+  // --- F1: estoque parado sem venda aberta -> sell_now ---
   const stuck = (state.positions ?? []).filter(
     (p) => p.item && (num(p.net) ?? 0) >= 1 && !p.hasOpenSell && (num(p.idleMin) ?? 0) > stockIdle
   );
-  if (stuck.length && league) {
-    let bidByItem = new Map<string, number>();
+
+  // bids frescos p/ TODOS que precisam de preço (estoque parado + vendas paradas)
+  let bidByItem = new Map<string, number>();
+  const needBid = [...new Set([...stuck.map((p) => p.item as string),
+    ...staleSells.map((o) => o.item as string)])];
+  if (needBid.length && league) {
     try {
       const rows = await prisma.cxSignal.findMany({
-        where: { league, item: { in: stuck.map((p) => p.item as string) } },
-        select: { item: true, bid: true },
+        where: { league, item: { in: needBid } }, select: { item: true, bid: true },
       });
       bidByItem = new Map(rows.filter((r) => r.bid != null).map((r) => [r.item, Number(r.bid)]));
     } catch (err) {
       console.error("[CX-Exec] sanitize: cxSignal lookup falhou:", err);
     }
-    for (const p of stuck) {
-      const bid = bidByItem.get(p.item as string);
-      if (bid == null || bid <= 0) continue;             // sem preço fresco — NÃO vende às cegas
-      const cost = num(p.avgBuyRatio) ?? 0;
-      const floor = cost * (1 + minMargin / 100);
-      if (cost > 0 && bid < floor) continue;             // abaixo do piso de margem — segura
-      const qty = Math.floor(num(p.net) ?? 0);
-      if (qty < 1) continue;
-      actions.push({ action: "sell_now", item: p.item as string, side: "sell",
-        base: p.base ?? "Chaos Orb", ratio: bid, qty,
-        reason: `estoque ${qty}x parado ${Math.floor(num(p.idleMin) ?? 0)}min; bid ${bid} >= piso ${floor.toFixed(2)}` });
+  }
+
+  for (const p of stuck) {
+    const bid = bidByItem.get(p.item as string);
+    if (bid == null || bid <= 0) continue;               // sem preço fresco — NÃO vende às cegas
+    const cost = num(p.avgBuyRatio) ?? 0;
+    const floor = cost * (1 + minMargin / 100);
+    if (cost > 0 && bid < floor) continue;               // abaixo do piso de margem — segura (F1)
+    const qty = Math.floor(num(p.net) ?? 0);
+    if (qty < 1) continue;
+    actions.push({ action: "sell_now", item: p.item as string, side: "sell",
+      base: p.base ?? "Chaos Orb", ratio: bid, qty,
+      reason: `estoque ${qty}x parado ${Math.floor(num(p.idleMin) ?? 0)}min; bid ${bid} >= piso ${floor.toFixed(2)}` });
+  }
+
+  // --- SANITIZAÇÃO DE VENDA PARADA: repreça p/ vender (com margem) OU review+standby ---
+  for (const o of staleSells) {
+    const item = o.item as string;
+    const bid = bidByItem.get(item);
+    const age = Math.floor(num(o.ageMin) ?? 0);
+    if (bid == null || bid <= 0) continue;               // sem preço — segura
+    const cost = costByItem.get(item) ?? 0;
+    const floor = cost > 0 ? cost * (1 + sellMargin / 100) : 0;
+    if (cost > 0 && bid < floor) {
+      // não dá pra vender com margem -> REVIEW (executor cancela + standby; usuário decide)
+      actions.push({ action: "review", item, side: "sell", orderKey: o.orderKey,
+        base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
+        reason: `venda ${age}min sem fill; mercado ${bid} < piso ${floor.toFixed(2)} (custo ${cost}) — revisar` });
+    } else {
+      // repreça pra vender no mercado (>= custo+margem quando o custo é conhecido)
+      actions.push({ action: "reprice_sell", item, side: "sell", orderKey: o.orderKey,
+        base: baseByItem.get(item) ?? "Chaos Orb", ratio: bid,
+        reason: `venda ${age}min sem fill; repreça p/ mercado ${bid}${cost > 0 ? ` (custo ${cost}, +${sellMargin}%)` : " (custo desconhecido)"}` });
     }
   }
 
