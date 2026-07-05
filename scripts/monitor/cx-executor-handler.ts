@@ -645,13 +645,16 @@ async function handleDecisionRequest(
   ws: WebSocket,
   msg: Extract<ExecutorMessage, { type: "decision_request" }>
 ): Promise<void> {
-  let plan: unknown = null;
+  let plan: Awaited<ReturnType<typeof readPlan>> | null = null;
   try {
     const p = msg.league ? await readPlan(msg.league) : null;
     if (p) plan = applyExploration(p);
   } catch (err) {
     console.error("[CX-Exec] decision_request falhou:", err);
   }
+  const act = plan ? plan.orders.filter((o) => o.class === "active").length : 0;
+  console.log(`[CX-Exec] decision_request de ${msg.executorId ?? "?"} (${msg.league ?? "?"}) -> `
+    + (plan ? `${plan.orders.length} ordens, ${act} ativas${(plan as { explored?: boolean }).explored ? " (explorado)" : ""}` : "sem plano"));
   safeSend(ws, { type: "decision_response", id: msg.id, plan });
 }
 
