@@ -34,6 +34,7 @@ import {
   Activity,
   Newspaper,
   Database,
+  BrainCircuit,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -122,6 +123,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "Exchange", href: "/farm/fills", icon: Repeat },
           { title: "CX Bot", href: "/farm/cx", icon: Activity },
           { title: "CX Stats", href: "/farm/cx/stats", icon: BarChart3 },
+          { title: "CX Brain", href: "/cx/brain", icon: BrainCircuit },
           { title: "Precos", href: "/farm/prices", icon: TrendingUp },
           { title: "Simulacoes", href: "/farm/simulations", icon: Calculator },
           { title: "Faturamento Anual", href: "/farm/simulations/annual", icon: Calculator },

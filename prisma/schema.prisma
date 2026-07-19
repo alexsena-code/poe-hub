@@ -770,3 +770,121 @@ model CxSchedule {
   @@index([enabled])
   @@map("cx_schedule")
 }
+
+// ============================================================
+// CX Event Sync — tabelas espelhadas do SQLite do plugin.
+// Populadas pelo executor via WS (sync_events). INSERT idempotente
+// (ON CONFLICT DO NOTHING) — rows nunca são atualizadas.
+// ============================================================
+
+// Contabilidade event-sourced: cada collect gera um evento imutável.
+model CxLedgerEvent {
+  txId   String @id @map("tx_id") // gerado pelo plugin (8-char hex)
+  ts     String // ISO 8601 do plugin
+  league String
+  item   String
+  base   String
+  kind   String // buy_fill | sell_proceeds
+  qty    Float
+  ratio  Float
+
+  syncedAt DateTime @default(now()) @map("synced_at")
+
+  @@index([league, item, kind])
+  @@map("cx_ledger_event")
+}
+
+// Profundidade do book capturada por scan_book.
+model CxBookDepth {
+  ts     String
+  league String
+  item   String
+  base   String
+  side   String // wanted | offered
+  rung   Int
+  give   Int
+  get    Int    @map("get")
+  listed Int
+
+  syncedAt DateTime @default(now()) @map("synced_at")
+
+  @@id([ts, item, base, side, rung])
+  @@index([league, item, base, side])
+  @@map("cx_book_depth")
+}
+
+// Detecção de fills pelo FillWatcher (analytics de timing/velocidade).
+model CxFillEvent {
+  id        String @id // 8-char hex gerado pelo plugin
+  ts        String
+  kind      String // fill | posted
+  orderKey  String @map("order_key")
+  league    String
+  item      String
+  base      String
+  side      String // buy | sell
+  ratio     Float
+  qty       Float
+  origStack Int    @map("orig_stack")
+
+  syncedAt DateTime @default(now()) @map("synced_at")
+
+  @@index([league, ts])
+  @@map("cx_fill_event")
+}
+
+model CxPosition {
+  id               String    @id @default(cuid())
+  pairKey          String    @map("pair_key")
+  league           String
+  strategy         String
+  side             String
+  ratioPosted      Float     @map("ratio_posted")
+  qty              Int
+  expectedOrderKey String    @map("expected_order_key")
+  status           String    @default("posted")
+  jobId            String?   @map("job_id")
+  fillEventId      String?   @map("fill_event_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  filledAt         DateTime? @map("filled_at")
+  closedAt         DateTime? @map("closed_at")
+  timeoutAt        DateTime? @map("timeout_at")
+
+  @@index([league, status])
+  @@index([expectedOrderKey])
+  @@index([pairKey, league])
+  @@map("cx_position")
+}
+
+model CxPairState {
+  id                  String    @id @default(cuid())
+  pairKey             String    @map("pair_key")
+  league              String
+  strategy            String
+  aggression          Float     @default(0.3)
+  consecutiveTimeouts Int       @default(0) @map("consecutive_timeouts")
+  consecutiveFills    Int       @default(0) @map("consecutive_fills")
+  avgFillTimeS        Float?    @map("avg_fill_time_s")
+  lastAdjustedAt      DateTime? @map("last_adjusted_at")
+  cooldownUntil       DateTime? @map("cooldown_until")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@unique([pairKey, league, strategy])
+  @@map("cx_pair_state")
+}
+
+model CxBrainLog {
+  id         String   @id @default(cuid())
+  ts         DateTime @default(now())
+  action     String
+  pairKey    String?  @map("pair_key")
+  detail     Json?
+  positionId String?  @map("position_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([ts])
+  @@index([action])
+  @@map("cx_brain_log")
+}

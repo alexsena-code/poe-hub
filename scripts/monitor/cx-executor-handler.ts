@@ -60,6 +60,15 @@ interface ExecutorLogEntry {
   meta?: unknown;
 }
 
+// Sync event-sourced: executor empurra eventos do SQLite local pro Postgres.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- aceita snake_case e camelCase do Python
+type SyncRow = Record<string, any>;
+interface SyncEventsData {
+  ledger?: SyncRow[];
+  book?: SyncRow[];
+  fills?: SyncRow[];
+}
+
 /** Decisão de trading reportada pelo executor (regra/LLM/manual). */
 interface DecisionData {
   ts?: string;
@@ -83,6 +92,7 @@ type ExecutorMessage =
   | ({ type: "decision"; executorId: string } & DecisionData)
   | { type: "validate_request"; executorId?: string; id: string; league?: string; items?: string[] }
   | { type: "book_report"; executorId?: string; lines?: unknown[] }
+  | { type: "sync_events"; executorId: string; data?: SyncEventsData } & Partial<SyncEventsData>
   | { type: "disconnect"; executorId: string };
 
 /** Tipos conhecidos — limita a cardinalidade do label {type} no prom. */
@@ -97,6 +107,7 @@ const KNOWN_MESSAGE_TYPES = new Set([
   "decision",
   "validate_request",
   "book_report",
+  "sync_events",
   "disconnect",
 ]);
 
@@ -203,6 +214,10 @@ export function handleExecutorConnection(ws: WebSocket): void {
         case "book_report":
           await handleBookReport(msg);
           await touch(msg.executorId ?? "");
+          break;
+        case "sync_events":
+          await handleSyncEvents(ws, msg);
+          await touch(msg.executorId);
           break;
         case "disconnect":
           await markOffline(msg.executorId);
@@ -635,6 +650,101 @@ async function handleBookReport(msg: Extract<ExecutorMessage, { type: "book_repo
   } catch (err) {
     console.error("[CX-Exec] book_report append falhou:", err);
   }
+}
+
+// ============================================================
+// Sync events (ledger + book + fills do SQLite → Postgres)
+// ============================================================
+
+const SYNC_BATCH_CAP = 500;
+
+async function handleSyncEvents(
+  ws: WebSocket,
+  msg: Extract<ExecutorMessage, { type: "sync_events" }>,
+): Promise<void> {
+  const d = msg.data ?? msg;
+  const ledger = Array.isArray(d.ledger) ? d.ledger.slice(0, SYNC_BATCH_CAP) : [];
+  const book = Array.isArray(d.book) ? d.book.slice(0, SYNC_BATCH_CAP) : [];
+  const fills = Array.isArray(d.fills) ? d.fills.slice(0, SYNC_BATCH_CAP) : [];
+
+  if (ledger.length === 0 && book.length === 0 && fills.length === 0) {
+    safeSend(ws, { type: "sync_ack", ledger: 0, book: 0, fills: 0 });
+    return;
+  }
+
+  let ledgerCount = 0;
+  let bookCount = 0;
+  let fillCount = 0;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (ledger.length > 0) {
+        const r = await tx.cxLedgerEvent.createMany({
+          data: ledger.map((e) => ({
+            txId: e.txId ?? e.tx_id,
+            ts: e.ts,
+            league: e.league,
+            item: e.item,
+            base: e.base,
+            kind: e.kind,
+            qty: e.qty,
+            ratio: e.ratio,
+          })),
+          skipDuplicates: true,
+        });
+        ledgerCount = r.count;
+      }
+
+      if (book.length > 0) {
+        const r = await tx.cxBookDepth.createMany({
+          data: book.map((e) => ({
+            ts: e.ts,
+            league: e.league,
+            item: e.item,
+            base: e.base,
+            side: e.side,
+            rung: e.rung,
+            give: e.give,
+            get: e.get,
+            listed: e.listed,
+          })),
+          skipDuplicates: true,
+        });
+        bookCount = r.count;
+      }
+
+      if (fills.length > 0) {
+        const r = await tx.cxFillEvent.createMany({
+          data: fills.map((e) => ({
+            id: e.id,
+            ts: e.ts,
+            kind: e.kind,
+            orderKey: e.orderKey ?? e.order_key,
+            league: e.league,
+            item: e.item,
+            base: e.base,
+            side: e.side,
+            ratio: e.ratio,
+            qty: e.qty,
+            origStack: e.origStack ?? e.orig_stack,
+          })),
+          skipDuplicates: true,
+        });
+        fillCount = r.count;
+      }
+    });
+
+    const total = ledgerCount + bookCount + fillCount;
+    if (total > 0) {
+      console.log(
+        `[CX-Exec] sync_events: ledger=+${ledgerCount} book=+${bookCount} fills=+${fillCount}`,
+      );
+    }
+  } catch (err) {
+    console.error("[CX-Exec] sync_events falhou:", err);
+  }
+
+  safeSend(ws, { type: "sync_ack", ledger: ledgerCount, book: bookCount, fills: fillCount });
 }
 
 // ============================================================

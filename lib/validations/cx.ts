@@ -4,12 +4,14 @@ import { z } from "zod/v4";
 export const CX_JOB_TYPES = [
   "run_job",
   "place_order",
+  "place",
   "cancel",
   "collect",
   "pause",
   "resume",
   "param_update",
   "read_state",
+  "scan_book",
 ] as const;
 
 export const CX_JOB_STATUSES = [
