@@ -35,6 +35,7 @@ import {
   Newspaper,
   Database,
   BrainCircuit,
+  Sword,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
             ],
           },
           { title: "Guides", href: "/workspace/guides", icon: BookOpen },
+          { title: "Builds", href: "/workspace/builds", icon: Sword },
           { title: "Ideas", href: "/workspace/ideas", icon: Lightbulb },
           { title: "Templates", href: "/workspace/templates", icon: FileText },
           { title: "Slang", href: "/workspace/slang", icon: BookOpenCheck },

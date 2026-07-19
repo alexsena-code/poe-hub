@@ -144,3 +144,41 @@ export const FETCH_CATEGORIES_QUERY = `
     "slug": slug.current
   }
 `.trim();
+
+// ─── Build Overview queries ──────────────────────────────────────────────────
+
+export const LIST_BUILD_OVERVIEWS_QUERY = `
+  *[_type == "buildOverview" && !(_id in path("drafts.**"))]
+  | order(_updatedAt desc) {
+    _id,
+    _type,
+    _updatedAt,
+    "slug": slug.current,
+    "sectionCount": count(sections)
+  }
+`.trim();
+
+export type BuildOverviewListItem = {
+  _id: string;
+  _type: "buildOverview";
+  _updatedAt: string;
+  slug: string;
+  sectionCount: number;
+};
+
+export const FETCH_BUILD_OVERVIEW_BY_SLUG_QUERY = `
+  *[_type == "buildOverview" && slug.current == $slug && !(_id in path("drafts.**"))][0] {
+    _id,
+    _type,
+    _rev,
+    _createdAt,
+    _updatedAt,
+    slug,
+    sections[] {
+      _key,
+      _type,
+      heading,
+      body
+    }
+  }
+`.trim();

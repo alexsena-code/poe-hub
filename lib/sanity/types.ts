@@ -222,3 +222,22 @@ export interface CategoryRef {
   title?: string;
   slug: string; // flattened slug.current
 }
+
+// ─── Build Overview ──────────────────────────────────────────────────────────
+
+export interface ContentSection {
+  _key: string;
+  _type: "contentSection";
+  heading?: string;
+  body?: PortableTextBlock[];
+}
+
+export interface BuildOverviewSanity {
+  _id: string;
+  _type: "buildOverview";
+  _rev?: string;
+  _createdAt?: string;
+  _updatedAt?: string;
+  slug: { _type: "slug"; current: string };
+  sections: ContentSection[];
+}
