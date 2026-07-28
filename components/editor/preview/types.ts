@@ -21,7 +21,7 @@ export type { PortableTextBlock, PortableTextContent } from "@/lib/sanity/types"
  */
 export interface ResolveContext {
   locale: string;
-  /** Active temp-league name, e.g. "Settlers". Falls back to "Mirage". */
+  /** Active temp-league name, e.g. "Settlers". Falls back to "Standard". */
   league?: string;
   gameVersion?: "path-of-exile-1" | "path-of-exile-2";
 }

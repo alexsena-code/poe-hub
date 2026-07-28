@@ -35,6 +35,7 @@ import { EditorBody } from './editor-body';
 import { RightRail } from './right-rail';
 import { PreviewPane } from './preview/preview-pane';
 import { useEditorPane } from './hooks/use-editor-pane';
+import { useLeagues } from '@/hooks/use-leagues';
 import type { EditorPane } from './hooks/use-editor-pane';
 import { openImageFilePicker } from './extensions/image-upload';
 import { tiptapToPortable } from './serializer/tiptap-to-portable';
@@ -138,6 +139,17 @@ export function EditorShell({
     [active.bodyJson],
   );
 
+  // Liga corrente do mesmo jogo que o post — é dela que o preview deve puxar
+  // preço. `undefined` enquanto carrega deixa o PreviewPane usar o próprio
+  // default, e o SWR refaz a busca quando o valor chega.
+  const { activeLeagues } = useLeagues();
+  const previewLeague = useMemo(
+    () =>
+      activeLeagues.find((l) => l.poeVersion === active.meta.gameVersion)?.name ??
+      activeLeagues[0]?.name,
+    [activeLeagues, active.meta.gameVersion],
+  );
+
   return (
     <EditorProvider value={contextValue}>
       <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden">
@@ -169,6 +181,9 @@ export function EditorShell({
                 metadata={active.meta.metadata}
                 gameVersion={active.meta.gameVersion}
                 locale={active.language}
+                // Sem esta prop o preview caía no default "Mirage" e consultava
+                // preços de uma liga encerrada, silenciosamente.
+                league={previewLeague}
               />
             ) : (
               <>

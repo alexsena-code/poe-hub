@@ -94,7 +94,10 @@ export async function resolveBlocks(
   }
 
   // Phase 2: batch-fetch in parallel
-  const league = ctx.league ?? "Mirage";
+  // Fallback em liga PERMANENTE de propósito. Aqui já esteve "Mirage", que ao
+  // terminar passou a devolver preço vazio sem erro — o preview simplesmente
+  // não mostrava número e ninguém sabia por quê. Standard nunca encerra.
+  const league = ctx.league ?? "Standard";
   const [prices, items, pobItems, passives] = await Promise.all([
     priceNames.size
       ? fetchPrices(Array.from(priceNames), league)

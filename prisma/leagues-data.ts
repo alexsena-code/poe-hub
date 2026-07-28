@@ -1,16 +1,22 @@
 /**
  * Historical league data for PoE 1 and PoE 2
  * Sources: poedb.tw, poe2db.tw, poewiki.net, gamingcy.com
- * Last updated: 2026-03-31
+ * Last updated: 2026-07-28
  *
  * To add a new league: add an entry here and run `npx prisma db seed`
+ *
+ * Ao virar a liga, mexa em DUAS linhas: a nova entra com `isCurrent: true` e a
+ * anterior precisa receber `endDate` e voltar para `false`. O seed propaga o que
+ * estiver aqui, mas `PATCH /api/leagues/:id` não desmarca a anterior sozinho —
+ * deixar as duas como `isCurrent` faz o painel escolher uma arbitrariamente.
  */
 
 export const LEAGUES = [
   // =============================================
   // Path of Exile 1 — Challenge Leagues
   // =============================================
-  { name: "Mirage", version: "3.28", poeVersion: "poe1" as const, startDate: "2026-03-06", endDate: null, isCurrent: true },
+  { name: "Allflame", version: "3.29", poeVersion: "poe1" as const, startDate: "2026-07-24", endDate: null, isCurrent: true },
+  { name: "Mirage", version: "3.28", poeVersion: "poe1" as const, startDate: "2026-03-06", endDate: "2026-07-21", isCurrent: false },
   { name: "Keepers of the Flame", version: "3.27", poeVersion: "poe1" as const, startDate: "2025-10-31", endDate: "2026-03-02", isCurrent: false },
   { name: "Mercenaries", version: "3.26", poeVersion: "poe1" as const, startDate: "2025-06-13", endDate: "2025-10-27", isCurrent: false },
   { name: "Settlers of Kalguur", version: "3.25", poeVersion: "poe1" as const, startDate: "2024-07-26", endDate: "2025-06-09", isCurrent: false },

@@ -36,7 +36,7 @@ export interface PreviewPaneProps {
   gameVersion: "path-of-exile-1" | "path-of-exile-2";
   /** Locale for link resolution inside resolveBlocks. Defaults to 'pt-br'. */
   locale?: string;
-  /** Active league name for price lookups. Defaults to 'Mirage'. */
+  /** Active league name for price lookups. Defaults to 'Standard' (permanent). */
   league?: string;
 }
 
@@ -83,7 +83,7 @@ export function PreviewPane({
   mainImageUrl,
   gameVersion,
   locale = "pt-br",
-  league = "Mirage",
+  league = "Standard", // permanente: um nome de liga temporária aqui envelhece sozinho
 }: PreviewPaneProps) {
   const ctx: ResolveContext = { locale, gameVersion, league };
   const swrKey = makePreviewKey(body, ctx);
