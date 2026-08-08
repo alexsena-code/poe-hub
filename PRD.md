@@ -66,6 +66,14 @@
 
 ### 3.2 — Módulo: Histórico de Preços (Discord Scraping)
 
+> **SUPERADO em ago/2026 (session 24).** Esta seção fica como registro do
+> requisito original; **não descreve o sistema atual**. O scraping do Discord foi
+> removido (tabelas `price_entries` e `discord_sources` dropadas) e substituído
+> pela coleta do marketplace **G2G** — preço da concorrência em USD, não preço de
+> venda própria em BRL. A tabela `daily_prices` foi preservada como arquivo
+> read-only porque as simulações dependem dela. Ver `docs/progress/session-24.md`
+> e `scripts/g2g-price-collector/README.md`.
+
 **Descrição:** Coletar preços de Divine Orbs e outros itens publicados em canais específicos do Discord, armazenar em PostgreSQL, e exibir histórico/gráficos na plataforma.
 
 #### 3.2.1 — Script de Coleta (CLI separado)

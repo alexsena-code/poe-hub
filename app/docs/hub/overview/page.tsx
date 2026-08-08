@@ -23,7 +23,7 @@ export default function HubOverviewPage() {
           ['Auth', 'NextAuth.js (credentials provider, bcrypt)'],
           ['Criptografia', 'AES-256-GCM (senhas de bot, proxy)'],
           ['Charts', 'Recharts'],
-          ['LLM', 'Gemini (price parser)'],
+          ['Coleta de preco', 'G2G search API (publica, sem credencial)'],
           ['Deploy', 'Docker + PM2 + Nginx'],
         ]}
       />
@@ -31,7 +31,7 @@ export default function HubOverviewPage() {
       <H2>Paginas do Dashboard</H2>
       <CardGrid>
         <Card title="Bots" description="CRUD completo, status tracking, proxy config, senhas criptografadas" href="/docs/hub/bots" />
-        <Card title="Precos & Discord" description="Scraping automatico de Discord, historico de precos, graficos" href="/docs/hub/prices" />
+        <Card title="Precos (G2G)" description="Preco da concorrencia no G2G, serie de snapshots, graficos" href="/docs/hub/prices" />
         <Card title="Vendas" description="Registro de transacoes, buyers, totais por periodo" href="/docs/hub/sales" />
         <Card title="Simulacoes" description="Projecoes de receita com override por semana/dia" href="/docs/hub/sales" />
         <Card title="Tasks" description="Kanban board com drag-and-drop, prioridades, modulos" href="/docs/hub/monitor" />

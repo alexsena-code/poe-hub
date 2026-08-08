@@ -33,7 +33,7 @@ export const NAV: NavSection[] = [
     items: [
       { title: 'Visao Geral', slug: 'hub/overview' },
       { title: 'Bots', slug: 'hub/bots' },
-      { title: 'Precos & Discord', slug: 'hub/prices' },
+      { title: 'Precos (G2G)', slug: 'hub/prices' },
       { title: 'Vendas & Simulacoes', slug: 'hub/sales' },
       { title: 'Monitoramento', slug: 'hub/monitor' },
     ],

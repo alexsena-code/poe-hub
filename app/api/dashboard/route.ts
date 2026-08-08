@@ -30,9 +30,8 @@ export async function GET() {
     openTasks,
     tasksByStatus,
     recentSales,
-    latestDivinePrice,
-    divinePrice7dAgo,
-    priceHistory30d,
+    latestG2gPrice,
+    g2gPrice7dAgo,
   ] = await Promise.all([
     // Active bots count
     prisma.bot.count({ where: { status: "active" } }),
@@ -65,55 +64,38 @@ export async function GET() {
       },
     }),
 
-    // Latest divine price for current leagues
-    prisma.dailyPrice.findFirst({
+    // Preço mais recente do Divine na concorrência (G2G), nas ligas correntes
+    prisma.g2gPriceSnapshot.findFirst({
       where: {
-        item: "divine",
+        item: "Divine Orb",
         ...(currentLeagueNames.length > 0
           ? { league: { in: currentLeagueNames } }
           : {}),
       },
-      orderBy: { date: "desc" },
+      orderBy: { collectedAt: "desc" },
     }),
 
-    // Divine price ~7 days ago
-    prisma.dailyPrice.findFirst({
+    // Última coleta anterior à janela de 7 dias, para a variação
+    prisma.g2gPriceSnapshot.findFirst({
       where: {
-        item: "divine",
-        date: { lte: sevenDaysAgo },
+        item: "Divine Orb",
+        collectedAt: { lte: sevenDaysAgo },
         ...(currentLeagueNames.length > 0
           ? { league: { in: currentLeagueNames } }
           : {}),
       },
-      orderBy: { date: "desc" },
-    }),
-
-    // Price history last 7 days for divine (per league, not mixed)
-    prisma.dailyPrice.findMany({
-      where: {
-        item: "divine",
-        date: { gte: sevenDaysAgo },
-        ...(currentLeagueNames.length > 0
-          ? { league: { in: currentLeagueNames } }
-          : {}),
-      },
-      orderBy: { date: "asc" },
-      select: {
-        date: true,
-        median: true,
-        cnlPrice: true,
-        league: true,
-      },
+      orderBy: { collectedAt: "desc" },
     }),
   ]);
 
-  // Calculate 7d change percentage
-  let divineChange7d: number | null = null;
-  if (latestDivinePrice && divinePrice7dAgo) {
-    const current = Number(latestDivinePrice.median);
-    const previous = Number(divinePrice7dAgo.median);
+  // Fica null nas primeiras semanas: a G2G não expõe histórico, então a série
+  // só existe a partir da primeira coleta nossa.
+  let g2gChange7d: number | null = null;
+  if (latestG2gPrice && g2gPrice7dAgo) {
+    const current = Number(latestG2gPrice.median);
+    const previous = Number(g2gPrice7dAgo.median);
     if (previous > 0) {
-      divineChange7d = ((current - previous) / previous) * 100;
+      g2gChange7d = ((current - previous) / previous) * 100;
     }
   }
 
@@ -138,17 +120,16 @@ export async function GET() {
     },
     openTasks,
     taskCounts,
-    currentDivinePrice: latestDivinePrice
+    g2gDivinePrice: latestG2gPrice
       ? {
-          median: Number(latestDivinePrice.median),
-          cnlPrice: latestDivinePrice.cnlPrice
-            ? Number(latestDivinePrice.cnlPrice)
-            : null,
-          date: latestDivinePrice.date,
-          league: latestDivinePrice.league,
+          median: Number(latestG2gPrice.median),
+          p25: Number(latestG2gPrice.p25),
+          offerCount: latestG2gPrice.offerCount,
+          collectedAt: latestG2gPrice.collectedAt,
+          league: latestG2gPrice.league,
         }
       : null,
-    divineChange7d,
+    g2gChange7d,
     recentSales: recentSales.map((s) => ({
       id: s.id,
       date: s.date,

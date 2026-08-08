@@ -9,18 +9,19 @@ interface DashboardData {
   totalBots: number;
   sales30d: { count: number; totalUsd: number; totalBrl: number };
   openTasks: number;
-  currentDivinePrice: {
+  g2gDivinePrice: {
     median: number;
-    cnlPrice: number | null;
-    date: string;
+    p25: number;
+    offerCount: number;
+    collectedAt: string;
     league: string;
   } | null;
-  divineChange7d: number | null;
+  g2gChange7d: number | null;
 }
 
 export function KpiCards({ data }: { data: DashboardData }) {
-  const divinePrice = data.currentDivinePrice;
-  const change7d = data.divineChange7d;
+  const g2gPrice = data.g2gDivinePrice;
+  const change7d = data.g2gChange7d;
 
   return (
     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -66,21 +67,16 @@ export function KpiCards({ data }: { data: DashboardData }) {
         </CardContent>
       </Card>
 
-      {/* Divine Atual */}
+      {/* Divine na concorrencia (G2G) — preco de revenda em USD, nao o nosso */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Divine Atual</CardTitle>
+          <CardTitle className="text-sm font-medium">Divine na G2G</CardTitle>
           <Gem className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold">
-              {divinePrice
-                ? `R$ ${divinePrice.median.toLocaleString("pt-BR", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`
-                : "--"}
+              {g2gPrice ? `US$ ${g2gPrice.median.toFixed(4)}` : "--"}
             </span>
             {change7d !== null && (
               <Badge
@@ -97,12 +93,9 @@ export function KpiCards({ data }: { data: DashboardData }) {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {divinePrice?.cnlPrice
-              ? `CNL: R$ ${divinePrice.cnlPrice.toLocaleString("pt-BR", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : "Sem dados de preco"}
+            {g2gPrice
+              ? `mediana de ${g2gPrice.offerCount} ofertas — piso US$ ${g2gPrice.p25.toFixed(4)}`
+              : "Sem coleta ainda"}
           </p>
         </CardContent>
       </Card>

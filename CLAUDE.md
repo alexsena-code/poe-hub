@@ -5,8 +5,8 @@
 Operational control panel for the Path of Trade solo operator. Consumes
 the `path-of-trade-content` engine's HTTP API (content generation, SEO
 research, ideation) and runs its own PoE-adjacent data pipelines
-(Discord price scraping, hardware deals monitoring, bot management,
-sales tracking, simulation planning).
+(G2G competitor price collection, hardware deals monitoring, bot
+management, sales tracking, simulation planning).
 
 **What it does.** Replaces a multi-tab spreadsheet operation with a
 single authenticated web app. Modules in production today:
@@ -14,7 +14,7 @@ single authenticated web app. Modules in production today:
 - `/dashboard` — KPIs (live prices, active bots, MTD revenue)
 - `/bots` — bot instance management (config, proxies, schedules)
 - `/sales` — revenue tracking per bot + per buyer
-- `/prices` — divine/chaos/USD/BRL price history from Discord scraping
+- `/farm/prices` — Divine Orb price on G2G (competitor intel, USD)
 - `/simulations` — scenario modeling (optimistic/expected/pessimistic)
 - `/tasks` — kanban board
 - `/settings/*` — proxy, leagues, users, global costs
@@ -169,7 +169,10 @@ rather than silently rewriting unrelated areas.
 - **Tests**: Vitest + React Testing Library (unit/component/integration)
   + Playwright (E2E)
 - **Container**: Docker Compose — `docker-compose.yml`
-- **Scraper**: standalone CLI — `scripts/discord-price-scraper/`
+- **Price collector**: standalone CLI — `scripts/g2g-price-collector/`.
+  In production it runs as a **Coolify Scheduled Task** hitting
+  `POST /api/prices/g2g` with `CRON_SECRET` — not a container of its own.
+  G2G's own API is public and needs no credentials.
 
 ## Key commands
 
@@ -192,8 +195,8 @@ npx playwright test                 # E2E
 docker compose up -d                # full stack (app + db)
 docker compose up -d db             # DB only (for local dev)
 
-# Scraper (manual)
-npx tsx scripts/discord-price-scraper/index.ts
+# Coletor de preço da concorrência (manual)
+npx tsx scripts/g2g-price-collector/index.ts --dry-run
 
 # Custom agents (Claude Code)
 # /agents                           list available
@@ -287,9 +290,6 @@ ENCRYPTION_KEY=<openssl rand -hex 32>
 ENGINE_API_URL=http://localhost:3001
 ENGINE_API_KEY=                     # matches engine's API_KEY env
 
-# Discord scraper
-DISCORD_TOKEN=
-
 # Admin seed
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=
@@ -339,8 +339,6 @@ agent). Invoke via `/agents` in Claude Code. Preserved agents:
 - **db-architect** — Prisma schema evolution, migrations, indexes.
 - **frontend-dev** — Next.js pages/components, shadcn/ui, forms.
 - **api-dev** — Route Handlers, zod validation, auth enforcement.
-- **scraper-dev** — Discord price scraper (legacy but occasionally
-  updated when Discord exporter format changes).
 - **qa-reviewer** — read-only code audit before merging.
 - **test-engineer** — Vitest + RTL test authoring after each feature.
 

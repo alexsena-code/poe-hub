@@ -31,29 +31,15 @@ services:
       db:
         condition: service_healthy
 
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile.scraper
-      # Override the cron schedule at build time:
-      #   docker compose build --build-arg CRON_SCHEDULE="0 * * * *" scraper
-      args:
-        CRON_SCHEDULE: "*/30 * * * *"
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://poth:poth@db:5432/poth
-      NODE_ENV: production
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
-    # Mount a host volume to persist DiscordChatExporter exports between runs.
-    # The DCE_PATH must point to the binary inside the container — mount it below
-    # or set DCE_PATH in .env to a path that exists inside the container.
-    volumes:
-      - scraper_exports:/app/exports
+# A coleta de preço do G2G NÃO tem serviço aqui de propósito.
+#
+# Em produção o hub roda no Coolify, e o agendamento é uma Scheduled Task da
+# própria aplicação chamando `POST /api/prices/g2g` (auth por CRON_SECRET) —
+# ver scripts/g2g-price-collector/README.md. Um container só para isso seria
+# ~500 MB parados para fazer duas chamadas HTTP a cada 30 min.
+#
+# Em dev, rode sob demanda:
+#   npx tsx scripts/g2g-price-collector/index.ts --dry-run
 
 volumes:
   pgdata:
-  scraper_exports:

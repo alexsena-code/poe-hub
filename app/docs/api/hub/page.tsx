@@ -31,19 +31,10 @@ export default function HubApiPage() {
       </EndpointGroup>
 
       <EndpointGroup title="Precos">
-        <Endpoint method="GET" path="/api/prices" description="Lista paginada" />
-        <Endpoint method="POST" path="/api/prices" description="Adicionar preco" />
-        <Endpoint method="GET" path="/api/prices/daily" description="Agregacao diaria" />
-        <Endpoint method="GET" path="/api/prices/daily/cross-league" description="Precos por league" />
-        <Endpoint method="GET" path="/api/prices/stats" description="Estatisticas" />
-        <Endpoint method="POST" path="/api/prices/scrape" description="Trigger Discord scraper" />
-      </EndpointGroup>
-
-      <EndpointGroup title="Discord Sources">
-        <Endpoint method="GET" path="/api/discord-sources" description="Lista canais configurados" />
-        <Endpoint method="POST" path="/api/discord-sources" description="Adicionar source" />
-        <Endpoint method="PUT" path="/api/discord-sources/[id]" description="Atualizar source" />
-        <Endpoint method="DELETE" path="/api/discord-sources/[id]" description="Deletar source" />
+        <Endpoint method="GET" path="/api/prices/g2g" description="Serie de snapshots da concorrencia (G2G)" />
+        <Endpoint method="POST" path="/api/prices/g2g" description="Dispara uma coleta agora" />
+        <Endpoint method="GET" path="/api/prices/daily" description="Arquivo: agregacao diaria (congelada em ago/2026)" />
+        <Endpoint method="GET" path="/api/prices/daily/cross-league" description="Arquivo: precos por league" />
       </EndpointGroup>
 
       <EndpointGroup title="Simulacoes">

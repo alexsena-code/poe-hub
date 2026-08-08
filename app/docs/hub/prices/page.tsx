@@ -1,73 +1,116 @@
-import { PageTitle, H2, P, Table, Diagram, Callout, CodeBlock } from '../../components';
+import { PageTitle, H2, H3, P, Table, Diagram, CodeBlock, Callout } from '../../components';
 
-export default function PricesPage() {
+export default function HubPricesPage() {
   return (
     <>
-      <PageTitle description="Scraping automatico de precos via Discord + parser AI (Gemini). Historico, graficos, e agregacao diaria.">
-        Precos & Discord
+      <PageTitle description="Coleta do preco do Divine Orb no marketplace G2G — inteligencia de preco da concorrencia, em USD.">
+        poe-hub — Precos (G2G)
       </PageTitle>
 
-      <Diagram title="Fluxo de scraping">{`
-  Discord Channels (/prices/sources)
-      |
-      v
-  DiscordChatExporter (CLI) -> export JSON
-      |
-      v
-  Parser Script (regex + Gemini)
-      |
-      v
-  PriceEntry (PostgreSQL, discord_message_id unico)
-      |
-      +---> Dashboard /prices (graficos + agregacao)
-      +---> Simulacoes (import por periodo)
-      `}</Diagram>
+      <Callout type="warning" title="A G2G nao guarda historico de preco">
+        Verificado em 08/08/2026: os endpoints de history/trend/chart devolvem 404,
+        e os 403 sao o API Gateway da AWS respondendo rota inexistente (um path
+        inventado da o mesmo 403). A pagina publica tambem nao tem grafico.
+        Consequencia pratica: cada coleta perdida e um buraco permanente na serie —
+        o historico so existe porque o cron roda.
+      </Callout>
 
-      <H2>Discord Sources</H2>
-      <P>Canais de Discord configurados para scraping de precos. Cada source define servidor, canal, e autores de referencia.</P>
+      <H2>Fluxo</H2>
+      <Diagram title="Pipeline de coleta">{`
+  cron (*/30) ou POST /api/prices/g2g
+        |
+        v
+  lib/g2g-client.ts      GET sls.g2g.com/offer/search (2 paginas)
+        |                filtra por plataforma / liga / item pelo title
+        v
+  lib/g2g-stats.ts       filtro MAD (k=4) + mediana, quartis, min, max
+        |
+        v
+  lib/g2g-collector.ts   grava G2gPriceSnapshot
+`}</Diagram>
+
+      <H2>Modelo</H2>
       <Table
-        headers={['Campo', 'Descricao']}
+        headers={['Campo', 'Proposito']}
         rows={[
-          ['server_id', 'ID do servidor Discord'],
-          ['channel_id', 'ID do canal especifico'],
-          ['cnl_author_ids', 'IDs de autores confiáveis (CNL)'],
-          ['label', 'Nome amigável para o dashboard'],
+          ['collectedAt', 'Quando a coleta rodou — a serie e indexada por isso'],
+          ['item / league / g2gLeague', 'Divine Orb / Allflame / "Allflame Standard"'],
+          ['median', 'Preco tipico apos o filtro de outlier — o numero principal'],
+          ['p25 / p75', 'Faixa competitiva; p25 e o piso honesto, sem a isca'],
+          ['min / max', 'Extremos do que sobrou apos o filtro'],
+          ['offerCount / rawOfferCount', 'A razao entre os dois indica coleta suja'],
+          ['cheapestSample', 'As 10 mais baratas, para auditar mediana suspeita'],
         ]}
       />
 
-      <H2>Modelo PriceEntry</H2>
-      <Table
-        headers={['Campo', 'Tipo', 'Descricao']}
-        rows={[
-          ['id', 'UUID', 'PK'],
-          ['discord_message_id', 'String (unique)', 'Previne duplicatas'],
-          ['price', 'Decimal(18,8)', 'Valor do preco'],
-          ['currency', 'Enum', 'divine | chaos | usd | brl | other'],
-          ['is_cnl', 'Boolean', 'Se autor e de referencia'],
-          ['raw_message', 'String', 'Mensagem original do Discord'],
-          ['timestamp', 'DateTime', 'Quando a mensagem foi postada'],
-          ['source_id', 'UUID', 'FK para DiscordSource'],
-        ]}
-      />
-
-      <H2>Agregacao</H2>
-      <Table
-        headers={['Endpoint', 'Descricao']}
-        rows={[
-          ['GET /api/prices/daily', 'Precos agregados por dia (min, max, avg, count)'],
-          ['GET /api/prices/daily/cross-league', 'Precos por league'],
-          ['GET /api/prices/stats', 'Estatisticas gerais'],
-        ]}
-      />
-
-      <H2>Price Parser (Gemini)</H2>
+      <H2>A API do G2G</H2>
       <P>
-        Mensagens do Discord sao parseadas em 2 etapas: primeiro regex para formatos conhecidos,
-        depois Gemini para mensagens ambiguas. Output: preco, moeda, quantidade, se e CNL.
+        Publica e sem autenticacao. Nada disso e documentado — foi descoberto por
+        tentativa.
+      </P>
+      <CodeBlock title="GET">{`https://sls.g2g.com/offer/search
+  ?seo_term=poe-currency
+  &country=US          # obrigatorio — sem ele: 4001 Missing mandatory parameter
+  &currency=USD
+  &group=0             # abre os grupos; no default cada linha e so a mais barata
+  &q=Divine%20Orb      # sem isso o Divine e inalcancavel por sort=lowest_price
+  &page_size=100&sort=lowest_price&page=1`}</CodeBlock>
+
+      <Callout type="info" title="Liga e item so existem no title">
+        <code>offer_attributes</code> usa IDs opacos (<code>lgc_19398_tier_47227</code>).
+        A unica fonte legivel e o <code>title</code>, no formato
+        <code> [PC] Allflame Standard &gt; Divine Orb</code>. O sufixo e
+        <strong> dificuldade</strong>: "Allflame Standard" e a liga temporaria
+        softcore, nao a Standard permanente. Uma consulta devolve PC, PS4 e Xbox e
+        todas as ligas misturadas — o filtro e feito no cliente.
+      </Callout>
+
+      <H2>Por que MAD e nao IQR</H2>
+      <P>
+        A distribuicao do G2G e muito assimetrica a direita. Numa amostra real de
+        80 ofertas de Divine (08/08/2026) havia listagens de US$ 1, US$ 2,20,
+        US$ 10,05, US$ 22 e US$ 999,99 contra uma mediana de US$ 0,06 — a media
+        bruta da US$ 13. A cerca classica q3 + 1.5*IQR caiu em US$ 0,394, quase 7x
+        a mediana, e ainda deixava lixo passar. O MAD com k=4 corta em US$ 0,165 e
+        mantem 58 das 80. A mediana ficou estavel entre k=3 e k=6, o que indica que
+        a estimativa nao depende da escolha do parametro.
       </P>
 
-      <Callout type="info" title="Trigger manual">
-        POST /api/prices/scrape dispara o scraping manualmente. Requer DISCORD_TOKEN e DCE_PATH configurados.
+      <H3>Cuidado com o piso</H3>
+      <P>
+        As ofertas mais baratas costumam ter min_qty igual ao available_qty: so
+        vendem o lote inteiro. Por isso o snapshot guarda p25 alem do min.
+      </P>
+
+      <H2>Operacao</H2>
+      <CodeBlock title="CLI">{`npx tsx scripts/g2g-price-collector/index.ts --dry-run
+npx tsx scripts/g2g-price-collector/index.ts --league Allflame
+npx tsx scripts/g2g-price-collector/index.ts --item "Chaos Orb"`}</CodeBlock>
+      <P>
+        Em producao o agendamento e uma <strong>Scheduled Task do Coolify</strong>
+        (g2g-price-collect, */30 * * * *, timeout 120s) rodando dentro do container
+        do app. Como ela nao tem cookie de sessao, chama a rota com
+        Authorization: Bearer CRON_SECRET. Nao ha container proprio pro coletor.
+      </P>
+      <Callout type="warning" title="Env var nova exige redeploy">
+        O CRON_SECRET e variavel de ambiente da aplicacao no Coolify. Ele so entra
+        no container num redeploy — sem ele no ambiente, o caminho do cron fica
+        desligado (secret vazio nunca autentica) e a task devolve 401.
+      </Callout>
+
+      <H2>Arquivo: o historico do Discord</H2>
+      <P>
+        Ate ago/2026 o preco vinha de scraping de canais do Discord. Esse pipeline
+        foi removido (tabelas price_entries e discord_sources dropadas). A tabela
+        daily_prices foi PRESERVADA como arquivo read-only: as simulacoes
+        (import-prices, create-projected e o overlay do comparador de cenarios) se
+        apoiam nos ~926 dias de historico de ligas passadas. Ela nao recebe dados
+        novos.
+      </P>
+      <Callout type="danger" title="Nao misture as duas series">
+        daily_prices e preco de venda propria em BRL; g2g_price_snapshots e preco
+        de concorrencia em USD. Sao grandezas diferentes — cruzar as duas eras num
+        mesmo grafico produz leitura errada.
       </Callout>
     </>
   );

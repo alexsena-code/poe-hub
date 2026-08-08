@@ -25,9 +25,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files
-.env
-.env*.local
+# O glob amplo vem primeiro e as exceções depois: `.env` sozinho não cobria
+# cópias como `.env.bak-*`, que carregam os mesmos segredos em claro.
+.env*
 !.env.example
+!.env.production.example
 !.env.test
 
 # vercel

@@ -116,10 +116,12 @@ YOUTUBE_API_KEY=AIza...`}</CodeBlock>
 NEXTAUTH_SECRET=<random-base64>
 NEXTAUTH_URL=https://pathoftrade.net
 ENCRYPTION_KEY=<random-hex-32>
-OPENROUTER_API_KEY=sk-or-...
-DISCORD_TOKEN=<bot-token>
-DCE_PATH=/path/to/DiscordChatExporter
 NEXT_PUBLIC_CONTENT_API_URL=https://api.pathoftrade.net/api`}</CodeBlock>
+
+      <Callout type="info" title="Coletor de preco nao precisa de credencial">
+        A API de busca do G2G e publica e sem autenticacao. O servico
+        g2g-collector so precisa de DATABASE_URL.
+      </Callout>
 
       <Callout type="danger" title="Nunca commitar .env">
         Todas as API keys e senhas ficam em .env local e no servidor. Nunca no repositorio.

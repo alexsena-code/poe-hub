@@ -18,14 +18,6 @@ enum BotStatus {
   maintenance
 }
 
-enum Currency {
-  divine
-  chaos
-  usd
-  brl
-  other
-}
-
 enum SaleUnit {
   divine
   mirror
@@ -162,30 +154,14 @@ model ProxyConfig {
   @@map("proxy_config")
 }
 
-model PriceEntry {
-  id               String   @id @default(uuid())
-  discordMessageId String   @unique @map("discord_message_id")
-  discordChannelId String   @map("discord_channel_id")
-  discordServerId  String   @map("discord_server_id")
-  authorDiscordId  String   @map("author_discord_id")
-  authorName       String   @map("author_name")
-  isCnl            Boolean  @default(false) @map("is_cnl")
-  price            Decimal  @db.Decimal(18, 8)
-  currency         Currency
-  item             String?
-  rawMessage       String   @map("raw_message")
-  messageTimestamp DateTime @map("message_timestamp")
-  league           String?
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  @@index([discordChannelId])
-  @@index([messageTimestamp])
-  @@index([currency])
-  @@index([isCnl])
-  @@index([league])
-  @@map("price_entries")
-}
-
+/// ARQUIVO — série histórica congelada em ago/2026.
+///
+/// Era alimentada pelo scraper do Discord, removido nessa data. Nada escreve
+/// mais aqui; a tabela sobrevive porque as simulações (`import-prices`,
+/// `create-projected` e o overlay do comparador de cenários) se apoiam nos
+/// ~926 dias de histórico de ligas passadas. Preço novo vive em
+/// `G2gPriceSnapshot`, que mede outra coisa: concorrência em USD, não venda
+/// própria em BRL. Não misture as duas séries num mesmo gráfico.
 model DailyPrice {
   id          String   @id @default(uuid())
   date        DateTime @db.Date
@@ -210,19 +186,38 @@ model DailyPrice {
   @@map("daily_prices")
 }
 
-model DiscordSource {
-  id           String   @id @default(uuid())
-  serverId     String   @map("server_id")
-  serverName   String   @map("server_name")
-  channelId    String   @map("channel_id")
-  channelName  String   @map("channel_name")
-  isActive     Boolean  @default(true) @map("is_active")
-  cnlAuthorIds String[] @map("cnl_author_ids")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+/// Preço da concorrência no G2G, em USD, por coleta.
+///
+/// Série temporal imutável: cada linha é uma leitura do marketplace, não um
+/// agregado do dia. `median` é calculada sobre as ofertas que sobreviveram ao
+/// filtro MAD (ver lib/g2g-stats.ts) — `rawOfferCount` guarda quantas vieram
+/// antes do filtro, porque a razão entre os dois é o sinal de que a coleta veio
+/// suja e a mediana merece desconfiança.
+model G2gPriceSnapshot {
+  id            String   @id @default(uuid())
+  collectedAt   DateTime @default(now()) @map("collected_at")
+  item          String   @default("Divine Orb")
+  league        String
+  /// Rótulo como o G2G escreve, ex. "Allflame Standard" — o sufixo é dificuldade.
+  g2gLeague     String   @map("g2g_league")
+  platform      String   @default("PC")
+  currency      String   @default("usd")
+  median        Decimal  @db.Decimal(18, 8)
+  mean          Decimal  @db.Decimal(18, 8)
+  min           Decimal  @db.Decimal(18, 8)
+  max           Decimal  @db.Decimal(18, 8)
+  p25           Decimal  @db.Decimal(18, 8)
+  p75           Decimal  @db.Decimal(18, 8)
+  offerCount    Int      @map("offer_count")
+  rawOfferCount Int      @map("raw_offer_count")
+  /// Amostra das ofertas mais baratas, para auditar uma mediana suspeita.
+  cheapestSample Json?   @map("cheapest_sample")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  @@unique([serverId, channelId])
-  @@map("discord_sources")
+  @@index([collectedAt])
+  @@index([item, league, collectedAt])
+  @@map("g2g_price_snapshots")
 }
 
 model Sale {

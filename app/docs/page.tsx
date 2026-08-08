@@ -47,7 +47,7 @@ export default function DocsWelcome() {
       <CardGrid>
         <Card title="Visao Geral" description="Dashboard operacional para gestao de bots, precos, vendas" href={h('hub/overview')} />
         <Card title="Bots" description="CRUD completo, criptografia AES-256-GCM, status tracking" href={h('hub/bots')} />
-        <Card title="Precos & Discord" description="Scraping automatico via DiscordChatExporter + parser AI" href={h('hub/prices')} />
+        <Card title="Precos (G2G)" description="Coleta do preco da concorrencia no G2G, em USD" href={h('hub/prices')} />
         <Card title="Vendas & Simulacoes" description="Registro de vendas e projecoes de receita" href={h('hub/sales')} />
       </CardGrid>
 

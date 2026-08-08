@@ -1,6 +1,5 @@
 import { KpiCards } from "@/components/modules/dashboard/kpi-cards";
 import { RecentSales } from "@/components/modules/dashboard/recent-sales";
-import { PriceCharts } from "@/components/modules/dashboard/price-charts";
 import { TaskSummary } from "@/components/modules/dashboard/task-summary";
 import { PageHeader } from "@/components/ui/page-header";
 import { fetchEngine } from "@/lib/fetch-engine";
@@ -19,13 +18,14 @@ interface DashboardData {
     in_progress: number;
     done: number;
   };
-  currentDivinePrice: {
+  g2gDivinePrice: {
     median: number;
-    cnlPrice: number | null;
-    date: string;
+    p25: number;
+    offerCount: number;
+    collectedAt: string;
     league: string;
   } | null;
-  divineChange7d: number | null;
+  g2gChange7d: number | null;
   recentSales: {
     id: string;
     date: string;
@@ -64,8 +64,6 @@ export default async function DashboardPage() {
       <PageHeader title="Dashboard" />
 
       <KpiCards data={data} />
-
-      <PriceCharts currentLeagues={data.currentLeagues} />
 
       <div className="grid gap-4 grid-cols-1">
         <TaskSummary counts={data.taskCounts} />
