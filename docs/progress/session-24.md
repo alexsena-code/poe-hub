@@ -158,5 +158,8 @@ para os 3 templates. Conferido: os backups agora são ignorados e
 2. **Revogar as chaves removidas** (Discord, OpenRouter, Gemini) nos provedores
    — apagar do `.env` não as invalida. Cópias seguem em `.env.bak-20260728` e
    `.env.pre-g2g-cleanup` (ambos agora ignorados pelo git).
-3. `/opt/poe-hub` na VPS é um deploy morto de 07/jul (com `Dockerfile.scraper` e
-   `node_modules`). Não é usado pelo Coolify — candidato a remoção.
+3. **`/opt/poe-hub` na VPS não pode ser apagado.** Parece deploy abandonado
+   (mtime de 07/jul, `Dockerfile.scraper`, 1,4 GB) e o Coolify não o usa — mas o
+   `poe-hub-ws.service` roda de dentro dele
+   (`ExecStart=/opt/poe-hub/node_modules/.bin/tsx scripts/monitor/ws-server.ts`),
+   ativo desde 28/07 com 0 restarts. Uma limpeza ali derruba o WS server.
