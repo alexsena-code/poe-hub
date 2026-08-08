@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: "Tarefas", urlSegment: "/admin/tasks" },
   { label: "Vendas", urlSegment: "/farm/sales" },
   { label: "Precos", urlSegment: "/farm/prices" },
+  { label: "Profit", urlSegment: "/farm/profit" },
   { label: "Simulacoes", urlSegment: "/farm/simulations" },
   { label: "Configuracoes", urlSegment: "/admin/config" },
 ];
