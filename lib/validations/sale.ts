@@ -2,7 +2,11 @@ import { z } from "zod/v4";
 
 export const createSaleSchema = z.object({
   date: z.string().min(1, "Data é obrigatória"),
-  buyerId: z.string().uuid("Buyer ID inválido"),
+  // Não valide como UUID: o buyer "CNL" é semeado com id fixo ("cnl-buyer",
+  // ver prisma/seed.ts) e existe em produção. A rota já confere a existência
+  // contra o banco antes de gravar, então o formato aqui não agregava — só
+  // rejeitaria uma venda legítima para o CNL.
+  buyerId: z.string().min(1, "Buyer ID é obrigatório"),
   quantity: z.number().positive("Quantidade deve ser positiva"),
   unit: z.enum(["divine", "mirror", "exalted", "other"]).default("divine"),
   divinePriceUsd: z.number().positive().nullable().optional(),

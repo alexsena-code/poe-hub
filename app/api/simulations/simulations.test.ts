@@ -83,6 +83,32 @@ describe("Simulations API", () => {
       expect(body.costLinks[0].costConfig.id).toBe(config.id);
     });
 
+    // Regressão: o cost config semeado tem id fixo legível
+    // ("default-cost-config", ver prisma/seed.ts) e é o que o dialog
+    // pré-seleciona. Enquanto o schema exigia `.uuid()`, criar simulação com a
+    // configuração de custo padrão falhava com "Validation failed".
+    it("should accept a cost config whose id is not a UUID", async () => {
+      const config = await createCostConfig({ id: "default-cost-config" });
+      const input = buildSimulationInput({ costConfigIds: [config.id] });
+
+      const res = await POST(
+        jsonReq("http://localhost:3000/api/simulations", "POST", input)
+      );
+      const body = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(body.costLinks[0].costConfig.id).toBe("default-cost-config");
+    });
+
+    it("should reject an empty cost config ID", async () => {
+      const input = buildSimulationInput({ costConfigIds: [""] });
+
+      const res = await POST(
+        jsonReq("http://localhost:3000/api/simulations", "POST", input)
+      );
+      expect(res.status).toBe(400);
+    });
+
     it("should reject invalid cost config IDs", async () => {
       const input = buildSimulationInput({
         costConfigIds: ["00000000-0000-0000-0000-000000000000"],

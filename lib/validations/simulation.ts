@@ -27,7 +27,12 @@ export const createSimulationSchema = z.object({
   status: z.enum(["draft", "active", "archived"]).optional().default("draft"),
   kind: simulationKindSchema.optional().default("operational"),
   notes: z.string().nullable().optional(),
-  costConfigIds: z.array(z.string().uuid()).optional(),
+  // Não valide como UUID: o cost config semeado tem id fixo legível
+  // ("default-cost-config", ver prisma/seed.ts) e é justamente o que o dialog
+  // pré-seleciona, então `.uuid()` rejeitava a criação no caminho mais comum.
+  // A existência já é conferida contra o banco na rota, que devolve 404 —
+  // checar o formato aqui não acrescentava garantia nenhuma.
+  costConfigIds: z.array(z.string().min(1, "Cost config ID vazio")).optional(),
 });
 
 export const updateSimulationSchema = z.object({
@@ -36,7 +41,8 @@ export const updateSimulationSchema = z.object({
   status: z.enum(["draft", "active", "archived"]).optional(),
   kind: simulationKindSchema.optional(),
   notes: z.string().nullable().optional(),
-  costConfigIds: z.array(z.string().uuid()).optional(),
+  // Mesmo motivo do create: id de cost config não é necessariamente UUID.
+  costConfigIds: z.array(z.string().min(1, "Cost config ID vazio")).optional(),
   // Cost overrides (editable directly on the simulation snapshot)
   proxyCostPerBotMonthly: z.number().min(0).nullable().optional(),
   levelingCostPerBot: z.number().min(0).nullable().optional(),

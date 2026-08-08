@@ -88,6 +88,22 @@ describe("Sales API", () => {
       expect(res.status).toBe(400);
     });
 
+    // Regressão: o buyer "CNL" é semeado com id fixo ("cnl-buyer", ver
+    // prisma/seed.ts). Enquanto buyerId exigia `.uuid()`, registrar uma venda
+    // para ele falhava com "Validation failed".
+    it("should accept a buyer whose id is not a UUID", async () => {
+      const buyer = await prisma.buyer.create({
+        data: { id: "cnl-buyer", name: "CNL", isCnl: true },
+      });
+      const input = buildSaleInput(buyer.id);
+
+      const res = await POST(jsonReq("http://localhost:3000/api/sales", "POST", input));
+      const body = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(body.buyerId).toBe("cnl-buyer");
+    });
+
     it("should reject non-existent buyer", async () => {
       const input = buildSaleInput("00000000-0000-0000-0000-000000000000");
 
