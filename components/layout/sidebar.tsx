@@ -127,6 +127,7 @@ const navSections: { label: string; items: NavEntry[] }[] = [
           { title: "CX Stats", href: "/farm/cx/stats", icon: BarChart3 },
           { title: "CX Brain", href: "/cx/brain", icon: BrainCircuit },
           { title: "Precos", href: "/farm/prices", icon: TrendingUp },
+          { title: "Profit", href: "/farm/profit", icon: Calculator },
           { title: "Simulacoes", href: "/farm/simulations", icon: Calculator },
           { title: "Faturamento Anual", href: "/farm/simulations/annual", icon: Calculator },
         ],

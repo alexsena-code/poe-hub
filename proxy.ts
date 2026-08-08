@@ -20,6 +20,7 @@ export const config = {
     "/farm/bots/:path*",
     "/farm/sales/:path*",
     "/farm/prices/:path*",
+    "/farm/profit/:path*",
     "/farm/simulations/:path*",
     "/admin/tasks/:path*",
     "/admin/config/:path*",

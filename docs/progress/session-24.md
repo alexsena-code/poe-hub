@@ -126,6 +126,50 @@ ficavam **versionáveis com segredos em claro**. Trocado por `.env*` + exceçõe
 para os 3 templates. Conferido: os backups agora são ignorados e
 `.env.example`, `.env.production.example` e `.env.test` seguem trackeados.
 
+## 5. Calculadora rápida de profit (`/farm/profit`)
+
+Responde "quanto está dando por dia" sem montar uma simulação inteira.
+
+| Arquivo | Papel |
+|---|---|
+| `lib/league-price-curve.ts` | Curva de queda por dia-de-liga, derivada de `daily_prices` |
+| `lib/daily-cost.ts` | Decomposição do custo diário (extraído do simulation-calculator) |
+| `lib/profit-forecast.ts` | Projeção dia a dia: receita, custo, lucro, break-even |
+| `app/api/prices/profit-forecast/route.ts` | Junta preço G2G + curva + cost configs |
+| `hooks/use-profit-forecast-data.ts` | Carrega o material uma vez por liga |
+| `components/modules/profit/*` | Inputs, cards e gráfico |
+
+**O cálculo roda no cliente.** A rota entrega os insumos; os controles
+(divines/hora, horas, bots, ajuste de preço) recalculam local, sem round-trip.
+
+**Sem duplicar o custo das simulações.** `decomposeDailyCost`/`dailyCostFor`
+foram extraídos de `simulation-calculator.ts`, que passou a consumi-los — as
+duas telas têm que dar o mesmo número. Os tipos `CostConfigData` e
+`CustomCostEntry` seguem re-exportados de lá porque vários módulos já os
+importavam desse caminho.
+
+### A curva
+
+Normaliza cada liga pelo seu próprio dia 7 antes de agregar por mediana: o
+patamar varia muito entre ligas (R$ 1,10 a R$ 5,50 no dia 7), então uma média
+dos absolutos mediria diferença entre ligas, não o formato da queda. Como a
+projeção usa só a razão entre dois dias, o dia de referência se cancela.
+
+Resultado com dados reais (PoE1: Mercenaries, Keepers, Mirage): dia 7 = 1,00 →
+dia 14 = 0,36 → dia 21 = 0,20 → dia 30 = 0,125 → dia 60 = 0,068.
+
+**Curva forçada a não subir.** Descoberto ao validar contra produção: a curva
+saltava de 0,085 (dia 60) para **0,465** (dia 90) e a projeção previa preço em
+alta. A cauda do histórico do Discord tem pontos sujos — Keepers dá fator 7,5 no
+dia 92 e Mercenaries 1,75 no dia 85, contra ~0,09 nos vizinhos — e com só duas
+ligas cobrindo a cauda a mediana não filtra. Como preço de currency não se
+recupera (o supply só cresce), a curva agregada passa por um mínimo corrente.
+
+Bug de tipagem corrigido no caminho: `toNumber` fazia `Number(val)`, que só
+funciona com Decimal do Prisma por acidente (via `toString`) e devolvia `NaN`
+para qualquer outro objeto que satisfizesse o tipo declarado. Agora chama
+`toNumber()` de verdade.
+
 ## Deploy — o que JÁ foi aplicado em produção
 
 1. **Migrations aplicadas na VPS** (08/08, numa única transação). O

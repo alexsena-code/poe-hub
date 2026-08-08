@@ -1,3 +1,15 @@
+import {
+  decomposeDailyCost,
+  dailyCostFor,
+  type CostConfigData,
+  type CustomCostEntry,
+} from "./daily-cost";
+
+// A decomposição do custo diário mora em `daily-cost.ts` porque a calculadora
+// rápida de profit usa a mesma conta. Os tipos seguem re-exportados daqui:
+// vários módulos já os importavam deste caminho.
+export type { CostConfigData, CustomCostEntry };
+
 // ============================================================
 // Types
 // ============================================================
@@ -26,24 +38,6 @@ export interface RawWeek {
   defaultDivinePriceUsd: number | { toNumber(): number } | null;
   defaultDivinePriceBrl: number | { toNumber(): number } | null;
   buildCostDivines?: number | { toNumber(): number } | null;
-}
-
-export interface CustomCostEntry {
-  id: string;
-  name: string;
-  amount: number;
-  cadence: "daily" | "monthly" | "one_time";
-  perBot: boolean;
-}
-
-/** Cost config data */
-export interface CostConfigData {
-  proxyCostPerBotMonthly: number | { toNumber(): number };
-  levelingCostPerBot: number | { toNumber(): number };
-  stashPackCostPerBot?: number | { toNumber(): number };
-  expluginsKeyCostDaily: number | { toNumber(): number };
-  dpbKeyCostDaily: number | { toNumber(): number };
-  customCosts?: CustomCostEntry[] | null;
 }
 
 /** Simulation-level options that can shift per-day costs (e.g. explugins discount). */
@@ -192,30 +186,16 @@ export function calculateWeek(
 
   let costUsd = 0;
   if (costConfig) {
-    const expluginsPerBotDaily = toNumRequired(costConfig.expluginsKeyCostDaily);
-    const dpbPerBotDaily = toNumRequired(costConfig.dpbKeyCostDaily);
-    const proxyPerBotDaily = toNumRequired(costConfig.proxyCostPerBotMonthly) / 30;
-
-    // Custom cost contributions to per-bot-daily and global-daily
-    let customPerBotDaily = 0;
-    let customGlobalDaily = 0;
-    for (const cc of costConfig.customCosts ?? []) {
-      if (cc.cadence === "one_time") continue;
-      const dailyAmount = cc.cadence === "monthly" ? cc.amount / 30 : cc.amount;
-      if (cc.perBot) customPerBotDaily += dailyAmount;
-      else customGlobalDaily += dailyAmount;
-    }
+    const parts = decomposeDailyCost(costConfig);
 
     costUsd = resolvedDays.reduce((sum, rd) => {
       const globalDay = (week.weekNumber - 1) * 7 + rd.dayNumber;
       const effExplugins = effectiveExpluginsRate(
-        expluginsPerBotDaily,
+        parts.expluginsPerBotDaily,
         globalDay,
         simOpts
       );
-      const cpb =
-        effExplugins + dpbPerBotDaily + proxyPerBotDaily + customPerBotDaily;
-      return sum + rd.activeBots * cpb + customGlobalDaily;
+      return sum + dailyCostFor(parts, rd.activeBots, effExplugins);
     }, 0);
   }
 
