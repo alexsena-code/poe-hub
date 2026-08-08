@@ -30,7 +30,10 @@ import { useLeagues } from "@/hooks/use-leagues";
 
 const createSchema = z.object({
   name: z.string().min(1, "Nome obrigatorio"),
-  league: z.string().optional(),
+  // Obrigatoria: o backend exige `league` com min(1), e o default do form e "".
+  // Sem isso o envio passava no client e voltava um "Validation failed"
+  // generico do servidor, sem apontar o campo.
+  league: z.string().min(1, "Selecione a liga"),
   durationWeeks: z.number().int().min(1).max(52).optional(),
   kind: z.enum(["operational", "forecast"]).optional(),
   costConfigId: z.string().optional(),
@@ -49,6 +52,26 @@ interface CostConfigOption {
   id: string;
   name: string;
   isDefault: boolean;
+}
+
+interface ApiError {
+  error?: string;
+  details?: { path?: (string | number)[]; message?: string }[];
+}
+
+/**
+ * Mensagem de erro que diz qual campo reprovou.
+ *
+ * As rotas respondem `{ error: "Validation failed", details: [...issues] }`, e
+ * mostrar só o `error` deixava o operador sem pista nenhuma do que corrigir.
+ */
+function describeApiError(err: ApiError): string {
+  const first = err.details?.[0];
+  if (first?.message) {
+    const field = first.path?.join(".");
+    return field ? `${field}: ${first.message}` : first.message;
+  }
+  return err.error || "Erro ao criar simulacao";
 }
 
 export function SimulationCreateDialog() {
@@ -130,7 +153,7 @@ export function SimulationCreateDialog() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Erro ao criar simulacao");
+          throw new Error(describeApiError(err));
         }
         const sim = await res.json();
         toast.success("Simulacao criada com sucesso");
