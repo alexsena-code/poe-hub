@@ -6,10 +6,14 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Spinner } from "@/components/ui/spinner";
 import { ProfitInputs, type ProfitInputsState } from "@/components/modules/profit/profit-inputs";
+import { ProfitCostEditor } from "@/components/modules/profit/profit-cost-editor";
 import { ProfitSummaryCards } from "@/components/modules/profit/profit-summary-cards";
 import { ProfitProjection } from "@/components/modules/profit/profit-projection";
 import { useProfitForecastData } from "@/hooks/use-profit-forecast-data";
+import { useProfitCostOverride } from "@/hooks/use-profit-cost-override";
 import { buildProfitForecast } from "@/lib/profit-forecast";
+import { computeBotPayback } from "@/lib/bot-payback";
+import { perBotDailyCost } from "@/lib/daily-cost";
 import { curveFromPoints } from "@/lib/league-price-curve";
 
 const DEFAULT_INPUTS: ProfitInputsState = {
@@ -19,8 +23,19 @@ const DEFAULT_INPUTS: ProfitInputsState = {
   days: 14,
   priceAdjustPct: 0,
   priceBasis: "median",
+  manualPriceUsd: null,
   costConfigId: null,
 };
+
+/** Preço bruto do dia conforme a base escolhida, antes de qualquer ajuste. */
+function basePriceFor(
+  inputs: ProfitInputsState,
+  basePrice: { medianUsd: number; p25Usd: number },
+): number {
+  if (inputs.priceBasis === "manual") return inputs.manualPriceUsd ?? 0;
+  if (inputs.priceBasis === "p25") return basePrice.p25Usd;
+  return basePrice.medianUsd;
+}
 
 export default function ProfitPage() {
   const { data, loading, error } = useProfitForecastData();
@@ -35,18 +50,36 @@ export default function ProfitPage() {
   }, [data?.costConfigs]);
 
   function patchInputs(patch: Partial<ProfitInputsState>) {
-    setInputs((prev) => ({ ...prev, ...patch }));
+    setInputs((prev) => {
+      const next = { ...prev, ...patch };
+      // Ao entrar no modo manual pela primeira vez, parte da mediana da G2G:
+      // começar em zero derrubaria a projeção inteira antes de o operador digitar.
+      if (next.priceBasis === "manual" && next.manualPriceUsd == null) {
+        next.manualPriceUsd = data?.basePrice?.medianUsd ?? null;
+      }
+      return next;
+    });
   }
+
+  const configCost = data?.costConfigs.find((c) => c.id === inputs.costConfigId) ?? null;
+  const cost = useProfitCostOverride(
+    configCost
+      ? { parts: configCost.parts, oneTimePerBot: configCost.oneTimePerBot }
+      : null,
+    inputs.costConfigId,
+  );
+  const costParts = cost.value.parts;
 
   const forecast = useMemo(() => {
     if (!data?.basePrice) return null;
 
-    const raw =
-      inputs.priceBasis === "p25" ? data.basePrice.p25Usd : data.basePrice.medianUsd;
-    const basePriceUsd = raw * (1 + inputs.priceAdjustPct / 100);
+    const raw = basePriceFor(inputs, data.basePrice);
+    // O preço manual já é o que o comprador paga; aplicar o ajuste da G2G em
+    // cima contaria o desconto duas vezes.
+    const basePriceUsd =
+      inputs.priceBasis === "manual" ? raw : raw * (1 + inputs.priceAdjustPct / 100);
     if (basePriceUsd <= 0) return null;
 
-    const costConfig = data.costConfigs.find((c) => c.id === inputs.costConfigId);
     const curve = data.curve
       ? curveFromPoints(data.curve.points, data.curve.referenceDay, data.curve.leaguesUsed)
       : null;
@@ -60,10 +93,23 @@ export default function ProfitPage() {
       divinesPerHour: inputs.divinesPerHour,
       hoursPerDay: inputs.hoursPerDay,
       activeBots: inputs.activeBots,
-      costParts: costConfig?.parts ?? null,
+      costParts,
       curve: data.league.currentDayOfLeague === null ? null : curve,
     });
-  }, [data, inputs]);
+  }, [data, inputs, costParts]);
+
+  // Payback de UMA conta, ao preço de hoje: o custo global não entra porque
+  // não é dívida do bot novo (ver `computeBotPayback`).
+  const payback = useMemo(() => {
+    const today = forecast?.days[0];
+    if (!today) return null;
+    return computeBotPayback({
+      oneTimeUsd: cost.value.oneTimePerBot,
+      divinesPerDayPerBot: inputs.divinesPerHour * inputs.hoursPerDay,
+      priceUsd: today.priceUsd,
+      dailyCostPerBotUsd: perBotDailyCost(costParts),
+    });
+  }, [forecast, inputs.divinesPerHour, inputs.hoursPerDay, cost.value.oneTimePerBot, costParts]);
 
   if (loading) {
     return (
@@ -119,9 +165,25 @@ export default function ProfitPage() {
         <>
           <ProfitInputs state={inputs} onChange={patchInputs} data={data} />
 
-          {forecast ? (
+          <ProfitCostEditor
+            value={cost.value}
+            edited={cost.edited}
+            configName={configCost?.name ?? null}
+            onChange={cost.patchParts}
+            onChangeOneTime={cost.setOneTimePerBot}
+            onReset={cost.reset}
+          />
+
+          {forecast && payback ? (
             <>
-              <ProfitSummaryCards forecast={forecast} days={inputs.days} />
+              <ProfitSummaryCards
+                forecast={forecast}
+                days={inputs.days}
+                costParts={costParts}
+                activeBots={inputs.activeBots}
+                payback={payback}
+                oneTimePerBot={cost.value.oneTimePerBot}
+              />
               <ProfitProjection
                 forecast={forecast}
                 curveLeagues={data.curve?.leaguesUsed ?? []}

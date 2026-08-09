@@ -29,6 +29,8 @@ export interface ProfitForecastData {
     name: string;
     isDefault: boolean;
     parts: DailyCostComponents;
+    /** Leveling + stash pack + customs únicos por bot. Só o payback usa. */
+    oneTimePerBot: number;
   }[];
 }
 

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { decomposeDailyCost, type CustomCostEntry } from "@/lib/daily-cost";
+import {
+  decomposeDailyCost,
+  oneTimeCostPerBot,
+  type CostConfigData,
+  type CustomCostEntry,
+} from "@/lib/daily-cost";
 import {
   buildDecayCurve,
   curveToPoints,
@@ -138,19 +143,21 @@ export async function GET(request: NextRequest) {
         }
       : null,
     costConfigs: costConfigs.map((config) => {
-      const parts = decomposeDailyCost({
+      const data: CostConfigData = {
         proxyCostPerBotMonthly: config.proxyCostPerBotMonthly,
         levelingCostPerBot: config.levelingCostPerBot,
         stashPackCostPerBot: config.stashPackCostPerBot,
         expluginsKeyCostDaily: config.expluginsKeyCostDaily,
         dpbKeyCostDaily: config.dpbKeyCostDaily,
         customCosts: (config.customCosts as CustomCostEntry[] | null) ?? null,
-      });
+      };
       return {
         id: config.id,
         name: config.name,
         isDefault: config.isDefault,
-        parts,
+        parts: decomposeDailyCost(data),
+        // Não entra no custo/dia; serve ao payback de uma conta nova.
+        oneTimePerBot: oneTimeCostPerBot(data),
       };
     }),
   });

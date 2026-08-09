@@ -81,6 +81,94 @@ export function decomposeDailyCost(config: CostConfigData): DailyCostComponents 
 }
 
 /**
+ * Custo de pôr UM bot de pé — cobranças únicas, sem expressão diária.
+ *
+ * Complementa `decomposeDailyCost`, que ignora essas parcelas de propósito.
+ * Customs `one_time` **globais** ficam de fora: não pertencem a um bot, então
+ * não entram no payback de uma conta.
+ */
+export function oneTimeCostPerBot(config: CostConfigData): number {
+  let customPerBot = 0;
+  for (const cost of config.customCosts ?? []) {
+    if (cost.cadence === "one_time" && cost.perBot) customPerBot += cost.amount;
+  }
+  return (
+    toNumber(config.levelingCostPerBot) +
+    toNumber(config.stashPackCostPerBot ?? 0) +
+    customPerBot
+  );
+}
+
+/**
+ * Custo diário de UM bot, sem as parcelas globais.
+ *
+ * É o que o payback de uma conta precisa: rateio de VPS/assinatura não é
+ * dívida do bot novo, é da operação.
+ */
+export function perBotDailyCost(parts: DailyCostComponents): number {
+  return (
+    parts.expluginsPerBotDaily +
+    parts.dpbPerBotDaily +
+    parts.proxyPerBotDaily +
+    parts.customPerBotDaily
+  );
+}
+
+/** Uma parcela do custo diário, para exibição. `key` é estável; o rótulo é da UI. */
+export interface DailyCostLine {
+  key: "explugins" | "dpb" | "proxy" | "customPerBot" | "customGlobal";
+  /** Valor por bot/dia. 0 nas linhas que não escalam com bots. */
+  perBotDaily: number;
+  /** Quanto esta linha contribui no custo do dia. */
+  totalDaily: number;
+}
+
+/**
+ * Abre o custo do dia nas parcelas que o compõem.
+ *
+ * Invariante: a soma dos `totalDaily` é igual a `dailyCostFor(parts, activeBots)`.
+ * Existe para a UI mostrar de onde vem o número sem reimplementar a conta —
+ * foi justamente a opacidade do total que escondeu um ExPlugins desatualizado.
+ *
+ * Componentes zerados são omitidos: linha "DPB: 0 × US$ 0,00" só polui.
+ *
+ * @example
+ * breakdownDailyCost(parts, 6); // [{key:"explugins", perBotDaily:1.8, totalDaily:10.8}, ...]
+ */
+export function breakdownDailyCost(
+  parts: DailyCostComponents,
+  activeBots: number,
+): DailyCostLine[] {
+  if (activeBots < 0) {
+    throw new Error(`bad activeBots: ${activeBots} (expected >= 0)`);
+  }
+
+  const perBotRates: [DailyCostLine["key"], number][] = [
+    ["explugins", parts.expluginsPerBotDaily],
+    ["dpb", parts.dpbPerBotDaily],
+    ["proxy", parts.proxyPerBotDaily],
+    ["customPerBot", parts.customPerBotDaily],
+  ];
+
+  const lines: DailyCostLine[] = perBotRates
+    .filter(([, rate]) => rate > 0)
+    .map(([key, rate]) => ({
+      key,
+      perBotDaily: rate,
+      totalDaily: activeBots * rate,
+    }));
+
+  if (parts.customGlobalDaily > 0) {
+    lines.push({
+      key: "customGlobal",
+      perBotDaily: 0,
+      totalDaily: parts.customGlobalDaily,
+    });
+  }
+  return lines;
+}
+
+/**
  * Custo de um dia com `activeBots` bots ligados.
  *
  * `expluginsOverride` existe para a simulação, que aplica um desconto
@@ -98,8 +186,9 @@ export function dailyCostFor(
   if (activeBots < 0) {
     throw new Error(`bad activeBots: ${activeBots} (expected >= 0)`);
   }
-  const explugins = expluginsOverride ?? parts.expluginsPerBotDaily;
   const perBot =
-    explugins + parts.dpbPerBotDaily + parts.proxyPerBotDaily + parts.customPerBotDaily;
+    expluginsOverride == null
+      ? perBotDailyCost(parts)
+      : perBotDailyCost({ ...parts, expluginsPerBotDaily: expluginsOverride });
   return activeBots * perBot + parts.customGlobalDaily;
 }

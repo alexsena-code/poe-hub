@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -11,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ProfitForecastData } from "@/hooks/use-profit-forecast-data";
+import { NumberField } from "./number-field";
 
 export interface ProfitInputsState {
   divinesPerHour: number;
@@ -19,9 +19,20 @@ export interface ProfitInputsState {
   days: number;
   /** Ajuste sobre o preço da G2G, em % (negativo = você vende mais barato). */
   priceAdjustPct: number;
-  priceBasis: "median" | "p25";
+  priceBasis: PriceBasis;
+  /**
+   * Preço que o comprador de fato paga, em USD/divine. Só vale com
+   * `priceBasis: "manual"`. null = ainda não informado.
+   */
+  manualPriceUsd: number | null;
   costConfigId: string | null;
 }
+
+/**
+ * `manual` existe porque a G2G é preço de varejo e o comprador em atacado
+ * (CNL) paga bem menos — projetar pela mediana da G2G superestima a receita.
+ */
+export type PriceBasis = "median" | "p25" | "manual";
 
 interface ProfitInputsProps {
   state: ProfitInputsState;
@@ -31,46 +42,15 @@ interface ProfitInputsProps {
 
 const NO_COST = "__none__";
 
-/** Campo numérico que não vira NaN quando o operador apaga tudo. */
-function NumberField({
-  id,
-  label,
-  value,
-  min,
-  max,
-  step,
-  suffix,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  suffix?: string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          id={id}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={Number.isFinite(value) ? value : ""}
-          onChange={(e) => {
-            const parsed = Number(e.target.value);
-            onChange(Number.isFinite(parsed) ? parsed : 0);
-          }}
-        />
-        {suffix && <span className="text-sm text-muted-foreground shrink-0">{suffix}</span>}
-      </div>
-    </div>
-  );
+/**
+ * Distância entre o preço manual e a mediana da G2G, para o operador enxergar
+ * o tamanho do desconto que está dando sem abrir a calculadora do celular.
+ */
+function deltaVsG2g(manualPriceUsd: number | null, medianUsd: number): string | null {
+  if (!manualPriceUsd || manualPriceUsd <= 0 || medianUsd <= 0) return null;
+  const pct = (manualPriceUsd / medianUsd - 1) * 100;
+  const sinal = pct >= 0 ? "+" : "";
+  return `${sinal}${pct.toFixed(1)}% vs mediana da G2G (US$ ${medianUsd.toFixed(4)})`;
 }
 
 export function ProfitInputs({ state, onChange, data }: ProfitInputsProps) {
@@ -124,7 +104,7 @@ export function ProfitInputs({ state, onChange, data }: ProfitInputsProps) {
           <Label htmlFor="base">Preço base</Label>
           <Select
             value={state.priceBasis}
-            onValueChange={(v) => onChange({ priceBasis: v as "median" | "p25" })}
+            onValueChange={(v) => onChange({ priceBasis: v as PriceBasis })}
           >
             <SelectTrigger id="base">
               <SelectValue />
@@ -132,20 +112,41 @@ export function ProfitInputs({ state, onChange, data }: ProfitInputsProps) {
             <SelectContent>
               <SelectItem value="median">Mediana da G2G</SelectItem>
               <SelectItem value="p25">p25 (piso competitivo)</SelectItem>
+              <SelectItem value="manual">Preço do comprador (manual)</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <NumberField
-          id="ajuste"
-          label="Ajuste sobre a G2G"
-          value={state.priceAdjustPct}
-          min={-90}
-          max={100}
-          step={1}
-          suffix="%"
-          onChange={(v) => onChange({ priceAdjustPct: v })}
-        />
+        {state.priceBasis === "manual" ? (
+          <div className="space-y-1.5">
+            <NumberField
+              id="preco-manual"
+              label="Preço do comprador"
+              value={state.manualPriceUsd ?? 0}
+              min={0}
+              max={10}
+              step={0.001}
+              suffix="US$/div"
+              onChange={(v) => onChange({ manualPriceUsd: v })}
+            />
+            {deltaVsG2g(state.manualPriceUsd, data.basePrice?.medianUsd ?? 0) && (
+              <p className="text-xs text-amber-500">
+                {deltaVsG2g(state.manualPriceUsd, data.basePrice?.medianUsd ?? 0)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <NumberField
+            id="ajuste"
+            label="Ajuste sobre a G2G"
+            value={state.priceAdjustPct}
+            min={-90}
+            max={100}
+            step={1}
+            suffix="%"
+            onChange={(v) => onChange({ priceAdjustPct: v })}
+          />
+        )}
 
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="custos">Custos diários</Label>
