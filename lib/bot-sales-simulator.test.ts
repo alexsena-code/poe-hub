@@ -7,6 +7,7 @@ const BASE: BotSalesSimulationInput = {
   salesEndDay: 30,
   newCustomersPerDay: 4,
   startingCustomers: 0,
+  botsPerCustomer: 1,
   dailyPriceUsd: 1,
   billingMode: "active_day",
   earlyHoursPerDay: 14,
@@ -37,6 +38,16 @@ describe("simulateBotSales", () => {
 
     expect(result.billableBotDays).toBe(1_780);
     expect(result.grossRevenueUsd).toBe(1_780);
+  });
+
+  it("charges every bot owned by each customer", () => {
+    const result = simulateBotSales({ ...BASE, botsPerCustomer: 3 });
+
+    expect(result.finalCustomers).toBe(96);
+    expect(result.finalActiveBots).toBe(288);
+    expect(result.billableBotDays).toBe(12_240);
+    expect(result.grossRevenueUsd).toBe(12_240);
+    expect(result.supportCostUsd).toBe(0);
   });
 
   it("deducts fees, refunds, support, fixed and launch costs", () => {

@@ -6,6 +6,7 @@ export interface BotSalesSimulationInput {
   salesEndDay: number;
   newCustomersPerDay: number;
   startingCustomers: number;
+  botsPerCustomer: number;
   dailyPriceUsd: number;
   billingMode: BotSalesBillingMode;
   earlyHoursPerDay: number;
@@ -22,6 +23,7 @@ export interface BotSalesSimulationInput {
 export interface BotSalesSimulationDay {
   day: number;
   customers: number;
+  activeBots: number;
   runtimeHours: number;
   billableBotDays: number;
   grossRevenueUsd: number;
@@ -32,6 +34,7 @@ export interface BotSalesSimulationDay {
 export interface BotSalesSimulation {
   days: BotSalesSimulationDay[];
   finalCustomers: number;
+  finalActiveBots: number;
   billableBotDays: number;
   grossRevenueUsd: number;
   paymentFeesUsd: number;
@@ -62,6 +65,7 @@ function validate(input: BotSalesSimulationInput): void {
   assertRange("refundPercent", input.refundPercent, 0, 100);
   assertRange("newCustomersPerDay", input.newCustomersPerDay, 0, 100_000);
   assertRange("startingCustomers", input.startingCustomers, 0, 1_000_000);
+  assertRange("botsPerCustomer", input.botsPerCustomer, 0, 100_000);
   assertRange("dailyPriceUsd", input.dailyPriceUsd, 0, 100_000);
   assertRange("supportCostPerCustomerDayUsd", input.supportCostPerCustomerDayUsd, 0, 100_000);
   assertRange("fixedCostUsd", input.fixedCostUsd, 0, 100_000_000);
@@ -96,10 +100,11 @@ export function simulateBotSales(input: BotSalesSimulationInput): BotSalesSimula
 
   for (let day = 1; day <= input.horizonDays; day += 1) {
     const customers = customersAtDay(input, day);
+    const activeBots = customers * input.botsPerCustomer;
     const scheduledHours =
       day <= input.hoursChangeDay ? input.earlyHoursPerDay : input.lateHoursPerDay;
     const runtimeHours = scheduledHours * utilization;
-    const billableBotDays = customers * billableFraction(input, runtimeHours);
+    const billableBotDays = activeBots * billableFraction(input, runtimeHours);
     const grossRevenueUsd = billableBotDays * input.dailyPriceUsd;
     const netRevenueUsd = grossRevenueUsd * (1 - feeRate - refundRate);
     const supportCostUsd = customers * input.supportCostPerCustomerDayUsd;
@@ -109,6 +114,7 @@ export function simulateBotSales(input: BotSalesSimulationInput): BotSalesSimula
     days.push({
       day,
       customers,
+      activeBots,
       runtimeHours,
       billableBotDays,
       grossRevenueUsd,
@@ -134,6 +140,7 @@ export function simulateBotSales(input: BotSalesSimulationInput): BotSalesSimula
   return {
     days,
     finalCustomers,
+    finalActiveBots: finalCustomers * input.botsPerCustomer,
     billableBotDays,
     grossRevenueUsd,
     paymentFeesUsd,

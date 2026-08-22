@@ -1,16 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { RevenueRail } from "@/components/modules/bot-sales/revenue-rail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +20,7 @@ const DEFAULT_INPUT: BotSalesSimulationInput = {
   salesEndDay: 30,
   newCustomersPerDay: 4,
   startingCustomers: 0,
+  botsPerCustomer: 1,
   dailyPriceUsd: 1,
   billingMode: "active_day",
   earlyHoursPerDay: 14,
@@ -159,100 +151,6 @@ function BillingModePicker({
   );
 }
 
-function RevenueRail({
-  input,
-  chartDays,
-}: {
-  input: BotSalesSimulationInput;
-  chartDays: ReturnType<typeof simulateBotSales>["days"];
-}) {
-  return (
-    <Card className="overflow-hidden border-cyan-950/70 bg-gradient-to-b from-cyan-950/20 to-card">
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-400">
-              Trilho da liga
-            </p>
-            <CardTitle className="mt-1 text-base">Clientes e lucro acumulado por dia</CardTitle>
-          </div>
-          <div className="flex gap-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <i className="h-2 w-2 rounded-full bg-cyan-400" /> Lucro
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i className="h-2 w-2 rounded-full bg-amber-400" /> Clientes
-            </span>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartDays} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="profitFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.32} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.01} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
-              <YAxis yAxisId="money" tickLine={false} axisLine={false} fontSize={11} width={62} />
-              <YAxis
-                yAxisId="customers"
-                orientation="right"
-                tickLine={false}
-                axisLine={false}
-                fontSize={11}
-                width={34}
-              />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
-                formatter={(value, name) => [
-                  name === "Lucro acumulado"
-                    ? `$${Number(value).toFixed(2)}`
-                    : Number(value).toFixed(0),
-                  name,
-                ]}
-                labelFormatter={(day) => `Dia ${day}`}
-              />
-              <ReferenceLine
-                yAxisId="money"
-                x={input.salesEndDay}
-                stroke="#fbbf24"
-                strokeDasharray="4 4"
-              />
-              <Area
-                yAxisId="money"
-                type="monotone"
-                dataKey="cumulativeProfitUsd"
-                name="Lucro acumulado"
-                stroke="#22d3ee"
-                fill="url(#profitFill)"
-                strokeWidth={2}
-              />
-              <Area
-                yAxisId="customers"
-                type="stepAfter"
-                dataKey="customers"
-                name="Clientes"
-                stroke="#fbbf24"
-                fill="transparent"
-                strokeWidth={1.5}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          A linha tracejada marca o fim da aquisição. Depois dela, a base permanece no cap
-          calculado.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function BotSalesSimulator() {
   const [input, setInput] = useState<BotSalesSimulationInput>(DEFAULT_INPUT);
   const result = useMemo(() => simulateBotSales(input), [input]);
@@ -278,7 +176,7 @@ export function BotSalesSimulator() {
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-border bg-card/60 p-5">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <Metric
             label="Receita bruta"
             value={<Money value={result.grossRevenueUsd} />}
@@ -294,6 +192,12 @@ export function BotSalesSimulator() {
             label="Cap de clientes"
             value={result.finalCustomers.toLocaleString("pt-BR")}
             note={`${input.newCustomersPerDay}/dia até o dia ${input.salesEndDay}`}
+            tone="amber"
+          />
+          <Metric
+            label="Bots no cap"
+            value={result.finalActiveBots.toLocaleString("pt-BR")}
+            note={`${input.botsPerCustomer.toLocaleString("pt-BR")} por usuário`}
             tone="amber"
           />
           <Metric
@@ -361,6 +265,14 @@ export function BotSalesSimulator() {
                 label="Clientes iniciais"
                 value={input.startingCustomers}
                 onChange={(startingCustomers) => patch({ startingCustomers })}
+              />
+              <NumericField
+                label="Bots por usuário"
+                suffix="média"
+                value={input.botsPerCustomer}
+                min={0.1}
+                step={0.1}
+                onChange={(botsPerCustomer) => patch({ botsPerCustomer })}
               />
               <NumericField
                 label="Começar vendas"
